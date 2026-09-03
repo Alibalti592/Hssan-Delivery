@@ -1,0 +1,31 @@
+# Environment / secrets
+.env
+.env.local
+.env.*.local
+
+# Symfony / PHP
+/backend/vendor/
+/backend/var/
+/backend/.phpunit.result.cache
+
+# React / Node
+/admin/node_modules/
+/admin/dist/
+/admin/.vite/
+
+# Flutter
+/mobile/.dart_tool/
+/mobile/.flutter-plugins
+/mobile/.flutter-plugins-dependencies
+/mobile/.packages
+/mobile/build/
+/mobile/.pub-cache/
+
+# IDE
+.vscode/
+.idea/
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db
