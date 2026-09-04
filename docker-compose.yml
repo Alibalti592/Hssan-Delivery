@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: hssan_delivery_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: hssan_delivery
+      POSTGRES_USER: hssan
+      POSTGRES_PASSWORD: hssan_dev_password
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
