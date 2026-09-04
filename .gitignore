@@ -1,5 +1,7 @@
 # Environment / secrets
-.env
+# NOTE: .env itself is intentionally NOT ignored — Symfony convention is to
+# commit it with safe, non-secret defaults. Real local overrides go in
+# .env.local (per-package .gitignore already excludes those, e.g. backend/.gitignore).
 .env.local
 .env.*.local
 

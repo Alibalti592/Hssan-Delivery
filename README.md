@@ -2,10 +2,10 @@
 
 Freelance delivery platform composed of:
 
-- Mobile application � Flutter
-- Admin dashboard � React + Vite
-- Backend API � Symfony
-- Database � MySQL
+- Mobile application — Flutter
+- Admin dashboard — React + Vite
+- Backend API — Symfony
+- Database — PostgreSQL
 
 ## Roles
 
@@ -15,7 +15,9 @@ Freelance delivery platform composed of:
 
 ## Core Delivery Flow
 
-PENDING ? ASSIGNED ? ACCEPTED ? PICKED_UP ? ON_THE_WAY ? DELIVERED
+PENDING → ASSIGNED → ACCEPTED → PICKED_UP → ON_THE_WAY → DELIVERED
+
+Additional states: CANCELLED, FAILED
 
 ## Services
 
@@ -27,6 +29,6 @@ PENDING ? ASSIGNED ? ACCEPTED ? PICKED_UP ? ON_THE_WAY ? DELIVERED
 
 ## Architecture
 
-mobile/   ? Flutter application
-admin/    ? React admin dashboard
-backend/  ? Symfony REST API
+mobile/   — Flutter application
+admin/    — React admin dashboard
+backend/  — Symfony REST API
