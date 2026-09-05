@@ -1,7 +1,7 @@
 security:
     # https://symfony.com/doc/current/security.html#registering-the-user-hashing-passwords
     password_hashers:
-        Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface: 'auto'
+        Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface: "auto"
 
     # https://symfony.com/doc/current/security.html#loading-the-user-the-user-provider
     providers:
@@ -9,7 +9,7 @@ security:
         app_user_provider:
             entity:
                 class: App\Entity\User
-                property: email
+                property: phone
 
     firewalls:
         dev:
@@ -17,7 +17,7 @@ security:
             pattern: ^/(_profiler|_wdt|assets|build)/
             security: false
 
-        # Handles POST /api/auth/login: validates email/password against
+        # Handles POST /api/auth/login: validates phone/password against
         # app_user_provider and, on success, issues a JWT via Lexik's handler.
         api_login:
             pattern: ^/api/auth/login
@@ -25,7 +25,7 @@ security:
             provider: app_user_provider
             json_login:
                 check_path: /api/auth/login
-                username_path: email
+                username_path: phone
                 password_path: password
                 success_handler: lexik_jwt_authentication.handler.authentication_success
                 failure_handler: lexik_jwt_authentication.handler.authentication_failure
