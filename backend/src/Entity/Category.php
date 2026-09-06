@@ -2,14 +2,14 @@
 
 namespace App\Entity;
 
-use App\Repository\RestaurantRepository;
+use App\Repository\CategoryRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 
-#[ORM\Entity(repositoryClass: RestaurantRepository::class)]
+#[ORM\Entity(repositoryClass: CategoryRepository::class)]
 #[ORM\HasLifecycleCallbacks]
-class Restaurant
+class Category
 {
     #[ORM\Id]
     #[ORM\GeneratedValue]
@@ -19,20 +19,12 @@ class Restaurant
     #[ORM\Column(length: 255)]
     private ?string $name = null;
 
-    #[ORM\Column(type: 'text', nullable: true)]
-    private ?string $description = null;
-
-    #[ORM\Column]
-    private bool $isAvailable = true;
+    #[ORM\ManyToOne(inversedBy: 'categories')]
+    #[ORM\JoinColumn(nullable: false)]
+    private ?Restaurant $restaurant = null;
 
     #[ORM\OneToMany(
-        mappedBy: 'restaurant',
-        targetEntity: Category::class
-    )]
-    private Collection $categories;
-
-    #[ORM\OneToMany(
-        mappedBy: 'restaurant',
+        mappedBy: 'category',
         targetEntity: Product::class
     )]
     private Collection $products;
@@ -45,7 +37,6 @@ class Restaurant
 
     public function __construct()
     {
-        $this->categories = new ArrayCollection();
         $this->products = new ArrayCollection();
     }
 
@@ -81,55 +72,14 @@ class Restaurant
         return $this;
     }
 
-    public function getDescription(): ?string
+    public function getRestaurant(): ?Restaurant
     {
-        return $this->description;
+        return $this->restaurant;
     }
 
-    public function setDescription(?string $description): static
+    public function setRestaurant(?Restaurant $restaurant): static
     {
-        $this->description = $description;
-
-        return $this;
-    }
-
-    public function isAvailable(): bool
-    {
-        return $this->isAvailable;
-    }
-
-    public function setIsAvailable(bool $isAvailable): static
-    {
-        $this->isAvailable = $isAvailable;
-
-        return $this;
-    }
-
-    /**
-     * @return Collection<int, Category>
-     */
-    public function getCategories(): Collection
-    {
-        return $this->categories;
-    }
-
-    public function addCategory(Category $category): static
-    {
-        if (!$this->categories->contains($category)) {
-            $this->categories->add($category);
-            $category->setRestaurant($this);
-        }
-
-        return $this;
-    }
-
-    public function removeCategory(Category $category): static
-    {
-        if ($this->categories->removeElement($category)) {
-            if ($category->getRestaurant() === $this) {
-                $category->setRestaurant(null);
-            }
-        }
+        $this->restaurant = $restaurant;
 
         return $this;
     }
@@ -146,7 +96,7 @@ class Restaurant
     {
         if (!$this->products->contains($product)) {
             $this->products->add($product);
-            $product->setRestaurant($this);
+            $product->setCategory($this);
         }
 
         return $this;
@@ -155,8 +105,8 @@ class Restaurant
     public function removeProduct(Product $product): static
     {
         if ($this->products->removeElement($product)) {
-            if ($product->getRestaurant() === $this) {
-                $product->setRestaurant(null);
+            if ($product->getCategory() === $this) {
+                $product->setCategory(null);
             }
         }
 
