@@ -2,6 +2,8 @@
 
 namespace App\Service;
 
+use App\Entity\Delivery;
+use App\Enum\DeliveryStatus;
 use App\Dto\Order\CreateOrderRequest;
 use App\Entity\Order;
 use App\Entity\OrderItem;
@@ -100,6 +102,14 @@ final class OrderService
         $order->setTotalAmount(
             $this->fromMillimes($totalMillimes)
         );
+        $delivery = new Delivery();
+
+$delivery->setOrder($order);
+$delivery->setStatus(DeliveryStatus::PENDING);
+
+$order->setDelivery($delivery);
+
+$this->entityManager->persist($delivery);
 
         $this->entityManager->persist($order);
         $this->entityManager->flush();
