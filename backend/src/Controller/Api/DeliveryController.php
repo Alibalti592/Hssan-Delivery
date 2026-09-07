@@ -2,11 +2,13 @@
 
 namespace App\Controller\Api;
 
+use App\Entity\User;
 use App\Repository\DeliveryRepository;
 use App\Repository\UserRepository;
 use App\Service\DeliveryService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
+use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
@@ -18,6 +20,28 @@ final class DeliveryController extends AbstractController
         private readonly DeliveryRepository $deliveryRepository,
         private readonly UserRepository $userRepository,
     ) {
+    }
+
+    #[Route(
+        '/mine',
+        name: 'api_delivery_mine',
+        methods: ['GET']
+    )]
+    #[IsGranted('ROLE_LIVREUR')]
+    public function mine(): JsonResponse
+    {
+        /** @var User $courier */
+        $courier = $this->getUser();
+
+        $deliveries = $this->deliveryRepository
+            ->findByCourier($courier);
+
+        return $this->json(
+            array_map(
+                fn ($delivery) => $this->deliveryResponse($delivery),
+                $deliveries
+            )
+        );
     }
 
     #[Route(
@@ -35,7 +59,7 @@ final class DeliveryController extends AbstractController
         if ($delivery === null) {
             return $this->json(
                 ['message' => 'Delivery not found.'],
-                404
+                Response::HTTP_NOT_FOUND
             );
         }
 
@@ -44,7 +68,7 @@ final class DeliveryController extends AbstractController
         if ($courier === null) {
             return $this->json(
                 ['message' => 'Courier not found.'],
-                404
+                Response::HTTP_NOT_FOUND
             );
         }
 
@@ -54,19 +78,174 @@ final class DeliveryController extends AbstractController
                 $courier
             );
 
-            return $this->json([
-                'id' => $delivery->getId(),
-                'status' => $delivery->getStatus()->value,
-                'courierId' => $delivery->getCourier()?->getId(),
-                'assignedAt' => $delivery->getAssignedAt()?->format(
-                    \DateTimeInterface::ATOM
-                ),
-            ]);
+            return $this->json(
+                $this->deliveryResponse($delivery)
+            );
         } catch (\RuntimeException $exception) {
             return $this->json(
                 ['message' => $exception->getMessage()],
-                400
+                Response::HTTP_BAD_REQUEST
             );
         }
+    }
+
+    #[Route(
+        '/{id}/accept',
+        name: 'api_delivery_accept',
+        methods: ['POST']
+    )]
+    #[IsGranted('ROLE_LIVREUR')]
+    public function accept(int $id): JsonResponse
+    {
+        return $this->executeCourierTransition(
+            $id,
+            'acceptDelivery'
+        );
+    }
+
+    #[Route(
+        '/{id}/pickup',
+        name: 'api_delivery_pickup',
+        methods: ['POST']
+    )]
+    #[IsGranted('ROLE_LIVREUR')]
+    public function pickup(int $id): JsonResponse
+    {
+        return $this->executeCourierTransition(
+            $id,
+            'markPickedUp'
+        );
+    }
+
+    #[Route(
+        '/{id}/on-the-way',
+        name: 'api_delivery_on_the_way',
+        methods: ['POST']
+    )]
+    #[IsGranted('ROLE_LIVREUR')]
+    public function onTheWay(int $id): JsonResponse
+    {
+        return $this->executeCourierTransition(
+            $id,
+            'markOnTheWay'
+        );
+    }
+
+    #[Route(
+        '/{id}/delivered',
+        name: 'api_delivery_delivered',
+        methods: ['POST']
+    )]
+    #[IsGranted('ROLE_LIVREUR')]
+    public function delivered(int $id): JsonResponse
+    {
+        return $this->executeCourierTransition(
+            $id,
+            'markDelivered'
+        );
+    }
+
+    #[Route(
+        '/{id}/cancel',
+        name: 'api_delivery_cancel',
+        methods: ['POST']
+    )]
+    #[IsGranted('ROLE_ADMIN')]
+    public function cancel(int $id): JsonResponse
+    {
+        $delivery = $this->deliveryRepository->find($id);
+
+        if ($delivery === null) {
+            return $this->json(
+                ['message' => 'Delivery not found.'],
+                Response::HTTP_NOT_FOUND
+            );
+        }
+
+        try {
+            $delivery = $this->deliveryService
+                ->cancelDelivery($delivery);
+
+            return $this->json(
+                $this->deliveryResponse($delivery)
+            );
+        } catch (\RuntimeException $exception) {
+            return $this->json(
+                ['message' => $exception->getMessage()],
+                Response::HTTP_BAD_REQUEST
+            );
+        }
+    }
+
+    #[Route(
+        '/{id}/fail',
+        name: 'api_delivery_fail',
+        methods: ['POST']
+    )]
+    #[IsGranted('ROLE_LIVREUR')]
+    public function fail(int $id): JsonResponse
+    {
+        return $this->executeCourierTransition(
+            $id,
+            'failDelivery'
+        );
+    }
+
+    private function executeCourierTransition(
+        int $id,
+        string $method
+    ): JsonResponse {
+        $delivery = $this->deliveryRepository->find($id);
+
+        if ($delivery === null) {
+            return $this->json(
+                ['message' => 'Delivery not found.'],
+                Response::HTTP_NOT_FOUND
+            );
+        }
+
+        /** @var User $courier */
+        $courier = $this->getUser();
+
+        try {
+            $delivery = $this->deliveryService->$method(
+                $delivery,
+                $courier
+            );
+
+            return $this->json(
+                $this->deliveryResponse($delivery)
+            );
+        } catch (\RuntimeException $exception) {
+            return $this->json(
+                ['message' => $exception->getMessage()],
+                Response::HTTP_BAD_REQUEST
+            );
+        }
+    }
+
+    private function deliveryResponse($delivery): array
+    {
+        return [
+            'id' => $delivery->getId(),
+            'orderId' => $delivery->getOrder()?->getId(),
+            'status' => $delivery->getStatus()->value,
+            'courierId' => $delivery->getCourier()?->getId(),
+            'assignedAt' => $delivery->getAssignedAt()?->format(
+                \DateTimeInterface::ATOM
+            ),
+            'acceptedAt' => $delivery->getAcceptedAt()?->format(
+                \DateTimeInterface::ATOM
+            ),
+            'pickedUpAt' => $delivery->getPickedUpAt()?->format(
+                \DateTimeInterface::ATOM
+            ),
+            'deliveredAt' => $delivery->getDeliveredAt()?->format(
+                \DateTimeInterface::ATOM
+            ),
+            'createdAt' => $delivery->getCreatedAt()?->format(
+                \DateTimeInterface::ATOM
+            ),
+        ];
     }
 }

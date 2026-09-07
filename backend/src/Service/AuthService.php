@@ -2,6 +2,7 @@
 
 namespace App\Service;
 
+use App\Dto\Admin\CreateCourierRequest;
 use App\Dto\Auth\RegisterUserRequest;
 use App\Entity\User;
 use App\Repository\UserRepository;
@@ -19,8 +20,14 @@ final class AuthService
 
     public function register(RegisterUserRequest $dto): User
     {
-        if ($this->userRepository->findOneBy(['phone' => $dto->phone]) !== null) {
-            throw new \RuntimeException('An account with this phone number already exists.');
+        if (
+            $this->userRepository->findOneBy([
+                'phone' => $dto->phone,
+            ]) !== null
+        ) {
+            throw new \RuntimeException(
+                'An account with this phone number already exists.'
+            );
         }
 
         $user = new User();
@@ -28,7 +35,10 @@ final class AuthService
         $user->setName($dto->name);
         $user->setPhone($dto->phone);
         $user->setPassword(
-            $this->passwordHasher->hashPassword($user, $dto->password)
+            $this->passwordHasher->hashPassword(
+                $user,
+                $dto->password
+            )
         );
 
         // Public registration creates CLIENT accounts only.
@@ -40,5 +50,38 @@ final class AuthService
 
         return $user;
     }
-}
 
+    public function createCourier(
+        CreateCourierRequest $dto
+    ): User {
+        if (
+            $this->userRepository->findOneBy([
+                'phone' => $dto->phone,
+            ]) !== null
+        ) {
+            throw new \RuntimeException(
+                'An account with this phone number already exists.'
+            );
+        }
+
+        $courier = new User();
+
+        $courier->setName($dto->name);
+        $courier->setPhone($dto->phone);
+        $courier->setPassword(
+            $this->passwordHasher->hashPassword(
+                $courier,
+                $dto->password
+            )
+        );
+
+        // Courier accounts are created and approved by an admin.
+        $courier->setRoles(['ROLE_LIVREUR']);
+        $courier->setVerifiedAt(new \DateTimeImmutable());
+
+        $this->entityManager->persist($courier);
+        $this->entityManager->flush();
+
+        return $courier;
+    }
+}
