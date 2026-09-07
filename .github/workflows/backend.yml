@@ -38,6 +38,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # Symfony's Dotenv::bootEnv() requires a ".env" file to exist on disk
+      # (even when APP_ENV/DATABASE_URL are already set as real env vars),
+      # both for the composer post-install "cache:clear" script and for
+      # tests/bootstrap.php. ".env" itself is untracked (developer-local),
+      # so CI needs its own copy; ".env.example" holds safe placeholder
+      # values and is committed for exactly this purpose.
+      - name: Create .env file
+        run: cp .env.example .env
+
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
