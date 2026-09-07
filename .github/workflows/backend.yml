@@ -19,13 +19,13 @@ jobs:
       postgres:
         image: postgres:16
         env:
-          POSTGRES_DB: hssan_delivery_test
+          POSTGRES_DB: hssan_delivery
           POSTGRES_USER: hssan
           POSTGRES_PASSWORD: hssan_test_password
         ports:
           - 5432:5432
         options: >-
-          --health-cmd="pg_isready -U hssan -d hssan_delivery_test"
+          --health-cmd="pg_isready -U hssan -d hssan_delivery"
           --health-interval=10s
           --health-timeout=5s
           --health-retries=5
@@ -58,30 +58,28 @@ jobs:
           openssl rsa -in config/jwt/private.pem -pubout -out config/jwt/public.pem
           chmod 600 config/jwt/private.pem
 
-      - name: Create test database
+      # NOTE: DATABASE_URL below points at the base "hssan_delivery" database,
+      # not "..._test". config/packages/doctrine.yaml appends "_test" to the
+      # dbname automatically for APP_ENV=test (dbname_suffix), the same way
+      # it does for local development. Pointing this at "hssan_delivery_test"
+      # directly would make Doctrine target a nonexistent "hssan_delivery_test_test".
+      - name: Reset and migrate the test database
         env:
           APP_ENV: test
           JWT_PASSPHRASE: ci-test-passphrase
-          DATABASE_URL: postgresql://hssan:hssan_test_password@127.0.0.1:5432/hssan_delivery_test?serverVersion=16&charset=utf8
-        run: php bin/console doctrine:database:create --env=test --if-not-exists
-
-      - name: Run migrations
-        env:
-          APP_ENV: test
-          JWT_PASSPHRASE: ci-test-passphrase
-          DATABASE_URL: postgresql://hssan:hssan_test_password@127.0.0.1:5432/hssan_delivery_test?serverVersion=16&charset=utf8
-        run: php bin/console doctrine:migrations:migrate --env=test --no-interaction
+          DATABASE_URL: postgresql://hssan:hssan_test_password@127.0.0.1:5432/hssan_delivery?serverVersion=16&charset=utf8
+        run: composer test-db-reset
 
       - name: Validate Doctrine schema
         env:
           APP_ENV: test
           JWT_PASSPHRASE: ci-test-passphrase
-          DATABASE_URL: postgresql://hssan:hssan_test_password@127.0.0.1:5432/hssan_delivery_test?serverVersion=16&charset=utf8
+          DATABASE_URL: postgresql://hssan:hssan_test_password@127.0.0.1:5432/hssan_delivery?serverVersion=16&charset=utf8
         run: php bin/console doctrine:schema:validate --env=test
 
       - name: Run PHPUnit
         env:
           APP_ENV: test
           JWT_PASSPHRASE: ci-test-passphrase
-          DATABASE_URL: postgresql://hssan:hssan_test_password@127.0.0.1:5432/hssan_delivery_test?serverVersion=16&charset=utf8
+          DATABASE_URL: postgresql://hssan:hssan_test_password@127.0.0.1:5432/hssan_delivery?serverVersion=16&charset=utf8
         run: php bin/phpunit
