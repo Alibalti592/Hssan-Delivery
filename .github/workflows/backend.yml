@@ -36,7 +36,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       # Symfony's Dotenv::bootEnv() requires a ".env" file to exist on disk
       # (even when APP_ENV/DATABASE_URL are already set as real env vars),
