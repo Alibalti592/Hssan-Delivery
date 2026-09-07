@@ -1,0 +1,72 @@
+name: Backend CI
+
+on:
+  push:
+    branches:
+      - dev
+      - main
+
+  pull_request:
+    branches:
+      - dev
+      - main
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: hssan_delivery_test
+          POSTGRES_USER: hssan
+          POSTGRES_PASSWORD: hssan_test_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U hssan -d hssan_delivery_test"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: pdo_pgsql
+          coverage: none
+
+      - name: Validate composer.json and composer.lock
+        run: composer validate --strict
+
+      - name: Install dependencies
+        run: composer install --prefer-dist --no-interaction --no-progress
+
+      - name: Create test database
+        env:
+          DATABASE_URL: postgresql://hssan:hssan_test_password@127.0.0.1:5432/hssan_delivery_test?serverVersion=16&charset=utf8
+        run: php bin/console doctrine:database:create --env=test --if-not-exists
+
+      - name: Run migrations
+        env:
+          DATABASE_URL: postgresql://hssan:hssan_test_password@127.0.0.1:5432/hssan_delivery_test?serverVersion=16&charset=utf8
+        run: php bin/console doctrine:migrations:migrate --env=test --no-interaction
+
+      - name: Validate Doctrine schema
+        env:
+          DATABASE_URL: postgresql://hssan:hssan_test_password@127.0.0.1:5432/hssan_delivery_test?serverVersion=16&charset=utf8
+        run: php bin/console doctrine:schema:validate --env=test
+
+      - name: Run PHPUnit
+        env:
+          DATABASE_URL: postgresql://hssan:hssan_test_password@127.0.0.1:5432/hssan_delivery_test?serverVersion=16&charset=utf8
+        run: php bin/phpunit
