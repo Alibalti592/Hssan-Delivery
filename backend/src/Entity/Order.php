@@ -52,7 +52,7 @@ class Order
     #[ORM\Column]
     private ?\DateTimeImmutable $updatedAt = null;
     #[ORM\OneToOne(mappedBy: 'order', targetEntity: Delivery::class)]
-private ?Delivery $delivery = null;
+    private ?Delivery $delivery = null;
 
     public function __construct()
     {
@@ -189,19 +189,20 @@ private ?Delivery $delivery = null;
     {
         return $this->updatedAt;
     }
-    public function getDelivery(): ?Delivery
-{
-    return $this->delivery;
-}
 
-public function setDelivery(?Delivery $delivery): static
-{
-    if ($delivery !== null && $delivery->getOrder() !== $this) {
-        $delivery->setOrder($this);
+    public function getDelivery(): ?Delivery
+    {
+        return $this->delivery;
     }
 
-    $this->delivery = $delivery;
+    public function setDelivery(?Delivery $delivery): static
+    {
+        if (null !== $delivery && $delivery->getOrder() !== $this) {
+            $delivery->setOrder($this);
+        }
 
-    return $this;
-}
+        $this->delivery = $delivery;
+
+        return $this;
+    }
 }
