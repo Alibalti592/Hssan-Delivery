@@ -1,0 +1,12 @@
+<?php
+
+namespace App\Dto\Admin;
+
+use Symfony\Component\Validator\Constraints as Assert;
+
+final class UpdateProductAvailabilityRequest
+{
+    #[Assert\NotNull]
+    #[Assert\Type('bool')]
+    public ?bool $isAvailable = null;
+}
