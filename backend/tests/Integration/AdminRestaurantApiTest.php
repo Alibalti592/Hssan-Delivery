@@ -398,4 +398,396 @@ final class AdminRestaurantApiTest extends WebTestCase
 
         self::assertSame([], $response);
     }
+    public function testAdminCanShowRestaurant(): void
+{
+    $client = static::createClient();
+
+    $this->entityManager = self::getContainer()
+        ->get(EntityManagerInterface::class);
+
+    $admin = $this->createTestUser(
+        'ROLE_ADMIN',
+        'Test Admin'
+    );
+
+    $restaurant = (new Restaurant())
+        ->setName('Show Restaurant')
+        ->setDescription('Restaurant to display')
+        ->setIsAvailable(true);
+
+    $this->entityManager->persist($restaurant);
+    $this->entityManager->flush();
+
+    $restaurantId = $restaurant->getId();
+
+    $adminToken = $this->authenticateClient(
+        $client,
+        $admin
+    );
+
+    $client->request(
+        'GET',
+        '/api/admin/restaurants/'.$restaurantId,
+        server: [
+            'HTTP_AUTHORIZATION' => 'Bearer '.$adminToken,
+        ]
+    );
+
+    self::assertResponseStatusCodeSame(
+        Response::HTTP_OK
+    );
+
+    $response = json_decode(
+        $client->getResponse()->getContent(),
+        true
+    );
+
+    self::assertIsArray($response);
+
+    self::assertSame(
+        $restaurantId,
+        $response['id']
+    );
+
+    self::assertSame(
+        'Show Restaurant',
+        $response['name']
+    );
+
+    self::assertSame(
+        'Restaurant to display',
+        $response['description']
+    );
+
+    self::assertTrue(
+        $response['isAvailable']
+    );
+}
+
+public function testAdminGets404ForUnknownRestaurant(): void
+{
+    $client = static::createClient();
+
+    $this->entityManager = self::getContainer()
+        ->get(EntityManagerInterface::class);
+
+    $admin = $this->createTestUser(
+        'ROLE_ADMIN',
+        'Test Admin'
+    );
+
+    $adminToken = $this->authenticateClient(
+        $client,
+        $admin
+    );
+
+    $client->request(
+        'GET',
+        '/api/admin/restaurants/999999',
+        server: [
+            'HTTP_AUTHORIZATION' => 'Bearer '.$adminToken,
+        ]
+    );
+
+    self::assertResponseStatusCodeSame(
+        Response::HTTP_NOT_FOUND
+    );
+}
+
+public function testAdminCanUpdateRestaurant(): void
+{
+    $client = static::createClient();
+
+    $this->entityManager = self::getContainer()
+        ->get(EntityManagerInterface::class);
+
+    $admin = $this->createTestUser(
+        'ROLE_ADMIN',
+        'Test Admin'
+    );
+
+    $restaurant = (new Restaurant())
+        ->setName('Old Restaurant Name')
+        ->setDescription('Old description')
+        ->setIsAvailable(true);
+
+    $this->entityManager->persist($restaurant);
+    $this->entityManager->flush();
+
+    $restaurantId = $restaurant->getId();
+
+    $adminToken = $this->authenticateClient(
+        $client,
+        $admin
+    );
+
+    $client->request(
+        'PUT',
+        '/api/admin/restaurants/'.$restaurantId,
+        server: [
+            'CONTENT_TYPE' => 'application/json',
+            'HTTP_AUTHORIZATION' => 'Bearer '.$adminToken,
+        ],
+        content: json_encode([
+            'name' => 'Updated Restaurant Name',
+            'description' => 'Updated description',
+            'isAvailable' => false,
+        ])
+    );
+
+    self::assertResponseStatusCodeSame(
+        Response::HTTP_OK
+    );
+
+    $response = json_decode(
+        $client->getResponse()->getContent(),
+        true
+    );
+
+    self::assertIsArray($response);
+
+    self::assertSame(
+        $restaurantId,
+        $response['id']
+    );
+
+    self::assertSame(
+        'Updated Restaurant Name',
+        $response['name']
+    );
+
+    self::assertSame(
+        'Updated description',
+        $response['description']
+    );
+
+    self::assertFalse(
+        $response['isAvailable']
+    );
+
+    $this->entityManager->clear();
+
+    $updatedRestaurant = $this->entityManager
+        ->getRepository(Restaurant::class)
+        ->find($restaurantId);
+
+    self::assertNotNull($updatedRestaurant);
+
+    self::assertSame(
+        'Updated Restaurant Name',
+        $updatedRestaurant->getName()
+    );
+
+    self::assertSame(
+        'Updated description',
+        $updatedRestaurant->getDescription()
+    );
+
+    self::assertFalse(
+        $updatedRestaurant->isAvailable()
+    );
+}
+
+public function testAdminCannotUpdateRestaurantWithInvalidData(): void
+{
+    $client = static::createClient();
+
+    $this->entityManager = self::getContainer()
+        ->get(EntityManagerInterface::class);
+
+    $admin = $this->createTestUser(
+        'ROLE_ADMIN',
+        'Test Admin'
+    );
+
+    $restaurant = (new Restaurant())
+        ->setName('Valid Restaurant')
+        ->setDescription('Valid description')
+        ->setIsAvailable(true);
+
+    $this->entityManager->persist($restaurant);
+    $this->entityManager->flush();
+
+    $restaurantId = $restaurant->getId();
+
+    $adminToken = $this->authenticateClient(
+        $client,
+        $admin
+    );
+
+    $client->request(
+        'PUT',
+        '/api/admin/restaurants/'.$restaurantId,
+        server: [
+            'CONTENT_TYPE' => 'application/json',
+            'HTTP_AUTHORIZATION' => 'Bearer '.$adminToken,
+        ],
+        content: json_encode([
+            'name' => '',
+            'description' => 'Invalid update',
+            'isAvailable' => true,
+        ])
+    );
+
+    self::assertResponseStatusCodeSame(
+        Response::HTTP_UNPROCESSABLE_ENTITY
+    );
+
+    $response = json_decode(
+        $client->getResponse()->getContent(),
+        true
+    );
+
+    self::assertIsArray($response);
+
+    self::assertSame(
+        'Validation failed.',
+        $response['message']
+    );
+
+    self::assertArrayHasKey(
+        'errors',
+        $response
+    );
+
+    self::assertArrayHasKey(
+        'name',
+        array_column(
+            $response['errors'],
+            'message',
+            'field'
+        )
+    );
+}
+
+public function testAdminCanChangeRestaurantAvailability(): void
+{
+    $client = static::createClient();
+
+    $this->entityManager = self::getContainer()
+        ->get(EntityManagerInterface::class);
+
+    $admin = $this->createTestUser(
+        'ROLE_ADMIN',
+        'Test Admin'
+    );
+
+    $restaurant = (new Restaurant())
+        ->setName('Availability Restaurant')
+        ->setDescription('Availability test')
+        ->setIsAvailable(true);
+
+    $this->entityManager->persist($restaurant);
+    $this->entityManager->flush();
+
+    $restaurantId = $restaurant->getId();
+
+    $adminToken = $this->authenticateClient(
+        $client,
+        $admin
+    );
+
+    $client->request(
+        'PATCH',
+        '/api/admin/restaurants/'.$restaurantId.'/availability',
+        server: [
+            'CONTENT_TYPE' => 'application/json',
+            'HTTP_AUTHORIZATION' => 'Bearer '.$adminToken,
+        ],
+        content: json_encode([
+            'isAvailable' => false,
+        ])
+    );
+
+    self::assertResponseStatusCodeSame(
+        Response::HTTP_OK
+    );
+
+    $response = json_decode(
+        $client->getResponse()->getContent(),
+        true
+    );
+
+    self::assertIsArray($response);
+
+    self::assertSame(
+        $restaurantId,
+        $response['id']
+    );
+
+    self::assertFalse(
+        $response['isAvailable']
+    );
+
+    $this->entityManager->clear();
+
+    $updatedRestaurant = $this->entityManager
+        ->getRepository(Restaurant::class)
+        ->find($restaurantId);
+
+    self::assertNotNull($updatedRestaurant);
+
+    self::assertFalse(
+        $updatedRestaurant->isAvailable()
+    );
+}
+
+public function testAdminCannotChangeAvailabilityWithInvalidData(): void
+{
+    $client = static::createClient();
+
+    $this->entityManager = self::getContainer()
+        ->get(EntityManagerInterface::class);
+
+    $admin = $this->createTestUser(
+        'ROLE_ADMIN',
+        'Test Admin'
+    );
+
+    $restaurant = (new Restaurant())
+        ->setName('Invalid Availability Restaurant')
+        ->setDescription('Availability validation test')
+        ->setIsAvailable(true);
+
+    $this->entityManager->persist($restaurant);
+    $this->entityManager->flush();
+
+    $restaurantId = $restaurant->getId();
+
+    $adminToken = $this->authenticateClient(
+        $client,
+        $admin
+    );
+
+    $client->request(
+        'PATCH',
+        '/api/admin/restaurants/'.$restaurantId.'/availability',
+        server: [
+            'CONTENT_TYPE' => 'application/json',
+            'HTTP_AUTHORIZATION' => 'Bearer '.$adminToken,
+        ],
+        content: json_encode([])
+    );
+
+    self::assertResponseStatusCodeSame(
+        Response::HTTP_UNPROCESSABLE_ENTITY
+    );
+
+    $response = json_decode(
+        $client->getResponse()->getContent(),
+        true
+    );
+
+    self::assertIsArray($response);
+
+    self::assertSame(
+        'Validation failed.',
+        $response['message']
+    );
+
+    self::assertArrayHasKey(
+        'errors',
+        $response
+    );
+}
 }

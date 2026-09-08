@@ -3,6 +3,8 @@
 namespace App\Controller\Api;
 
 use App\Dto\Admin\CreateRestaurantRequest;
+use App\Dto\Admin\UpdateRestaurantAvailabilityRequest;
+use App\Dto\Admin\UpdateRestaurantRequest;
 use App\Service\RestaurantService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -63,8 +65,12 @@ final class AdminRestaurantController extends AbstractController
                 'name' => $restaurant->getName(),
                 'description' => $restaurant->getDescription(),
                 'isAvailable' => $restaurant->isAvailable(),
-                'createdAt' => $restaurant->getCreatedAt()?->format(\DateTimeInterface::ATOM),
-                'updatedAt' => $restaurant->getUpdatedAt()?->format(\DateTimeInterface::ATOM),
+                'createdAt' => $restaurant->getCreatedAt()?->format(
+                    \DateTimeInterface::ATOM
+                ),
+                'updatedAt' => $restaurant->getUpdatedAt()?->format(
+                    \DateTimeInterface::ATOM
+                ),
             ],
             Response::HTTP_CREATED
         );
@@ -82,11 +88,167 @@ final class AdminRestaurantController extends AbstractController
                     'name' => $restaurant->getName(),
                     'description' => $restaurant->getDescription(),
                     'isAvailable' => $restaurant->isAvailable(),
-                    'createdAt' => $restaurant->getCreatedAt()?->format(\DateTimeInterface::ATOM),
-                    'updatedAt' => $restaurant->getUpdatedAt()?->format(\DateTimeInterface::ATOM),
+                    'createdAt' => $restaurant->getCreatedAt()?->format(
+                        \DateTimeInterface::ATOM
+                    ),
+                    'updatedAt' => $restaurant->getUpdatedAt()?->format(
+                        \DateTimeInterface::ATOM
+                    ),
                 ],
                 $restaurants
             )
         );
+    }
+
+    #[Route('/{id}', name: 'api_admin_restaurant_show', methods: ['GET'])]
+    public function show(int $id): JsonResponse
+    {
+        $restaurant = $this->restaurantService->get($id);
+
+        if (null === $restaurant) {
+            return $this->json(
+                ['message' => 'Restaurant not found.'],
+                Response::HTTP_NOT_FOUND
+            );
+        }
+
+        return $this->json([
+            'id' => $restaurant->getId(),
+            'name' => $restaurant->getName(),
+            'description' => $restaurant->getDescription(),
+            'isAvailable' => $restaurant->isAvailable(),
+            'createdAt' => $restaurant->getCreatedAt()?->format(
+                \DateTimeInterface::ATOM
+            ),
+            'updatedAt' => $restaurant->getUpdatedAt()?->format(
+                \DateTimeInterface::ATOM
+            ),
+        ]);
+    }
+
+    #[Route('/{id}', name: 'api_admin_restaurant_update', methods: ['PUT'])]
+    public function update(
+        int $id,
+        Request $request,
+    ): JsonResponse {
+        $restaurant = $this->restaurantService->get($id);
+
+        if (null === $restaurant) {
+            return $this->json(
+                ['message' => 'Restaurant not found.'],
+                Response::HTTP_NOT_FOUND
+            );
+        }
+
+        /** @var UpdateRestaurantRequest $dto */
+        $dto = $this->serializer->deserialize(
+            $request->getContent(),
+            UpdateRestaurantRequest::class,
+            'json'
+        );
+
+        $violations = $this->validator->validate($dto);
+
+        if (count($violations) > 0) {
+            $errors = [];
+
+            foreach ($violations as $violation) {
+                $errors[] = [
+                    'field' => $violation->getPropertyPath(),
+                    'message' => $violation->getMessage(),
+                ];
+            }
+
+            return $this->json(
+                [
+                    'message' => 'Validation failed.',
+                    'errors' => $errors,
+                ],
+                Response::HTTP_UNPROCESSABLE_ENTITY
+            );
+        }
+
+        $restaurant = $this->restaurantService->update(
+            $restaurant,
+            $dto
+        );
+
+        return $this->json([
+            'id' => $restaurant->getId(),
+            'name' => $restaurant->getName(),
+            'description' => $restaurant->getDescription(),
+            'isAvailable' => $restaurant->isAvailable(),
+            'createdAt' => $restaurant->getCreatedAt()?->format(
+                \DateTimeInterface::ATOM
+            ),
+            'updatedAt' => $restaurant->getUpdatedAt()?->format(
+                \DateTimeInterface::ATOM
+            ),
+        ]);
+    }
+
+    #[Route(
+        '/{id}/availability',
+        name: 'api_admin_restaurant_availability',
+        methods: ['PATCH']
+    )]
+    public function availability(
+        int $id,
+        Request $request,
+    ): JsonResponse {
+        $restaurant = $this->restaurantService->get($id);
+
+        if (null === $restaurant) {
+            return $this->json(
+                ['message' => 'Restaurant not found.'],
+                Response::HTTP_NOT_FOUND
+            );
+        }
+
+        /** @var UpdateRestaurantAvailabilityRequest $dto */
+        $dto = $this->serializer->deserialize(
+            $request->getContent(),
+            UpdateRestaurantAvailabilityRequest::class,
+            'json'
+        );
+
+        $violations = $this->validator->validate($dto);
+
+        if (count($violations) > 0) {
+            $errors = [];
+
+            foreach ($violations as $violation) {
+                $errors[] = [
+                    'field' => $violation->getPropertyPath(),
+                    'message' => $violation->getMessage(),
+                ];
+            }
+
+            return $this->json(
+                [
+                    'message' => 'Validation failed.',
+                    'errors' => $errors,
+                ],
+                Response::HTTP_UNPROCESSABLE_ENTITY
+            );
+        }
+
+        $restaurant = $this->restaurantService->setAvailability(
+            $restaurant,
+            $dto->isAvailable
+        );
+
+        return $this->json([
+            'id' => $restaurant->getId(),
+            'name' => $restaurant->getName(),
+            'description' => $restaurant->getDescription(),
+            'isAvailable' => $restaurant->isAvailable(),
+            'createdAt' => $restaurant->getCreatedAt()?->format(
+                \DateTimeInterface::ATOM
+            ),
+            'updatedAt' => $restaurant->getUpdatedAt()?->format(
+                \DateTimeInterface::ATOM
+            ),
+        ]);
     }
 }
