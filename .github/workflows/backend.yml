@@ -1,0 +1,94 @@
+name: Backend CI
+
+on:
+  push:
+    branches:
+      - dev
+      - main
+
+  pull_request:
+    branches:
+      - dev
+      - main
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: hssan_delivery
+          POSTGRES_USER: hssan
+          POSTGRES_PASSWORD: hssan_test_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U hssan -d hssan_delivery"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      # Symfony's Dotenv::bootEnv() requires a ".env" file to exist on disk
+      # (even when APP_ENV/DATABASE_URL are already set as real env vars),
+      # both for the composer post-install "cache:clear" script and for
+      # tests/bootstrap.php. ".env" itself is untracked (developer-local),
+      # so CI needs its own copy; ".env.example" holds safe placeholder
+      # values and is committed for exactly this purpose.
+      - name: Create .env file
+        run: cp .env.example .env
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: pdo_pgsql
+          coverage: none
+
+      - name: Validate composer.json and composer.lock
+        run: composer validate --no-check-publish
+
+      - name: Install dependencies
+        run: composer install --prefer-dist --no-interaction --no-progress
+
+      - name: Generate JWT test keys
+        run: |
+          mkdir -p config/jwt
+          openssl genrsa -out config/jwt/private.pem 4096
+          openssl rsa -in config/jwt/private.pem -pubout -out config/jwt/public.pem
+          chmod 600 config/jwt/private.pem
+
+      # NOTE: DATABASE_URL below points at the base "hssan_delivery" database,
+      # not "..._test". config/packages/doctrine.yaml appends "_test" to the
+      # dbname automatically for APP_ENV=test (dbname_suffix), the same way
+      # it does for local development. Pointing this at "hssan_delivery_test"
+      # directly would make Doctrine target a nonexistent "hssan_delivery_test_test".
+      - name: Reset and migrate the test database
+        env:
+          APP_ENV: test
+          JWT_PASSPHRASE: ci-test-passphrase
+          DATABASE_URL: postgresql://hssan:hssan_test_password@127.0.0.1:5432/hssan_delivery?serverVersion=16&charset=utf8
+        run: composer test-db-reset
+
+      - name: Validate Doctrine schema
+        env:
+          APP_ENV: test
+          JWT_PASSPHRASE: ci-test-passphrase
+          DATABASE_URL: postgresql://hssan:hssan_test_password@127.0.0.1:5432/hssan_delivery?serverVersion=16&charset=utf8
+        run: php bin/console doctrine:schema:validate --env=test
+
+      - name: Run PHPUnit
+        env:
+          APP_ENV: test
+          JWT_PASSPHRASE: ci-test-passphrase
+          DATABASE_URL: postgresql://hssan:hssan_test_password@127.0.0.1:5432/hssan_delivery?serverVersion=16&charset=utf8
+        run: php bin/phpunit
