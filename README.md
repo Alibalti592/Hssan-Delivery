@@ -468,10 +468,27 @@ Phase 5 — Real-time features
  Live delivery tracking
  Maps/navigation
 Phase 6 — Additional services
+
+The current schema is hard-coupled to restaurant delivery: `Order` requires a
+`Restaurant` and `Delivery` is always tied 1:1 to an `Order`. None of the
+services below can be added on top of that as-is — `Order`/`Delivery` need
+to be generalized first (e.g. `Order` becoming polymorphic across a
+restaurant order, a parcel job, or a supermarket cart) before any service
+work starts. A `DeliveryType` enum (`RESTAURANT`, `SUPERMARKET`, `PARCEL`)
+already exists in `src/Enum/DeliveryType.php` as a placeholder but isn't
+wired into anything yet.
+
+Bill payment and money transfer aren't delivery workflows at all — they need
+a wallet/balance per user and a transaction ledger, not a courier. Money
+transfer in particular carries money-transmission licensing considerations
+that depend on jurisdiction and should be scoped before implementation
+starts.
+
+ Generalize Order/Delivery schema (prerequisite for every item below)
  Supermarket delivery
  Parcel delivery
- Bill payment
- Money transfer
+ Bill payment (biller integration, payment method, transaction ledger)
+ Money transfer (wallet/balance, transaction ledger, licensing review)
 Phase 7 — Production infrastructure
  Docker
  Staging environment
