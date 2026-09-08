@@ -344,24 +344,24 @@ final class AuthApiTest extends WebTestCase
 
         self::assertIsArray($response);
 
-       self::assertArrayHasKey(
-    'error',
-    $response
-);
+        self::assertArrayHasKey(
+            'message',
+            $response
+        );
 
-self::assertSame(
-    'Validation failed',
-    $response['error']
-);
+        self::assertSame(
+            'Validation failed.',
+            $response['message']
+        );
 
-self::assertArrayHasKey(
-    'fields',
-    $response
-);
+        self::assertArrayHasKey(
+            'errors',
+            $response
+        );
 
-self::assertNotEmpty(
-    $response['fields']
-);
+        self::assertNotEmpty(
+            $response['errors']
+        );
     }
 
     public function testUnauthenticatedUserCannotAccessMe(): void

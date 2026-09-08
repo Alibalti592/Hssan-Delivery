@@ -17,8 +17,6 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\Column]
     private ?int $id = null;
 
-    
-
     /**
      * @var list<string> The user roles
      */
@@ -34,10 +32,8 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\Column(length: 255)]
     private ?string $name = null;
 
-    #[ORM\Column(length: 255, unique :true)]
+    #[ORM\Column(length: 255, unique : true)]
     private ?string $phone = null;
-
-   
 
     /**
      * Null until an admin approves the account. Clients are verified
@@ -70,8 +66,6 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     {
         return $this->id;
     }
-
-    
 
     /**
      * A visual identifier that represents this user.
@@ -161,8 +155,6 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         return $this;
     }
 
-   
-
     public function getVerifiedAt(): ?\DateTimeImmutable
     {
         return $this->verifiedAt;
@@ -177,7 +169,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
 
     public function isVerified(): bool
     {
-        return $this->verifiedAt !== null;
+        return null !== $this->verifiedAt;
     }
 
     public function getCreatedAt(): ?\DateTimeImmutable

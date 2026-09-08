@@ -138,6 +138,23 @@ POST /api/auth/login
 GET  /api/auth/me
 Admin courier management
 POST /api/admin/couriers
+Admin restaurant management
+POST   /api/admin/restaurants
+GET    /api/admin/restaurants
+GET    /api/admin/restaurants/{id}
+PUT    /api/admin/restaurants/{id}
+PATCH  /api/admin/restaurants/{id}/availability
+Admin category management
+POST /api/admin/restaurants/{restaurantId}/categories
+GET  /api/admin/restaurants/{restaurantId}/categories
+GET  /api/admin/categories/{id}
+PUT  /api/admin/categories/{id}
+Admin product management
+POST   /api/admin/restaurants/{restaurantId}/products
+GET    /api/admin/restaurants/{restaurantId}/products
+GET    /api/admin/products/{id}
+PUT    /api/admin/products/{id}
+PATCH  /api/admin/products/{id}/availability
 Delivery management
 GET  /api/deliveries/mine
 
@@ -150,8 +167,10 @@ POST /api/deliveries/{id}/cancel
 POST /api/deliveries/{id}/fail
 Orders
 POST /api/orders
+GET  /api/orders
+GET  /api/orders/{id}
 
-The API is protected with JWT authentication and role-based authorization where required.
+The API is protected with JWT authentication and role-based authorization where required. Order and delivery listing endpoints scope results to the authenticated user; there is currently no admin-wide order listing (tracked in Phase 1 of the roadmap below).
 
 Backend setup
 Requirements
@@ -235,6 +254,7 @@ invalid registration data
 admin courier creation
 courier authentication
 courier authorization
+admin restaurant, category and product management
 delivery assignment
 delivery lifecycle transitions
 invalid delivery transitions
@@ -242,14 +262,26 @@ wrong-courier protection
 non-courier protection
 order/delivery status synchronization
 
-Run the complete test suite:
+It also contains unit tests for the pure logic that backs those workflows: the
+decimal/millimes money conversion and the delivery-to-order status mapping.
+
+Run the complete test suite (this resets the test database first):
+
+composer test
+
+Or, against an already-migrated test database:
 
 php bin/phpunit
 
 Current baseline:
 
-29 tests
-239 assertions
+90 tests
+546 assertions
+
+Tests share a single Postgres database rather than running each in its own
+transaction, so re-running `php bin/phpunit` without resetting the database
+first (`composer test`, or the `test-db-reset` composer script) can fail on
+leftover data from the previous run.
 Continuous Integration
 
 GitHub Actions runs the backend CI workflow on pushes and pull requests targeting:

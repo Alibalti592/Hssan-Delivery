@@ -7,25 +7,24 @@ use App\Dto\Admin\ProductResponse;
 use App\Dto\Admin\UpdateProductAvailabilityRequest;
 use App\Dto\Admin\UpdateProductRequest;
 use App\Service\ProductService;
-use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
-use Symfony\Component\Serializer\Exception\NotNormalizableValueException;
 use Symfony\Component\Serializer\SerializerInterface;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
 
 #[Route('/api/admin')]
 #[IsGranted('ROLE_ADMIN')]
-final class AdminProductController extends AbstractController
+final class AdminProductController extends AbstractApiController
 {
     public function __construct(
-        private readonly SerializerInterface $serializer,
-        private readonly ValidatorInterface $validator,
+        SerializerInterface $serializer,
+        ValidatorInterface $validator,
         private readonly ProductService $productService,
     ) {
+        parent::__construct($serializer, $validator);
     }
 
     #[Route(
@@ -46,39 +45,8 @@ final class AdminProductController extends AbstractController
             );
         }
 
-        try {
-            /** @var CreateProductRequest $dto */
-            $dto = $this->serializer->deserialize(
-                $request->getContent(),
-                CreateProductRequest::class,
-                'json'
-            );
-        } catch (NotNormalizableValueException) {
-            return $this->validationErrorResponse([
-                [
-                    'field' => 'request',
-                    'message' => 'Invalid request data.',
-                ],
-            ]);
-        }
-
-        $violations = $this->validator->validate($dto);
-
-        if (count($violations) > 0) {
-            return $this->json(
-                [
-                    'message' => 'Validation failed.',
-                    'errors' => array_map(
-                        static fn ($violation) => [
-                            'field' => $violation->getPropertyPath(),
-                            'message' => $violation->getMessage(),
-                        ],
-                        iterator_to_array($violations)
-                    ),
-                ],
-                Response::HTTP_UNPROCESSABLE_ENTITY
-            );
-        }
+        /** @var CreateProductRequest $dto */
+        $dto = $this->deserializeAndValidate($request, CreateProductRequest::class);
 
         try {
             $product = $this->productService->create(
@@ -120,8 +88,7 @@ final class AdminProductController extends AbstractController
 
         return $this->json(
             array_map(
-                static fn ($product) =>
-                    ProductResponse::fromEntity($product),
+                static fn ($product) => ProductResponse::fromEntity($product),
                 $products
             )
         );
@@ -166,39 +133,8 @@ final class AdminProductController extends AbstractController
             );
         }
 
-        try {
-            /** @var UpdateProductRequest $dto */
-            $dto = $this->serializer->deserialize(
-                $request->getContent(),
-                UpdateProductRequest::class,
-                'json'
-            );
-        } catch (NotNormalizableValueException) {
-            return $this->validationErrorResponse([
-                [
-                    'field' => 'request',
-                    'message' => 'Invalid request data.',
-                ],
-            ]);
-        }
-
-        $violations = $this->validator->validate($dto);
-
-        if (count($violations) > 0) {
-            return $this->json(
-                [
-                    'message' => 'Validation failed.',
-                    'errors' => array_map(
-                        static fn ($violation) => [
-                            'field' => $violation->getPropertyPath(),
-                            'message' => $violation->getMessage(),
-                        ],
-                        iterator_to_array($violations)
-                    ),
-                ],
-                Response::HTTP_UNPROCESSABLE_ENTITY
-            );
-        }
+        /** @var UpdateProductRequest $dto */
+        $dto = $this->deserializeAndValidate($request, UpdateProductRequest::class);
 
         try {
             $product = $this->productService->update(
@@ -235,45 +171,8 @@ final class AdminProductController extends AbstractController
             );
         }
 
-        try {
-            /** @var UpdateProductAvailabilityRequest $dto */
-            $dto = $this->serializer->deserialize(
-                $request->getContent(),
-                UpdateProductAvailabilityRequest::class,
-                'json'
-            );
-        } catch (NotNormalizableValueException) {
-            return $this->json(
-                [
-                    'message' => 'Validation failed.',
-                    'errors' => [
-                        [
-                            'field' => 'isAvailable',
-                            'message' => 'This value must be a boolean.',
-                        ],
-                    ],
-                ],
-                Response::HTTP_UNPROCESSABLE_ENTITY
-            );
-        }
-
-        $violations = $this->validator->validate($dto);
-
-        if (count($violations) > 0) {
-            return $this->json(
-                [
-                    'message' => 'Validation failed.',
-                    'errors' => array_map(
-                        static fn ($violation) => [
-                            'field' => $violation->getPropertyPath(),
-                            'message' => $violation->getMessage(),
-                        ],
-                        iterator_to_array($violations)
-                    ),
-                ],
-                Response::HTTP_UNPROCESSABLE_ENTITY
-            );
-        }
+        /** @var UpdateProductAvailabilityRequest $dto */
+        $dto = $this->deserializeAndValidate($request, UpdateProductAvailabilityRequest::class);
 
         $product = $this->productService->setAvailability(
             $product,
@@ -282,17 +181,6 @@ final class AdminProductController extends AbstractController
 
         return $this->json(
             ProductResponse::fromEntity($product)
-        );
-    }
-
-    private function validationErrorResponse(array $errors): JsonResponse
-    {
-        return $this->json(
-            [
-                'message' => 'Validation failed.',
-                'errors' => $errors,
-            ],
-            Response::HTTP_UNPROCESSABLE_ENTITY
         );
     }
 }

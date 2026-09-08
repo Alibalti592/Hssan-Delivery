@@ -6,7 +6,6 @@ use App\Dto\Admin\CreateRestaurantRequest;
 use App\Dto\Admin\UpdateRestaurantAvailabilityRequest;
 use App\Dto\Admin\UpdateRestaurantRequest;
 use App\Service\RestaurantService;
-use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -17,45 +16,21 @@ use Symfony\Component\Validator\Validator\ValidatorInterface;
 
 #[Route('/api/admin/restaurants')]
 #[IsGranted('ROLE_ADMIN')]
-final class AdminRestaurantController extends AbstractController
+final class AdminRestaurantController extends AbstractApiController
 {
     public function __construct(
-        private readonly SerializerInterface $serializer,
-        private readonly ValidatorInterface $validator,
+        SerializerInterface $serializer,
+        ValidatorInterface $validator,
         private readonly RestaurantService $restaurantService,
     ) {
+        parent::__construct($serializer, $validator);
     }
 
     #[Route('', name: 'api_admin_restaurant_create', methods: ['POST'])]
     public function create(Request $request): JsonResponse
     {
         /** @var CreateRestaurantRequest $dto */
-        $dto = $this->serializer->deserialize(
-            $request->getContent(),
-            CreateRestaurantRequest::class,
-            'json'
-        );
-
-        $violations = $this->validator->validate($dto);
-
-        if (count($violations) > 0) {
-            $errors = [];
-
-            foreach ($violations as $violation) {
-                $errors[] = [
-                    'field' => $violation->getPropertyPath(),
-                    'message' => $violation->getMessage(),
-                ];
-            }
-
-            return $this->json(
-                [
-                    'message' => 'Validation failed.',
-                    'errors' => $errors,
-                ],
-                Response::HTTP_UNPROCESSABLE_ENTITY
-            );
-        }
+        $dto = $this->deserializeAndValidate($request, CreateRestaurantRequest::class);
 
         $restaurant = $this->restaurantService->create($dto);
 
@@ -141,32 +116,7 @@ final class AdminRestaurantController extends AbstractController
         }
 
         /** @var UpdateRestaurantRequest $dto */
-        $dto = $this->serializer->deserialize(
-            $request->getContent(),
-            UpdateRestaurantRequest::class,
-            'json'
-        );
-
-        $violations = $this->validator->validate($dto);
-
-        if (count($violations) > 0) {
-            $errors = [];
-
-            foreach ($violations as $violation) {
-                $errors[] = [
-                    'field' => $violation->getPropertyPath(),
-                    'message' => $violation->getMessage(),
-                ];
-            }
-
-            return $this->json(
-                [
-                    'message' => 'Validation failed.',
-                    'errors' => $errors,
-                ],
-                Response::HTTP_UNPROCESSABLE_ENTITY
-            );
-        }
+        $dto = $this->deserializeAndValidate($request, UpdateRestaurantRequest::class);
 
         $restaurant = $this->restaurantService->update(
             $restaurant,
@@ -206,32 +156,7 @@ final class AdminRestaurantController extends AbstractController
         }
 
         /** @var UpdateRestaurantAvailabilityRequest $dto */
-        $dto = $this->serializer->deserialize(
-            $request->getContent(),
-            UpdateRestaurantAvailabilityRequest::class,
-            'json'
-        );
-
-        $violations = $this->validator->validate($dto);
-
-        if (count($violations) > 0) {
-            $errors = [];
-
-            foreach ($violations as $violation) {
-                $errors[] = [
-                    'field' => $violation->getPropertyPath(),
-                    'message' => $violation->getMessage(),
-                ];
-            }
-
-            return $this->json(
-                [
-                    'message' => 'Validation failed.',
-                    'errors' => $errors,
-                ],
-                Response::HTTP_UNPROCESSABLE_ENTITY
-            );
-        }
+        $dto = $this->deserializeAndValidate($request, UpdateRestaurantAvailabilityRequest::class);
 
         $restaurant = $this->restaurantService->setAvailability(
             $restaurant,

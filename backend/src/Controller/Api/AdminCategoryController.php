@@ -6,7 +6,6 @@ use App\Dto\Admin\CategoryResponse;
 use App\Dto\Admin\CreateCategoryRequest;
 use App\Dto\Admin\UpdateCategoryRequest;
 use App\Service\CategoryService;
-use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -17,13 +16,14 @@ use Symfony\Component\Validator\Validator\ValidatorInterface;
 
 #[Route('/api/admin')]
 #[IsGranted('ROLE_ADMIN')]
-final class AdminCategoryController extends AbstractController
+final class AdminCategoryController extends AbstractApiController
 {
     public function __construct(
-        private readonly SerializerInterface $serializer,
-        private readonly ValidatorInterface $validator,
+        SerializerInterface $serializer,
+        ValidatorInterface $validator,
         private readonly CategoryService $categoryService,
     ) {
+        parent::__construct($serializer, $validator);
     }
 
     #[Route(
@@ -33,7 +33,7 @@ final class AdminCategoryController extends AbstractController
     )]
     public function create(
         int $restaurantId,
-        Request $request
+        Request $request,
     ): JsonResponse {
         $restaurant = $this->categoryService->getRestaurant($restaurantId);
 
@@ -45,32 +45,7 @@ final class AdminCategoryController extends AbstractController
         }
 
         /** @var CreateCategoryRequest $dto */
-        $dto = $this->serializer->deserialize(
-            $request->getContent(),
-            CreateCategoryRequest::class,
-            'json'
-        );
-
-        $violations = $this->validator->validate($dto);
-
-        if (count($violations) > 0) {
-            $errors = [];
-
-            foreach ($violations as $violation) {
-                $errors[] = [
-                    'field' => $violation->getPropertyPath(),
-                    'message' => $violation->getMessage(),
-                ];
-            }
-
-            return $this->json(
-                [
-                    'message' => 'Validation failed.',
-                    'errors' => $errors,
-                ],
-                Response::HTTP_UNPROCESSABLE_ENTITY
-            );
-        }
+        $dto = $this->deserializeAndValidate($request, CreateCategoryRequest::class);
 
         $category = $this->categoryService->create(
             $restaurant,
@@ -105,8 +80,7 @@ final class AdminCategoryController extends AbstractController
 
         return $this->json(
             array_map(
-                static fn ($category) =>
-                    CategoryResponse::fromEntity($category),
+                static fn ($category) => CategoryResponse::fromEntity($category),
                 $categories
             )
         );
@@ -140,7 +114,7 @@ final class AdminCategoryController extends AbstractController
     )]
     public function update(
         int $id,
-        Request $request
+        Request $request,
     ): JsonResponse {
         $category = $this->categoryService->get($id);
 
@@ -152,32 +126,7 @@ final class AdminCategoryController extends AbstractController
         }
 
         /** @var UpdateCategoryRequest $dto */
-        $dto = $this->serializer->deserialize(
-            $request->getContent(),
-            UpdateCategoryRequest::class,
-            'json'
-        );
-
-        $violations = $this->validator->validate($dto);
-
-        if (count($violations) > 0) {
-            $errors = [];
-
-            foreach ($violations as $violation) {
-                $errors[] = [
-                    'field' => $violation->getPropertyPath(),
-                    'message' => $violation->getMessage(),
-                ];
-            }
-
-            return $this->json(
-                [
-                    'message' => 'Validation failed.',
-                    'errors' => $errors,
-                ],
-                Response::HTTP_UNPROCESSABLE_ENTITY
-            );
-        }
+        $dto = $this->deserializeAndValidate($request, UpdateCategoryRequest::class);
 
         $category = $this->categoryService->update(
             $category,

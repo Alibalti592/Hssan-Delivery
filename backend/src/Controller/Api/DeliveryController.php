@@ -2,6 +2,7 @@
 
 namespace App\Controller\Api;
 
+use App\Entity\Delivery;
 use App\Entity\User;
 use App\Repository\DeliveryRepository;
 use App\Repository\UserRepository;
@@ -56,7 +57,7 @@ final class DeliveryController extends AbstractController
     ): JsonResponse {
         $delivery = $this->deliveryRepository->find($id);
 
-        if ($delivery === null) {
+        if (null === $delivery) {
             return $this->json(
                 ['message' => 'Delivery not found.'],
                 Response::HTTP_NOT_FOUND
@@ -65,7 +66,7 @@ final class DeliveryController extends AbstractController
 
         $courier = $this->userRepository->find($courierId);
 
-        if ($courier === null) {
+        if (null === $courier) {
             return $this->json(
                 ['message' => 'Courier not found.'],
                 Response::HTTP_NOT_FOUND
@@ -99,7 +100,7 @@ final class DeliveryController extends AbstractController
     {
         return $this->executeCourierTransition(
             $id,
-            'acceptDelivery'
+            fn (Delivery $delivery, User $courier) => $this->deliveryService->acceptDelivery($delivery, $courier)
         );
     }
 
@@ -113,7 +114,7 @@ final class DeliveryController extends AbstractController
     {
         return $this->executeCourierTransition(
             $id,
-            'markPickedUp'
+            fn (Delivery $delivery, User $courier) => $this->deliveryService->markPickedUp($delivery, $courier)
         );
     }
 
@@ -127,7 +128,7 @@ final class DeliveryController extends AbstractController
     {
         return $this->executeCourierTransition(
             $id,
-            'markOnTheWay'
+            fn (Delivery $delivery, User $courier) => $this->deliveryService->markOnTheWay($delivery, $courier)
         );
     }
 
@@ -141,7 +142,7 @@ final class DeliveryController extends AbstractController
     {
         return $this->executeCourierTransition(
             $id,
-            'markDelivered'
+            fn (Delivery $delivery, User $courier) => $this->deliveryService->markDelivered($delivery, $courier)
         );
     }
 
@@ -155,7 +156,7 @@ final class DeliveryController extends AbstractController
     {
         $delivery = $this->deliveryRepository->find($id);
 
-        if ($delivery === null) {
+        if (null === $delivery) {
             return $this->json(
                 ['message' => 'Delivery not found.'],
                 Response::HTTP_NOT_FOUND
@@ -187,17 +188,20 @@ final class DeliveryController extends AbstractController
     {
         return $this->executeCourierTransition(
             $id,
-            'failDelivery'
+            fn (Delivery $delivery, User $courier) => $this->deliveryService->failDelivery($delivery, $courier)
         );
     }
 
+    /**
+     * @param callable(Delivery, User): Delivery $transition
+     */
     private function executeCourierTransition(
         int $id,
-        string $method
+        callable $transition,
     ): JsonResponse {
         $delivery = $this->deliveryRepository->find($id);
 
-        if ($delivery === null) {
+        if (null === $delivery) {
             return $this->json(
                 ['message' => 'Delivery not found.'],
                 Response::HTTP_NOT_FOUND
@@ -208,10 +212,7 @@ final class DeliveryController extends AbstractController
         $courier = $this->getUser();
 
         try {
-            $delivery = $this->deliveryService->$method(
-                $delivery,
-                $courier
-            );
+            $delivery = $transition($delivery, $courier);
 
             return $this->json(
                 $this->deliveryResponse($delivery)

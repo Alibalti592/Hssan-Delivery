@@ -18,43 +18,34 @@ use Symfony\Component\Validator\Validator\ValidatorInterface;
 class AuthController extends AbstractApiController
 {
     public function __construct(
-    private readonly SerializerInterface $serializer,
-    private readonly ValidatorInterface $validator,
-    private readonly AuthService $authService,
-    private readonly Security $security,
-) {
-}
+        SerializerInterface $serializer,
+        ValidatorInterface $validator,
+        private readonly AuthService $authService,
+        private readonly Security $security,
+    ) {
+        parent::__construct($serializer, $validator);
+    }
 
     #[Route('/register', name: 'api_auth_register', methods: ['POST'])]
-public function register(Request $request): JsonResponse
-{
-    /** @var RegisterUserRequest $dto */
-    $dto = $this->serializer->deserialize(
-        $request->getContent(),
-        RegisterUserRequest::class,
-        'json'
-    );
+    public function register(Request $request): JsonResponse
+    {
+        /** @var RegisterUserRequest $dto */
+        $dto = $this->deserializeAndValidate($request, RegisterUserRequest::class);
 
-    $violations = $this->validator->validate($dto);
+        try {
+            $user = $this->authService->register($dto);
+        } catch (\RuntimeException $exception) {
+            return new JsonResponse(
+                ['error' => $exception->getMessage()],
+                Response::HTTP_CONFLICT
+            );
+        }
 
-    if (\count($violations) > 0) {
-        return $this->validationErrorResponse($violations);
-    }
-
-    try {
-        $user = $this->authService->register($dto);
-    } catch (\RuntimeException $exception) {
         return new JsonResponse(
-            ['error' => $exception->getMessage()],
-            Response::HTTP_CONFLICT
+            UserResponse::fromEntity($user),
+            Response::HTTP_CREATED
         );
     }
-
-    return new JsonResponse(
-        UserResponse::fromEntity($user),
-        Response::HTTP_CREATED
-    );
-}
 
     /**
      * Never actually executed: the "api_login" firewall's json_login

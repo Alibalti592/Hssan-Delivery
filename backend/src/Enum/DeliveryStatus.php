@@ -12,4 +12,21 @@ enum DeliveryStatus: string
     case DELIVERED = 'DELIVERED';
     case CANCELLED = 'CANCELLED';
     case FAILED = 'FAILED';
+
+    /**
+     * The order status this delivery status keeps the parent order synced to.
+     */
+    public function toOrderStatus(): OrderStatus
+    {
+        return match ($this) {
+            self::PENDING => OrderStatus::PENDING,
+            self::ASSIGNED,
+            self::ACCEPTED => OrderStatus::CONFIRMED,
+            self::PICKED_UP,
+            self::ON_THE_WAY => OrderStatus::READY_FOR_PICKUP,
+            self::DELIVERED => OrderStatus::COMPLETED,
+            self::CANCELLED,
+            self::FAILED => OrderStatus::CANCELLED,
+        };
+    }
 }
