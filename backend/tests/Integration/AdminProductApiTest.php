@@ -16,6 +16,19 @@ final class AdminProductApiTest extends WebTestCase
 {
     private EntityManagerInterface $entityManager;
 
+    protected function tearDown(): void
+    {
+        if (isset($this->entityManager)) {
+            $this->entityManager
+                ->createQuery('DELETE FROM App\Entity\Product p')
+                ->execute();
+
+            $this->entityManager->clear();
+        }
+
+        parent::tearDown();
+    }
+
     public function testAdminCanCreateProduct(): void
     {
         $client = static::createClient();
