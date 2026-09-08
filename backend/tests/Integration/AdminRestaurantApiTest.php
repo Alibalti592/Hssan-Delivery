@@ -4,6 +4,7 @@ namespace App\Tests\Integration;
 
 use App\Entity\Restaurant;
 use App\Entity\User;
+use App\Entity\Category;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
@@ -364,6 +365,9 @@ final class AdminRestaurantApiTest extends WebTestCase
 
         $this->entityManager = self::getContainer()
             ->get(EntityManagerInterface::class);
+        $this->entityManager
+            ->createQuery('DELETE FROM App\Entity\Category c')
+             ->execute();
 
         $this->entityManager
             ->createQuery('DELETE FROM App\Entity\Restaurant r')
