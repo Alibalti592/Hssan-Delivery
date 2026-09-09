@@ -160,6 +160,12 @@ POST /api/admin/delivery-zones
 GET  /api/admin/delivery-zones
 GET  /api/admin/delivery-zones/{id}
 PUT  /api/admin/delivery-zones/{id}
+Admin order management
+GET  /api/admin/orders
+GET  /api/admin/orders/{id}
+Admin delivery oversight
+GET  /api/admin/deliveries
+GET  /api/admin/deliveries/{id}
 Delivery management
 GET  /api/deliveries/mine
 
@@ -177,7 +183,7 @@ GET  /api/orders/{id}
 Delivery zones
 GET  /api/delivery-zones
 
-The API is protected with JWT authentication and role-based authorization where required. Order and delivery listing endpoints scope results to the authenticated user; there is currently no admin-wide order listing (tracked in Phase 1 of the roadmap below).
+The API is protected with JWT authentication and role-based authorization where required. GET /api/orders and GET /api/deliveries/mine scope results to the authenticated user; admins get unscoped visibility via GET /api/admin/orders and GET /api/admin/deliveries, which also return deliveryId/courierId so an admin can find the ID to act on with the assign/cancel endpoints above.
 
 Delivery pricing
 
@@ -281,7 +287,8 @@ invalid registration data
 admin courier creation
 courier authentication
 courier authorization
-admin restaurant, category and product management
+admin restaurant, category, product and delivery zone management
+admin order and delivery visibility
 delivery assignment
 delivery lifecycle transitions
 invalid delivery transitions
@@ -379,6 +386,7 @@ automatic delivery creation
 delivery assignment
 courier delivery lifecycle
 admin courier creation
+admin order and delivery visibility
 role-based authorization
 order/delivery status synchronization
 integration tests
@@ -460,7 +468,7 @@ Phase 1 — Backend domain completeness
  Restaurant management
  Category management
  Product management
- Admin order management
+ Admin order management (done — see "Admin order management" and "Admin delivery oversight" above)
  Courier management improvements
  Delivery pricing (done — zone-based, see "Delivery pricing" above, including admin CRUD for zones)
  Address / geolocation model

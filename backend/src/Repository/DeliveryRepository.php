@@ -26,4 +26,12 @@ class DeliveryRepository extends ServiceEntityRepository
             ->getQuery()
             ->getResult();
     }
+
+    /**
+     * @return Delivery[]
+     */
+    public function findAllOrderedByCreatedAtDesc(): array
+    {
+        return $this->findBy([], ['createdAt' => 'DESC']);
+    }
 }

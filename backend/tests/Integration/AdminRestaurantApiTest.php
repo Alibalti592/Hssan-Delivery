@@ -365,6 +365,25 @@ final class AdminRestaurantApiTest extends WebTestCase
 
         $this->entityManager = self::getContainer()
             ->get(EntityManagerInterface::class);
+
+        // Deleted in dependency order so leftover orders/deliveries from
+        // other test classes don't trip a foreign key violation.
+        $this->entityManager
+            ->createQuery('DELETE FROM App\Entity\Delivery d')
+            ->execute();
+
+        $this->entityManager
+            ->createQuery('DELETE FROM App\Entity\OrderItem oi')
+            ->execute();
+
+        $this->entityManager
+            ->createQuery('DELETE FROM App\Entity\Order o')
+            ->execute();
+
+        $this->entityManager
+            ->createQuery('DELETE FROM App\Entity\Product p')
+            ->execute();
+
         $this->entityManager
             ->createQuery('DELETE FROM App\Entity\Category c')
              ->execute();

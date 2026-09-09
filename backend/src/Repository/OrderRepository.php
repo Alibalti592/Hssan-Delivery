@@ -12,4 +12,12 @@ class OrderRepository extends ServiceEntityRepository
     {
         parent::__construct($registry, Order::class);
     }
+
+    /**
+     * @return Order[]
+     */
+    public function findAllOrderedByCreatedAtDesc(): array
+    {
+        return $this->findBy([], ['createdAt' => 'DESC']);
+    }
 }

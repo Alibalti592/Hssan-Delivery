@@ -2,6 +2,7 @@
 
 namespace App\Controller\Api;
 
+use App\Dto\DeliveryResponse;
 use App\Entity\Delivery;
 use App\Entity\User;
 use App\Repository\DeliveryRepository;
@@ -39,7 +40,7 @@ final class DeliveryController extends AbstractController
 
         return $this->json(
             array_map(
-                fn ($delivery) => $this->deliveryResponse($delivery),
+                fn ($delivery) => DeliveryResponse::fromEntity($delivery),
                 $deliveries
             )
         );
@@ -80,7 +81,7 @@ final class DeliveryController extends AbstractController
             );
 
             return $this->json(
-                $this->deliveryResponse($delivery)
+                DeliveryResponse::fromEntity($delivery)
             );
         } catch (\RuntimeException $exception) {
             return $this->json(
@@ -168,7 +169,7 @@ final class DeliveryController extends AbstractController
                 ->cancelDelivery($delivery);
 
             return $this->json(
-                $this->deliveryResponse($delivery)
+                DeliveryResponse::fromEntity($delivery)
             );
         } catch (\RuntimeException $exception) {
             return $this->json(
@@ -215,7 +216,7 @@ final class DeliveryController extends AbstractController
             $delivery = $transition($delivery, $courier);
 
             return $this->json(
-                $this->deliveryResponse($delivery)
+                DeliveryResponse::fromEntity($delivery)
             );
         } catch (\RuntimeException $exception) {
             return $this->json(
@@ -223,30 +224,5 @@ final class DeliveryController extends AbstractController
                 Response::HTTP_BAD_REQUEST
             );
         }
-    }
-
-    private function deliveryResponse($delivery): array
-    {
-        return [
-            'id' => $delivery->getId(),
-            'orderId' => $delivery->getOrder()?->getId(),
-            'status' => $delivery->getStatus()->value,
-            'courierId' => $delivery->getCourier()?->getId(),
-            'assignedAt' => $delivery->getAssignedAt()?->format(
-                \DateTimeInterface::ATOM
-            ),
-            'acceptedAt' => $delivery->getAcceptedAt()?->format(
-                \DateTimeInterface::ATOM
-            ),
-            'pickedUpAt' => $delivery->getPickedUpAt()?->format(
-                \DateTimeInterface::ATOM
-            ),
-            'deliveredAt' => $delivery->getDeliveredAt()?->format(
-                \DateTimeInterface::ATOM
-            ),
-            'createdAt' => $delivery->getCreatedAt()?->format(
-                \DateTimeInterface::ATOM
-            ),
-        ];
     }
 }
