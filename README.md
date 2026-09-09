@@ -49,6 +49,7 @@ A client can:
 create an account
 authenticate with phone and password
 browse the available catalogue
+save multiple labeled delivery addresses
 create orders
 receive a linked delivery
 Livreur
@@ -192,8 +193,25 @@ GET  /api/orders
 GET  /api/orders/{id}
 Delivery zones
 GET  /api/delivery-zones
+Addresses
+POST   /api/addresses
+GET    /api/addresses
+GET    /api/addresses/{id}
+PUT    /api/addresses/{id}
+DELETE /api/addresses/{id}
 
-The API is protected with JWT authentication and role-based authorization where required. GET /api/orders and GET /api/deliveries/mine scope results to the authenticated user; admins get unscoped visibility via GET /api/admin/orders and GET /api/admin/deliveries, which also return deliveryId/courierId so an admin can find the ID to act on with the assign/cancel endpoints above.
+The API is protected with JWT authentication and role-based authorization where required. GET /api/orders, GET /api/deliveries/mine and GET /api/addresses(/{id}) scope results to the authenticated user; admins get unscoped visibility via GET /api/admin/orders and GET /api/admin/deliveries, which also return deliveryId/courierId so an admin can find the ID to act on with the assign/cancel endpoints above.
+
+Saved addresses
+
+A user can save multiple labeled delivery addresses (e.g. "Domicile", "Bureau"),
+each with a free-text address line and optional courier instructions. Exactly one
+address can be marked as the default per user — setting isDefault on one
+automatically clears it on every other address that user owns. There is no
+geocoding or map integration yet: addressLine is plain text, not lat/lng, and
+saved addresses are not yet wired into order creation (POST /api/orders still
+takes its own deliveryAddress field directly). This is the "address" half of
+Phase 1's "Address / geolocation model" item; geolocation itself is still open.
 
 Delivery pricing
 
@@ -302,6 +320,8 @@ admin order and delivery visibility
 admin courier listing and deactivation
 deactivated accounts cannot log in
 deactivated couriers cannot be assigned deliveries
+saved address CRUD and per-user ownership scoping
+default-address invariant (setting one clears the others)
 delivery assignment
 delivery lifecycle transitions
 invalid delivery transitions
@@ -393,6 +413,7 @@ client registration
 login
 authenticated profile endpoint
 restaurant/product foundations
+saved delivery addresses
 order creation
 zone-based delivery pricing
 automatic delivery creation
@@ -485,7 +506,7 @@ Phase 1 — Backend domain completeness
  Admin order management (done — see "Admin order management" and "Admin delivery oversight" above)
  Courier management improvements (done — list/show/deactivate, see "Admin courier management" above)
  Delivery pricing (done — zone-based, see "Delivery pricing" above, including admin CRUD for zones)
- Address / geolocation model
+ Address / geolocation model (address half done — see "Saved addresses" above; geolocation/lat-lng still open)
 Phase 2 — Restaurant operations
  Order confirmation
  Order preparation workflow
