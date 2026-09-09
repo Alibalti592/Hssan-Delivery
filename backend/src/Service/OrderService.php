@@ -9,6 +9,7 @@ use App\Entity\OrderItem;
 use App\Entity\User;
 use App\Enum\DeliveryStatus;
 use App\Enum\OrderStatus;
+use App\Repository\DeliveryZoneRepository;
 use App\Repository\OrderRepository;
 use App\Repository\ProductRepository;
 use App\Repository\RestaurantRepository;
@@ -22,6 +23,7 @@ final class OrderService
         private readonly OrderRepository $orderRepository,
         private readonly RestaurantRepository $restaurantRepository,
         private readonly ProductRepository $productRepository,
+        private readonly DeliveryZoneRepository $deliveryZoneRepository,
     ) {
     }
 
@@ -39,12 +41,19 @@ final class OrderService
             throw new \RuntimeException('Restaurant is currently unavailable.');
         }
 
+        $deliveryZone = $this->deliveryZoneRepository->find($dto->deliveryZoneId);
+
+        if (null === $deliveryZone) {
+            throw new \RuntimeException('Delivery zone not found.');
+        }
+
         $order = new Order();
 
         $order->setUser($user);
         $order->setRestaurant($restaurant);
         $order->setNote($dto->note);
         $order->setDeliveryAddress($dto->deliveryAddress);
+        $order->setDeliveryZone($deliveryZone);
         $order->setStatus(OrderStatus::PENDING);
 
         $totalMillimes = 0;
@@ -90,8 +99,13 @@ final class OrderService
             throw new \RuntimeException('Order total must be greater than zero.');
         }
 
+        $deliveryFeeMillimes = Money::toMillimes($deliveryZone->getFee());
+
+        $order->setDeliveryFee(
+            Money::fromMillimes($deliveryFeeMillimes)
+        );
         $order->setTotalAmount(
-            Money::fromMillimes($totalMillimes)
+            Money::fromMillimes($totalMillimes + $deliveryFeeMillimes)
         );
         $delivery = new Delivery();
 

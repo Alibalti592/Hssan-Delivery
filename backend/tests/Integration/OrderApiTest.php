@@ -4,6 +4,7 @@ namespace App\Tests\Integration;
 
 use App\Entity\Category;
 use App\Entity\Delivery;
+use App\Entity\DeliveryZone;
 use App\Entity\Product;
 use App\Entity\Restaurant;
 use App\Entity\User;
@@ -38,6 +39,7 @@ final class OrderApiTest extends WebTestCase
             $restaurant,
             $category
         );
+        $zone = $this->createTestDeliveryZone('4.000');
 
         $token = $this->authenticateClient($client, $user);
 
@@ -58,6 +60,7 @@ final class OrderApiTest extends WebTestCase
                 ],
                 'note' => 'Integration test',
                 'deliveryAddress' => 'Tunis, Tunisia',
+                'deliveryZoneId' => $zone->getId(),
             ])
         );
 
@@ -76,7 +79,17 @@ final class OrderApiTest extends WebTestCase
         );
 
         self::assertSame(
-            '25.000',
+            '4.000',
+            $responseData['deliveryFee']
+        );
+
+        self::assertSame(
+            $zone->getId(),
+            $responseData['deliveryZoneId']
+        );
+
+        self::assertSame(
+            '29.000',
             $responseData['totalAmount']
         );
 
@@ -147,6 +160,7 @@ final class OrderApiTest extends WebTestCase
                     ],
                 ],
                 'deliveryAddress' => 'Tunis, Tunisia',
+                'deliveryZoneId' => 1,
             ])
         );
 
@@ -197,6 +211,7 @@ final class OrderApiTest extends WebTestCase
                     ],
                 ],
                 'deliveryAddress' => 'Tunis, Tunisia',
+                'deliveryZoneId' => 1,
             ])
         );
 
@@ -223,6 +238,7 @@ final class OrderApiTest extends WebTestCase
         $user = $this->createTestUser();
 
         $restaurant = $this->createTestRestaurant();
+        $zone = $this->createTestDeliveryZone('4.000');
 
         $token = $this->authenticateClient($client, $user);
 
@@ -242,6 +258,7 @@ final class OrderApiTest extends WebTestCase
                     ],
                 ],
                 'deliveryAddress' => 'Tunis, Tunisia',
+                'deliveryZoneId' => $zone->getId(),
             ])
         );
 
@@ -276,6 +293,7 @@ final class OrderApiTest extends WebTestCase
             $otherRestaurant,
             $category
         );
+        $zone = $this->createTestDeliveryZone('4.000');
 
         $token = $this->authenticateClient($client, $user);
 
@@ -295,6 +313,7 @@ final class OrderApiTest extends WebTestCase
                     ],
                 ],
                 'deliveryAddress' => 'Tunis, Tunisia',
+                'deliveryZoneId' => $zone->getId(),
             ])
         );
 
@@ -328,6 +347,7 @@ final class OrderApiTest extends WebTestCase
             $category,
             false
         );
+        $zone = $this->createTestDeliveryZone('4.000');
 
         $token = $this->authenticateClient($client, $user);
 
@@ -347,6 +367,7 @@ final class OrderApiTest extends WebTestCase
                     ],
                 ],
                 'deliveryAddress' => 'Tunis, Tunisia',
+                'deliveryZoneId' => $zone->getId(),
             ])
         );
 
@@ -397,6 +418,7 @@ final class OrderApiTest extends WebTestCase
                     ],
                 ],
                 'deliveryAddress' => 'Tunis, Tunisia',
+                'deliveryZoneId' => 1,
             ])
         );
 
@@ -415,6 +437,95 @@ final class OrderApiTest extends WebTestCase
         self::assertNotEmpty(
             $response['errors']
         );
+    }
+
+    public function testCreateOrderFailsWhenDeliveryZoneDoesNotExist(): void
+    {
+        $client = static::createClient();
+
+        $this->entityManager = self::getContainer()
+            ->get(EntityManagerInterface::class);
+
+        $user = $this->createTestUser();
+
+        $restaurant = $this->createTestRestaurant();
+        $category = $this->createTestCategory($restaurant);
+        $product = $this->createTestProduct(
+            $restaurant,
+            $category
+        );
+
+        $token = $this->authenticateClient($client, $user);
+
+        $client->request(
+            'POST',
+            '/api/orders',
+            server: [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_AUTHORIZATION' => 'Bearer ' . $token,
+            ],
+            content: json_encode([
+                'restaurantId' => $restaurant->getId(),
+                'items' => [
+                    [
+                        'productId' => $product->getId(),
+                        'quantity' => 1,
+                    ],
+                ],
+                'deliveryAddress' => 'Tunis, Tunisia',
+                'deliveryZoneId' => 999999,
+            ])
+        );
+
+        self::assertResponseStatusCodeSame(400);
+
+        $response = json_decode(
+            $client->getResponse()->getContent(),
+            true
+        );
+
+        self::assertSame(
+            'Delivery zone not found.',
+            $response['message']
+        );
+    }
+
+    public function testDeliveryZonesCanBeListed(): void
+    {
+        $client = static::createClient();
+
+        $this->entityManager = self::getContainer()
+            ->get(EntityManagerInterface::class);
+
+        $user = $this->createTestUser();
+        $zone = $this->createTestDeliveryZone('4.000');
+
+        $token = $this->authenticateClient($client, $user);
+
+        $client->request(
+            'GET',
+            '/api/delivery-zones',
+            server: [
+                'HTTP_AUTHORIZATION' => 'Bearer ' . $token,
+            ]
+        );
+
+        self::assertResponseIsSuccessful();
+
+        $response = json_decode(
+            $client->getResponse()->getContent(),
+            true
+        );
+
+        self::assertIsArray($response);
+
+        $names = array_column($response, 'name');
+
+        self::assertContains($zone->getName(), $names);
+
+        $fees = array_column($response, 'fee', 'name');
+
+        self::assertSame('4.000', $fees[$zone->getName()]);
     }
 
     private function createTestUser(): User
@@ -498,6 +609,20 @@ final class OrderApiTest extends WebTestCase
         $this->entityManager->flush();
 
         return $product;
+    }
+
+    private function createTestDeliveryZone(
+        string $fee
+    ): DeliveryZone {
+        $zone = new DeliveryZone();
+
+        $zone->setName('Test Zone '.random_int(1000, 9999));
+        $zone->setFee($fee);
+
+        $this->entityManager->persist($zone);
+        $this->entityManager->flush();
+
+        return $zone;
     }
 
     private function authenticateClient(

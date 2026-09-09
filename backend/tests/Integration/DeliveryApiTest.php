@@ -4,6 +4,7 @@ namespace App\Tests\Integration;
 
 use App\Entity\Category;
 use App\Entity\Delivery;
+use App\Entity\DeliveryZone;
 use App\Entity\Order;
 use App\Entity\OrderItem;
 use App\Entity\Product;
@@ -869,13 +870,20 @@ final class DeliveryApiTest extends WebTestCase
             'Delivery Test Client'
         );
 
+        $deliveryZone = new DeliveryZone();
+
+        $deliveryZone->setName('Test Zone '.random_int(1000, 9999));
+        $deliveryZone->setFee('4.000');
+
         $order = new Order();
 
         $order->setUser($clientUser);
         $order->setRestaurant($restaurant);
         $order->setNote('Delivery integration test');
         $order->setDeliveryAddress('Tunis, Tunisia');
-        $order->setTotalAmount('12.500');
+        $order->setDeliveryZone($deliveryZone);
+        $order->setDeliveryFee('4.000');
+        $order->setTotalAmount('16.500');
         $order->setStatus(OrderStatus::PENDING);
 
         $orderItem = new OrderItem();
@@ -896,6 +904,7 @@ final class DeliveryApiTest extends WebTestCase
         $this->entityManager->persist($restaurant);
         $this->entityManager->persist($category);
         $this->entityManager->persist($product);
+        $this->entityManager->persist($deliveryZone);
         $this->entityManager->persist($order);
         $this->entityManager->persist($delivery);
 

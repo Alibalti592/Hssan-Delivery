@@ -169,8 +169,28 @@ Orders
 POST /api/orders
 GET  /api/orders
 GET  /api/orders/{id}
+Delivery zones
+GET  /api/delivery-zones
 
 The API is protected with JWT authentication and role-based authorization where required. Order and delivery listing endpoints scope results to the authenticated user; there is currently no admin-wide order listing (tracked in Phase 1 of the roadmap below).
+
+Delivery pricing
+
+Delivery fees are zone-based rather than distance/GPS-based: each named neighborhood is
+pre-assigned a fixed fee (currently seeded for the Bizerte area). The flow is:
+
+Customer selects their delivery zone from the list returned by GET /api/delivery-zones
+   ↓
+Customer confirms the order, sending deliveryZoneId alongside the item list
+   ↓
+POST /api/orders looks up that zone's fee and adds it to the item total
+   ↓
+The order response returns deliveryZoneId, deliveryZoneName, deliveryFee, and totalAmount
+(totalAmount = item total + deliveryFee)
+
+There is no geocoding or distance calculation involved — the customer picks their zone
+directly, and zones are managed in the database (seeded via migration, not yet exposed
+through an admin endpoint).
 
 Backend setup
 Requirements
@@ -347,6 +367,7 @@ login
 authenticated profile endpoint
 restaurant/product foundations
 order creation
+zone-based delivery pricing
 automatic delivery creation
 delivery assignment
 courier delivery lifecycle
@@ -434,7 +455,7 @@ Phase 1 — Backend domain completeness
  Product management
  Admin order management
  Courier management improvements
- Delivery pricing
+ Delivery pricing (done — zone-based, see "Delivery pricing" above; admin CRUD for zones still pending)
  Address / geolocation model
 Phase 2 — Restaurant operations
  Order confirmation

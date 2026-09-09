@@ -4,13 +4,12 @@ namespace App\Tests\Unit;
 
 use App\Enum\DeliveryStatus;
 use App\Enum\OrderStatus;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 final class DeliveryStatusTest extends TestCase
 {
-    /**
-     * @dataProvider mapping
-     */
+    #[DataProvider('mapping')]
     public function testToOrderStatus(DeliveryStatus $deliveryStatus, OrderStatus $expectedOrderStatus): void
     {
         self::assertSame($expectedOrderStatus, $deliveryStatus->toOrderStatus());

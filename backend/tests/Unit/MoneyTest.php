@@ -3,21 +3,18 @@
 namespace App\Tests\Unit;
 
 use App\Util\Money;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 final class MoneyTest extends TestCase
 {
-    /**
-     * @dataProvider amounts
-     */
+    #[DataProvider('amounts')]
     public function testToMillimes(string $amount, int $expected): void
     {
         self::assertSame($expected, Money::toMillimes($amount));
     }
 
-    /**
-     * @dataProvider amounts
-     */
+    #[DataProvider('amounts')]
     public function testFromMillimes(string $amount, int $millimes): void
     {
         self::assertSame($amount, Money::fromMillimes($millimes));
