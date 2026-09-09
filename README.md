@@ -155,6 +155,11 @@ GET    /api/admin/restaurants/{restaurantId}/products
 GET    /api/admin/products/{id}
 PUT    /api/admin/products/{id}
 PATCH  /api/admin/products/{id}/availability
+Admin delivery zone management
+POST /api/admin/delivery-zones
+GET  /api/admin/delivery-zones
+GET  /api/admin/delivery-zones/{id}
+PUT  /api/admin/delivery-zones/{id}
 Delivery management
 GET  /api/deliveries/mine
 
@@ -189,8 +194,10 @@ The order response returns deliveryZoneId, deliveryZoneName, deliveryFee, and to
 (totalAmount = item total + deliveryFee)
 
 There is no geocoding or distance calculation involved — the customer picks their zone
-directly, and zones are managed in the database (seeded via migration, not yet exposed
-through an admin endpoint).
+directly. Zones are seeded via migration and managed through the admin delivery zone
+endpoints above (name and fee are updatable; there is no delete endpoint, consistent
+with restaurants/categories/products — zones already referenced by past orders are
+never removed).
 
 Backend setup
 Requirements
@@ -455,7 +462,7 @@ Phase 1 — Backend domain completeness
  Product management
  Admin order management
  Courier management improvements
- Delivery pricing (done — zone-based, see "Delivery pricing" above; admin CRUD for zones still pending)
+ Delivery pricing (done — zone-based, see "Delivery pricing" above, including admin CRUD for zones)
  Address / geolocation model
 Phase 2 — Restaurant operations
  Order confirmation
