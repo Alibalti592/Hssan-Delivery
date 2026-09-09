@@ -2,20 +2,23 @@
 
 Hssan Delivery is a delivery platform currently under development.
 
-The project is structured around a Symfony REST API backend, a Flutter mobile application, and a planned React/Vite administration dashboard.
+The project is structured around a Symfony REST API backend, a React/Vite administration dashboard, and a Flutter mobile application.
 
 ## Current project structure
 
 ```text
 Hssan-Delivery/
 ├── backend/    # Symfony REST API
+├── admin/      # React + Vite admin dashboard
 ├── mobile/     # Flutter mobile application
-├── admin/      # Planned React + Vite dashboard
 └── .github/
     └── workflows/
         └── backend.yml
 
-Current status: The Symfony backend is the most advanced component. The Flutter application and React admin dashboard are not yet implemented as production-ready applications.
+Current status: The Symfony backend is the most advanced component, followed by
+the admin dashboard (covers restaurant/category/product/delivery-zone/courier
+management and order/delivery visibility — see `admin/README.md`). The Flutter
+application is not yet implemented as a production-ready application.
 
 Technology stack
 Backend
@@ -257,6 +260,13 @@ DATABASE_URL
 JWT_SECRET_KEY
 JWT_PUBLIC_KEY
 JWT_PASSPHRASE
+CORS_ALLOW_ORIGIN
+
+CORS_ALLOW_ORIGIN is a regex of browser origins allowed to call /api/* (via
+nelmio/cors-bundle). Needed for any browser-based client — the admin
+dashboard in particular. The example default covers any localhost/127.0.0.1
+port for local development; tighten it to the real deployed origin(s) in
+production.
 
 The local .env file must never be committed.
 
@@ -458,20 +468,24 @@ notifications
 map/navigation integration
 Admin dashboard
 
-The React/Vite admin dashboard is planned but is not yet implemented.
-
-Planned features:
+The React/Vite admin dashboard (`admin/`) is implemented and covers:
 
 admin authentication
-dashboard
-order management
-delivery monitoring
-courier management
-courier assignment
+dashboard (counts overview)
+order visibility (list + detail)
+delivery monitoring (list + detail)
+delivery assignment / cancellation
+courier management (list, create, activate/deactivate)
 restaurant management
 category management
 product/menu management
-operational statistics
+delivery zone management
+
+Not yet implemented in the dashboard:
+
+operational statistics beyond simple counts
+image/photo upload for restaurants or products
+pagination on any list (matches the backend, which doesn't paginate yet either)
 Future services
 
 The platform is intended to expand beyond restaurant delivery.
@@ -523,7 +537,7 @@ Phase 3 — Flutter application
  Courier application
  Courier delivery queue
  Delivery status actions
-Phase 4 — React admin dashboard
+Phase 4 — React admin dashboard (done — see admin/README.md)
  Admin authentication
  Dashboard
  Order management
