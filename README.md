@@ -57,6 +57,10 @@ A courier account is created by an administrator.
 
 The courier receives credentials from the administrator and uses them to authenticate through the mobile application.
 
+An admin can deactivate a courier account (e.g. one who has left) without deleting
+it. A deactivated account can no longer log in, and can no longer be assigned new
+deliveries — attempting either returns an explicit error rather than failing silently.
+
 A courier can:
 
 view assigned deliveries
@@ -71,6 +75,9 @@ The administrator can currently:
 
 authenticate
 create courier accounts
+list and view courier accounts
+deactivate/reactivate a courier account
+view all orders and deliveries
 assign deliveries to couriers
 cancel eligible deliveries
 
@@ -137,7 +144,10 @@ POST /api/auth/register
 POST /api/auth/login
 GET  /api/auth/me
 Admin courier management
-POST /api/admin/couriers
+POST  /api/admin/couriers
+GET   /api/admin/couriers
+GET   /api/admin/couriers/{id}
+PATCH /api/admin/couriers/{id}/active
 Admin restaurant management
 POST   /api/admin/restaurants
 GET    /api/admin/restaurants
@@ -289,6 +299,9 @@ courier authentication
 courier authorization
 admin restaurant, category, product and delivery zone management
 admin order and delivery visibility
+admin courier listing and deactivation
+deactivated accounts cannot log in
+deactivated couriers cannot be assigned deliveries
 delivery assignment
 delivery lifecycle transitions
 invalid delivery transitions
@@ -386,6 +399,7 @@ automatic delivery creation
 delivery assignment
 courier delivery lifecycle
 admin courier creation
+admin courier listing and deactivation
 admin order and delivery visibility
 role-based authorization
 order/delivery status synchronization
@@ -469,7 +483,7 @@ Phase 1 — Backend domain completeness
  Category management
  Product management
  Admin order management (done — see "Admin order management" and "Admin delivery oversight" above)
- Courier management improvements
+ Courier management improvements (done — list/show/deactivate, see "Admin courier management" above)
  Delivery pricing (done — zone-based, see "Delivery pricing" above, including admin CRUD for zones)
  Address / geolocation model
 Phase 2 — Restaurant operations

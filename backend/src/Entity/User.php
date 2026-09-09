@@ -43,6 +43,13 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\Column(nullable: true)]
     private ?\DateTimeImmutable $verifiedAt = null;
 
+    /**
+     * An admin can deactivate an account (e.g. a courier who left) without
+     * deleting it. A deactivated account can no longer authenticate.
+     */
+    #[ORM\Column(options: ['default' => true])]
+    private bool $isActive = true;
+
     #[ORM\Column]
     private ?\DateTimeImmutable $createdAt = null;
 
@@ -170,6 +177,18 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function isVerified(): bool
     {
         return null !== $this->verifiedAt;
+    }
+
+    public function isActive(): bool
+    {
+        return $this->isActive;
+    }
+
+    public function setActive(bool $isActive): static
+    {
+        $this->isActive = $isActive;
+
+        return $this;
     }
 
     public function getCreatedAt(): ?\DateTimeImmutable

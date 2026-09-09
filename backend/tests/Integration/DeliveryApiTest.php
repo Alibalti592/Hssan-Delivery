@@ -213,6 +213,62 @@ final class DeliveryApiTest extends WebTestCase
         );
     }
 
+    public function testAdminCannotAssignDeliveryToDeactivatedCourier(): void
+    {
+        $client = static::createClient();
+
+        $this->entityManager = self::getContainer()
+            ->get(EntityManagerInterface::class);
+
+        $admin = $this->createTestUser(
+            'ROLE_ADMIN',
+            'Test Admin'
+        );
+
+        $courier = $this->createTestUser(
+            'ROLE_LIVREUR',
+            'Deactivated Courier'
+        );
+
+        $courier->setActive(false);
+
+        $this->entityManager->flush();
+
+        $delivery = $this->createTestDelivery();
+
+        $token = $this->authenticateClient(
+            $client,
+            $admin
+        );
+
+        $client->request(
+            'POST',
+            sprintf(
+                '/api/deliveries/%d/assign/%d',
+                $delivery->getId(),
+                $courier->getId()
+            ),
+            server: [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_AUTHORIZATION' => 'Bearer ' . $token,
+            ]
+        );
+
+        self::assertResponseStatusCodeSame(
+            Response::HTTP_BAD_REQUEST
+        );
+
+        $response = json_decode(
+            $client->getResponse()->getContent(),
+            true
+        );
+
+        self::assertSame(
+            'This courier has been deactivated.',
+            $response['message']
+        );
+    }
+
     public function testCourierCanCompleteDeliveryLifecycle(): void
     {
         $client = static::createClient();

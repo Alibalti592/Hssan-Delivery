@@ -28,6 +28,10 @@ final class DeliveryService
                 throw new \RuntimeException('The selected user is not a courier.');
             }
 
+            if (!$courier->isActive()) {
+                throw new \RuntimeException('This courier has been deactivated.');
+            }
+
             $delivery->setCourier($courier);
             $delivery->setStatus(DeliveryStatus::ASSIGNED);
             $delivery->setAssignedAt(new \DateTimeImmutable());
