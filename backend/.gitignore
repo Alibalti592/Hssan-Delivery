@@ -9,6 +9,10 @@
 /vendor/
 ###< symfony/framework-bundle ###
 
+# Auto-generated container config array-shapes; regenerated on cache warmup
+# and on any bundle change, so it should never be committed.
+/config/reference.php
+
 .env.dev
 
 ###> lexik/jwt-authentication-bundle ###
