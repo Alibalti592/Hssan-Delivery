@@ -1,5 +1,5 @@
 import '../core/api_client.dart';
-import 'courier.dart';
+import 'account.dart';
 
 class AuthRepository {
   AuthRepository(this._api);
@@ -20,8 +20,22 @@ class AuthRepository {
     return token;
   }
 
-  Future<Courier> me() async {
+  /// Creates a ROLE_CLIENT account. Does not sign in — callers should
+  /// follow up with [login].
+  Future<void> register({
+    required String name,
+    required String phone,
+    required String password,
+  }) async {
+    await _api.post('/api/auth/register', {
+      'name': name,
+      'phone': phone,
+      'password': password,
+    });
+  }
+
+  Future<Account> me() async {
     final body = await _api.get('/api/auth/me');
-    return Courier.fromJson(body as Map<String, dynamic>);
+    return Account.fromJson(body as Map<String, dynamic>);
   }
 }

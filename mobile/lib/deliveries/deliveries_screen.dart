@@ -48,7 +48,7 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> {
   @override
   Widget build(BuildContext context) {
     final controller = context.watch<DeliveriesController>();
-    final courier = context.watch<AuthController>().courier;
+    final account = context.watch<AuthController>().account;
 
     return Scaffold(
       appBar: AppBar(
@@ -60,7 +60,7 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> {
             onPressed: _confirmSignOut,
           ),
         ],
-        bottom: courier == null
+        bottom: account == null
             ? null
             : PreferredSize(
                 preferredSize: const Size.fromHeight(24),
@@ -69,7 +69,7 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> {
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
                     child: Text(
-                      'Connecté en tant que ${courier.name}',
+                      'Connecté en tant que ${account.name}',
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
                   ),

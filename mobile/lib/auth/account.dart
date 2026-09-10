@@ -1,6 +1,8 @@
-/// The signed-in courier's profile, from `GET /api/auth/me`.
-class Courier {
-  Courier({
+/// The signed-in account's profile, from `GET /api/auth/me`. Shared by both
+/// personas this app serves: clients (ROLE_CLIENT) and couriers
+/// (ROLE_LIVREUR).
+class Account {
+  Account({
     required this.id,
     required this.name,
     required this.phone,
@@ -13,9 +15,10 @@ class Courier {
   final List<String> roles;
 
   bool get isCourier => roles.contains('ROLE_LIVREUR');
+  bool get isClient => roles.contains('ROLE_CLIENT');
 
-  factory Courier.fromJson(Map<String, dynamic> json) {
-    return Courier(
+  factory Account.fromJson(Map<String, dynamic> json) {
+    return Account(
       id: json['id'] as int,
       name: json['name'] as String? ?? '',
       phone: json['phone'] as String? ?? '',

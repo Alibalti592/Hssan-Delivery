@@ -1,10 +1,19 @@
-# Hssan Delivery — Courier App
+# Hssan Delivery — Mobile App
 
-Flutter application for couriers (`ROLE_LIVREUR`), UI in French. It covers the
-courier half of the delivery workflow end to end:
+Flutter application serving both end-user personas, UI in French. The
+signed-in account's role decides which half of the app is shown — no
+separate builds or flavors.
 
-- **Login** (`Espace livreur`) — phone + password against
-  `POST /api/auth/login`; non-courier accounts are rejected.
+- **Login / register** — phone + password against `POST /api/auth/login`;
+  new clients can self-register via `POST /api/auth/register`
+  (`ROLE_CLIENT`). Courier accounts are still admin-provisioned only. An
+  account with neither `ROLE_CLIENT` nor `ROLE_LIVREUR` (e.g. an admin-only
+  account) is rejected with a friendly message.
+- After sign-in, the app branches on the account's role: `ROLE_LIVREUR` →
+  the courier dashboard, `ROLE_CLIENT` → the client home.
+
+## Courier (`ROLE_LIVREUR`)
+
 - **Dashboard** (`Tableau de bord`) — greeting, a local availability toggle,
   today's delivered count and pending-proposal count, and a shortcut to the
   in-progress delivery if there is one.
@@ -20,7 +29,23 @@ courier half of the delivery workflow end to end:
   current status. Marking a delivery delivered opens a confirmation screen
   (`Livraison confirmée`) showing the amount collected.
 
-The client persona (browsing, cart, checkout, tracking) is not part of this app.
+## Client (`ROLE_CLIENT`)
+
+- **Restaurants** (`Restaurants`) — the public catalogue,
+  `GET /api/restaurants` (available restaurants only).
+- **Menu** — categories and products for a restaurant
+  (`GET /api/restaurants/{id}/categories`, `.../products`), with quantity
+  steppers to add/remove items.
+- **Cart** — a single restaurant's worth of items at a time (the backend's
+  order model is one restaurant per order); adding from a different
+  restaurant asks for confirmation before replacing the cart.
+- **Checkout** (`Livraison`) — delivery address (free text), delivery zone
+  (`GET /api/delivery-zones`, sets the delivery fee), an optional note, and a
+  live running total, then `POST /api/orders`.
+- **Order confirmation** — shown right after a successful order.
+- **Orders** (`Mes commandes`) — order history (`GET /api/orders`) and detail
+  (`GET /api/orders/{id}`) with status.
+- **Profile** — account name/phone and sign out.
 
 ## Requirements
 
@@ -45,8 +70,9 @@ flutter pub get
 flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8000
 ```
 
-Seed a courier account in the backend first (`composer fixtures`): `21000001` /
-`courier1234`.
+Seed accounts in the backend first (`composer fixtures`):
+courier `21000001` / `courier1234`, client `22000001` / `client1234` — or
+register a new client from the login screen.
 
 ## Test
 
@@ -65,11 +91,16 @@ lib/
   config.dart              API base URL (--dart-define)
   theme.dart               Material 3 theme (navy brand) + status colours
   core/                    HTTP client, typed errors, secure token storage
-  auth/                    login: repository, ChangeNotifier controller, screen
-  dashboard/               landing screen after login
-  deliveries/              queue, available-deliveries, detail, confirmation:
+  auth/                    login/register: repository, ChangeNotifier controller, screens
+  dashboard/               courier landing screen after login
+  deliveries/              courier queue, available-deliveries, detail, confirmation:
                            models, repository, controller, screens
-  widgets/                 shared UI (status chip)
+  catalogue/               restaurant/category/product models + repository
+  cart/                    single-restaurant cart (ChangeNotifier)
+  orders/                  client order models + repository
+  client/                  client home shell, restaurant/menu/cart/checkout,
+                           order history/detail, profile
+  widgets/                 shared UI (delivery status chip, order status chip)
 ```
 
 State management is `provider` + `ChangeNotifier`. The API client injects the JWT

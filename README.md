@@ -469,8 +469,12 @@ integration tests
 GitHub Actions CI
 Mobile
 
-The Flutter application (`mobile/`) currently implements the **courier app** —
-see `mobile/README.md`:
+The Flutter application (`mobile/`) now serves **both personas** — courier
+and client — from a single app, branching on the signed-in account's role
+right after login (`ROLE_LIVREUR` → courier dashboard, `ROLE_CLIENT` →
+client home). See `mobile/README.md`.
+
+Courier:
 
 courier authentication (ROLE_LIVREUR only)
 a dashboard (availability toggle, today's stats, current delivery shortcut)
@@ -481,16 +485,23 @@ accept / decline / pickup / on-the-way / delivered / fail actions
 a delivery-confirmed screen showing the amount collected
 tap-to-call the customer
 
+Client:
+
+client registration and authentication (ROLE_CLIENT)
+restaurant browsing (GET /api/restaurants)
+menu browsing by category with add-to-cart (GET .../categories, .../products)
+a cart (single-restaurant, quantity steppers, restaurant-switch confirmation)
+checkout (delivery address, delivery zone, optional note, live total)
+order placement (POST /api/orders) and a confirmation screen
+order history and order detail (GET /api/orders, GET /api/orders/{id})
+a profile screen (account info, sign out)
+
 Not yet in the app:
 
-the entire client persona (browsing, cart, checkout, order tracking)
 push notifications
 map / navigation integration
-
-The backend is no longer the blocker for the client persona: a public
-catalogue (GET /api/restaurants, .../categories, .../products, see
-"Catalogue" above) now exists for any signed-in account. What's missing is
-purely the client screens themselves in the Flutter app.
+saved-address picker in checkout (the backend has `/api/addresses`; checkout
+currently takes a free-text address)
 Admin dashboard
 
 The React/Vite admin dashboard (`admin/`) is implemented and covers:
@@ -550,17 +561,17 @@ Phase 2 — Restaurant operations
  Order preparation workflow
  Ready-for-pickup workflow
  Restaurant operational endpoints
-Phase 3 — Flutter application
- Client application shell
- Client authentication
- Restaurant browsing
- Catalogue
- Cart
- Checkout
- Order tracking
- Courier application
- Courier delivery queue
- Delivery status actions
+Phase 3 — Flutter application (done — see "Mobile" above)
+ Client application shell (done)
+ Client authentication (done)
+ Restaurant browsing (done)
+ Catalogue (done)
+ Cart (done)
+ Checkout (done)
+ Order tracking (done — history + detail; no push notifications yet)
+ Courier application (done)
+ Courier delivery queue (done)
+ Delivery status actions (done)
 Phase 4 — React admin dashboard (done — see admin/README.md)
  Admin authentication
  Dashboard

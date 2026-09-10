@@ -66,8 +66,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   Widget build(BuildContext context) {
     final controller = context.watch<DeliveriesController>();
-    final courier = context.watch<AuthController>().courier;
-    final firstName = courier?.name.split(' ').first ?? '';
+    final account = context.watch<AuthController>().account;
+    final firstName = account?.name.split(' ').first ?? '';
 
     if (!controller.loadedOnce && controller.loading) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));

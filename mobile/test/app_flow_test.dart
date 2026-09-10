@@ -67,20 +67,107 @@ void main() {
 
       expect(error, isNull);
       expect(auth.status, AuthStatus.signedIn);
-      expect(auth.courier!.name, 'Awa');
+      expect(auth.account!.name, 'Awa');
       expect(await storage.read(), 'jwt-123');
     });
 
-    test('rejects a non-courier account without persisting a token', () async {
+    test('signs in a client and stores the token', () async {
+      final storage = _MemoryTokenStorage();
+      final mock = MockClient((request) async {
+        if (request.url.path == '/api/auth/login') {
+          return _json({'token': 'jwt-456'});
+        }
+        if (request.url.path == '/api/auth/me') {
+          expect(request.headers['Authorization'], 'Bearer jwt-456');
+          return _json({
+            'id': 9,
+            'name': 'Sami',
+            'phone': '22000001',
+            'roles': ['ROLE_CLIENT', 'ROLE_USER'],
+            'isVerified': true,
+          });
+        }
+        return _json({'message': 'unexpected'}, 404);
+      });
+
+      late final AuthController auth;
+      auth = AuthController(
+        repository: AuthRepository(
+          ApiClient(
+            tokenProvider: () => auth.token,
+            onUnauthorized: () {},
+            httpClient: mock,
+          ),
+        ),
+        storage: storage,
+      );
+
+      final error = await auth.signIn('22000001', 'client1234');
+
+      expect(error, isNull);
+      expect(auth.status, AuthStatus.signedIn);
+      expect(auth.account!.isClient, isTrue);
+      expect(auth.account!.isCourier, isFalse);
+      expect(await storage.read(), 'jwt-456');
+    });
+
+    test('rejects an account with neither role, without persisting a token', () async {
       final storage = _MemoryTokenStorage();
       final mock = MockClient((request) async {
         if (request.url.path == '/api/auth/login') {
           return _json({'token': 'jwt-xyz'});
         }
         return _json({
-          'id': 9,
-          'name': 'Client',
-          'phone': '22000001',
+          'id': 1,
+          'name': 'Admin',
+          'phone': '20000000',
+          'roles': ['ROLE_ADMIN', 'ROLE_USER'],
+          'isVerified': true,
+        });
+      });
+
+      late final AuthController auth;
+      auth = AuthController(
+        repository: AuthRepository(
+          ApiClient(
+            tokenProvider: () => auth.token,
+            onUnauthorized: () {},
+            httpClient: mock,
+          ),
+        ),
+        storage: storage,
+      );
+
+      final error = await auth.signIn('20000000', 'admin1234');
+
+      expect(error, contains('client'));
+      expect(auth.status, isNot(AuthStatus.signedIn));
+      expect(await storage.read(), isNull);
+    });
+
+    test('register creates the account then signs in', () async {
+      final storage = _MemoryTokenStorage();
+      var registerCalled = false;
+      final mock = MockClient((request) async {
+        if (request.url.path == '/api/auth/register') {
+          registerCalled = true;
+          final body = jsonDecode(request.body) as Map<String, dynamic>;
+          expect(body['phone'], '22000099');
+          return _json({
+            'id': 42,
+            'name': 'Nouveau Client',
+            'phone': '22000099',
+            'roles': ['ROLE_CLIENT'],
+            'isVerified': true,
+          }, 201);
+        }
+        if (request.url.path == '/api/auth/login') {
+          return _json({'token': 'jwt-new'});
+        }
+        return _json({
+          'id': 42,
+          'name': 'Nouveau Client',
+          'phone': '22000099',
           'roles': ['ROLE_CLIENT', 'ROLE_USER'],
           'isVerified': true,
         });
@@ -98,11 +185,16 @@ void main() {
         storage: storage,
       );
 
-      final error = await auth.signIn('22000001', 'client1234');
+      final error = await auth.register(
+        name: 'Nouveau Client',
+        phone: '22000099',
+        password: 'client1234',
+      );
 
-      expect(error, contains('livreur'));
-      expect(auth.status, isNot(AuthStatus.signedIn));
-      expect(await storage.read(), isNull);
+      expect(registerCalled, isTrue);
+      expect(error, isNull);
+      expect(auth.status, AuthStatus.signedIn);
+      expect(await storage.read(), 'jwt-new');
     });
 
     test('maps a 401 to a friendly message', () async {

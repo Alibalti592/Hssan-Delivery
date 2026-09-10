@@ -4,28 +4,35 @@ import 'package:provider/provider.dart';
 import 'auth/auth_controller.dart';
 import 'auth/auth_repository.dart';
 import 'auth/login_screen.dart';
+import 'cart/cart.dart';
+import 'catalogue/catalogue_repository.dart';
+import 'client/client_home_screen.dart';
 import 'core/api_client.dart';
 import 'core/token_storage.dart';
 import 'dashboard/dashboard_screen.dart';
 import 'deliveries/deliveries_controller.dart';
 import 'deliveries/delivery_repository.dart';
+import 'orders/orders_repository.dart';
 import 'theme.dart';
 
 void main() {
-  runApp(const CourierApp());
+  runApp(const HssanDeliveryApp());
 }
 
-class CourierApp extends StatefulWidget {
-  const CourierApp({super.key});
+class HssanDeliveryApp extends StatefulWidget {
+  const HssanDeliveryApp({super.key});
 
   @override
-  State<CourierApp> createState() => _CourierAppState();
+  State<HssanDeliveryApp> createState() => _HssanDeliveryAppState();
 }
 
-class _CourierAppState extends State<CourierApp> {
+class _HssanDeliveryAppState extends State<HssanDeliveryApp> {
   late final AuthController _auth;
   late final ApiClient _api;
   late final DeliveriesController _deliveries;
+  late final CatalogueRepository _catalogue;
+  late final OrdersRepository _orders;
+  late final CartController _cart;
 
   @override
   void initState() {
@@ -42,6 +49,9 @@ class _CourierAppState extends State<CourierApp> {
       storage: TokenStorage(),
     );
     _deliveries = DeliveriesController(DeliveryRepository(_api));
+    _catalogue = CatalogueRepository(_api);
+    _orders = OrdersRepository(_api);
+    _cart = CartController();
 
     _auth.bootstrap();
   }
@@ -51,6 +61,7 @@ class _CourierAppState extends State<CourierApp> {
     _api.close();
     _auth.dispose();
     _deliveries.dispose();
+    _cart.dispose();
     super.dispose();
   }
 
@@ -60,9 +71,12 @@ class _CourierAppState extends State<CourierApp> {
       providers: [
         ChangeNotifierProvider.value(value: _auth),
         ChangeNotifierProvider.value(value: _deliveries),
+        ChangeNotifierProvider.value(value: _cart),
+        Provider.value(value: _catalogue),
+        Provider.value(value: _orders),
       ],
       child: MaterialApp(
-        title: 'Delivery Hassen — Livreur',
+        title: 'Delivery Hassen',
         debugShowCheckedModeBanner: false,
         theme: buildTheme(Brightness.light),
         darkTheme: buildTheme(Brightness.dark),
@@ -77,15 +91,17 @@ class _Root extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final status = context.watch<AuthController>().status;
+    final auth = context.watch<AuthController>();
 
-    switch (status) {
+    switch (auth.status) {
       case AuthStatus.unknown:
         return const Scaffold(body: Center(child: CircularProgressIndicator()));
       case AuthStatus.signedOut:
         return const LoginScreen();
       case AuthStatus.signedIn:
-        return const DashboardScreen();
+        return auth.account!.isCourier
+            ? const DashboardScreen()
+            : const ClientHomeScreen();
     }
   }
 }

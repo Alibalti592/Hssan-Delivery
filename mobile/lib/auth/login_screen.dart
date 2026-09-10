@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../theme.dart';
 import 'auth_controller.dart';
+import 'register_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -62,7 +63,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   SizedBox(height: 8),
                   Text(
-                    'Espace livreur',
+                    'Delivery Hassen',
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: 22,
@@ -71,7 +72,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   SizedBox(height: 4),
                   Text(
-                    'Connectez-vous pour prendre vos courses',
+                    'Connectez-vous pour continuer',
                     style: TextStyle(color: Colors.white70, fontSize: 14),
                   ),
                 ],
@@ -153,6 +154,18 @@ class _LoginScreenState extends State<LoginScreen> {
                               : const Text('Se connecter'),
                         ),
                         const SizedBox(height: 16),
+                        Center(
+                          child: TextButton(
+                            onPressed: busy
+                                ? null
+                                : () => Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) => const RegisterScreen(),
+                                    ),
+                                  ),
+                            child: const Text('Créer un compte client'),
+                          ),
+                        ),
                         Center(
                           child: Text(
                             'Compte livreur créé par un administrateur',

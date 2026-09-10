@@ -2,8 +2,8 @@ import 'package:flutter/foundation.dart';
 
 import '../core/api_exception.dart';
 import '../core/token_storage.dart';
+import 'account.dart';
 import 'auth_repository.dart';
-import 'courier.dart';
 
 enum AuthStatus { unknown, signedOut, signedIn }
 
@@ -18,12 +18,12 @@ class AuthController extends ChangeNotifier {
   final TokenStorage _storage;
 
   AuthStatus _status = AuthStatus.unknown;
-  Courier? _courier;
+  Account? _account;
   String? _token;
   bool _busy = false;
 
   AuthStatus get status => _status;
-  Courier? get courier => _courier;
+  Account? get account => _account;
   String? get token => _token;
   bool get busy => _busy;
 
@@ -37,12 +37,12 @@ class AuthController extends ChangeNotifier {
 
     _token = stored;
     try {
-      final courier = await _repository.me();
-      if (!courier.isCourier) {
+      final account = await _repository.me();
+      if (!account.isClient && !account.isCourier) {
         await _discard();
         return;
       }
-      _courier = courier;
+      _account = account;
       _set(AuthStatus.signedIn);
     } on ApiException {
       await _discard();
@@ -60,14 +60,14 @@ class AuthController extends ChangeNotifier {
       final token = await _repository.login(phone.trim(), password);
       _token = token;
 
-      final courier = await _repository.me();
-      if (!courier.isCourier) {
+      final account = await _repository.me();
+      if (!account.isClient && !account.isCourier) {
         _token = null;
-        return "Ce compte n'est pas un compte livreur.";
+        return "Ce compte n'est ni un compte client, ni un compte livreur.";
       }
 
       await _storage.write(token);
-      _courier = courier;
+      _account = account;
       _set(AuthStatus.signedIn);
       return null;
     } on ApiException catch (e) {
@@ -84,6 +84,34 @@ class AuthController extends ChangeNotifier {
     }
   }
 
+  /// Creates a ROLE_CLIENT account, then signs in with the same credentials.
+  /// Returns an error message on failure, or null on success.
+  Future<String?> register({
+    required String name,
+    required String phone,
+    required String password,
+  }) async {
+    _busy = true;
+    notifyListeners();
+    try {
+      await _repository.register(name: name, phone: phone, password: password);
+    } on ApiException catch (e) {
+      _busy = false;
+      notifyListeners();
+      return e.statusCode == 409
+          ? 'Un compte existe déjà avec ce numéro.'
+          : e.message;
+    } on NetworkException catch (e) {
+      _busy = false;
+      notifyListeners();
+      return e.message;
+    }
+
+    _busy = false;
+    notifyListeners();
+    return signIn(phone, password);
+  }
+
   Future<void> signOut() => _discard();
 
   /// Called by the API client when any request comes back 401.
@@ -96,7 +124,7 @@ class AuthController extends ChangeNotifier {
   Future<void> _discard() async {
     await _storage.clear();
     _token = null;
-    _courier = null;
+    _account = null;
     _set(AuthStatus.signedOut);
   }
 
