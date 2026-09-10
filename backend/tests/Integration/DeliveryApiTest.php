@@ -703,6 +703,19 @@ final class DeliveryApiTest extends WebTestCase
             $courier->getId(),
             $response[0]['courierId']
         );
+
+        // The courier needs the pickup/drop-off details, not just an order id.
+        $order = $response[0]['order'];
+
+        self::assertIsArray($order);
+        self::assertSame($delivery->getOrder()->getId(), $order['id']);
+        self::assertSame('Tunis, Tunisia', $order['deliveryAddress']);
+        self::assertSame('Delivery Test Client', $order['customerName']);
+        self::assertNotEmpty($order['customerPhone']);
+        self::assertNotEmpty($order['restaurantName']);
+        self::assertCount(1, $order['items']);
+        self::assertSame(1, $order['items'][0]['quantity']);
+        self::assertSame('12.500', $order['items'][0]['unitPrice']);
     }
 
     public function testClientCannotAccessCourierDeliveries(): void

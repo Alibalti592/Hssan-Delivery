@@ -190,6 +190,10 @@ POST /api/deliveries/{id}/on-the-way
 POST /api/deliveries/{id}/delivered
 POST /api/deliveries/{id}/cancel
 POST /api/deliveries/{id}/fail
+
+Every delivery response embeds an `order` summary (restaurant name, delivery
+address, customer name + phone, items, fee, total) so a courier has everything
+needed to carry out the job in one call.
 Orders
 POST /api/orders
 GET  /api/orders
