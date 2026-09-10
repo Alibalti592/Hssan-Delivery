@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../orders/order_models.dart';
 import '../orders/orders_repository.dart';
+import '../theme.dart';
 import '../widgets/order_status_chip.dart';
 
 class OrderDetailScreen extends StatefulWidget {
@@ -56,6 +57,15 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 ],
               ),
               const SizedBox(height: 16),
+              if (order.status != OrderStatus.cancelled) ...[
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+                    child: _StatusTimeline(status: order.status),
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(16),
@@ -155,6 +165,99 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             ],
           );
         },
+      ),
+    );
+  }
+}
+
+/// Progress through the order lifecycle, based purely on the current
+/// [OrderStatus] — the backend doesn't record a timestamp per stage, so this
+/// shows which stages are done/current/upcoming without inventing times.
+class _StatusTimeline extends StatelessWidget {
+  const _StatusTimeline({required this.status});
+
+  final OrderStatus status;
+
+  static const _stages = [
+    OrderStatus.pending,
+    OrderStatus.confirmed,
+    OrderStatus.preparing,
+    OrderStatus.readyForPickup,
+    OrderStatus.completed,
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final currentIndex = _stages.indexOf(status);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (var i = 0; i < _stages.length; i++)
+          _TimelineRow(
+            label: _stages[i].label,
+            isDone: i < currentIndex,
+            isCurrent: i == currentIndex,
+            isLast: i == _stages.length - 1,
+          ),
+      ],
+    );
+  }
+}
+
+class _TimelineRow extends StatelessWidget {
+  const _TimelineRow({
+    required this.label,
+    required this.isDone,
+    required this.isCurrent,
+    required this.isLast,
+  });
+
+  final String label;
+  final bool isDone;
+  final bool isCurrent;
+  final bool isLast;
+
+  @override
+  Widget build(BuildContext context) {
+    final active = isDone || isCurrent;
+    final dotColor = isCurrent ? warnText : (isDone ? successText : cardBorder);
+
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Column(
+            children: [
+              Container(
+                width: 11,
+                height: 11,
+                decoration: BoxDecoration(
+                  color: dotColor,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              if (!isLast)
+                Expanded(
+                  child: Container(width: 1.4, color: const Color(0xFFE6EAEF)),
+                ),
+            ],
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 14),
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontWeight: active ? FontWeight.w700 : FontWeight.w400,
+                  color: active ? navy : mutedText,
+                  fontSize: 13,
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

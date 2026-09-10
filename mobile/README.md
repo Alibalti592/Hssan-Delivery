@@ -33,19 +33,24 @@ separate builds or flavors.
 
 - **Restaurants** (`Restaurants`) — the public catalogue,
   `GET /api/restaurants` (available restaurants only).
-- **Menu** — categories and products for a restaurant
-  (`GET /api/restaurants/{id}/categories`, `.../products`), with quantity
-  steppers to add/remove items.
+- **Menu** — categories (as filter chips) and products for a restaurant
+  (`GET /api/restaurants/{id}/categories`, `.../products`), with inline
+  quantity steppers or a dedicated **product detail** screen (quantity
+  picker, running total) reached by tapping a row.
 - **Cart** — a single restaurant's worth of items at a time (the backend's
   order model is one restaurant per order); adding from a different
-  restaurant asks for confirmation before replacing the cart.
-- **Checkout** (`Livraison`) — delivery address (free text), delivery zone
-  (`GET /api/delivery-zones`, sets the delivery fee), an optional note, and a
-  live running total, then `POST /api/orders`.
+  restaurant asks for confirmation before replacing the cart. Reachable both
+  as its own tab and as a pushed screen while browsing.
+- **Checkout** (`Livraison`) — delivery address (free text, or picked from a
+  saved address), delivery zone (`GET /api/delivery-zones`, sets the delivery
+  fee), an optional note, and a live running total, then `POST /api/orders`.
 - **Order confirmation** — shown right after a successful order.
 - **Orders** (`Mes commandes`) — order history (`GET /api/orders`) and detail
-  (`GET /api/orders/{id}`) with status.
-- **Profile** — account name/phone and sign out.
+  (`GET /api/orders/{id}`) with a status timeline (pending → confirmed →
+  preparing → ready for pickup → completed, or cancelled).
+- **Saved addresses** (`Mes adresses`, from the profile menu) — list and add
+  (`GET`/`POST /api/addresses`); also usable as a picker from checkout.
+- **Profile** — account name/phone, saved addresses, and sign out.
 
 ## Requirements
 
@@ -98,9 +103,11 @@ lib/
   catalogue/               restaurant/category/product models + repository
   cart/                    single-restaurant cart (ChangeNotifier)
   orders/                  client order models + repository
-  client/                  client home shell, restaurant/menu/cart/checkout,
-                           order history/detail, profile
-  widgets/                 shared UI (delivery status chip, order status chip)
+  addresses/               saved-address models + repository
+  client/                  client home shell, restaurant/menu/product detail,
+                           cart/checkout, order history/detail, addresses,
+                           profile
+  widgets/                 shared UI (dark header, delivery/order status chips)
 ```
 
 State management is `provider` + `ChangeNotifier`. The API client injects the JWT

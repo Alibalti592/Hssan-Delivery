@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import 'addresses/address_repository.dart';
 import 'auth/auth_controller.dart';
 import 'auth/auth_repository.dart';
 import 'auth/login_screen.dart';
@@ -32,6 +33,7 @@ class _HssanDeliveryAppState extends State<HssanDeliveryApp> {
   late final DeliveriesController _deliveries;
   late final CatalogueRepository _catalogue;
   late final OrdersRepository _orders;
+  late final AddressRepository _addresses;
   late final CartController _cart;
 
   @override
@@ -51,6 +53,7 @@ class _HssanDeliveryAppState extends State<HssanDeliveryApp> {
     _deliveries = DeliveriesController(DeliveryRepository(_api));
     _catalogue = CatalogueRepository(_api);
     _orders = OrdersRepository(_api);
+    _addresses = AddressRepository(_api);
     _cart = CartController();
 
     _auth.bootstrap();
@@ -74,6 +77,7 @@ class _HssanDeliveryAppState extends State<HssanDeliveryApp> {
         ChangeNotifierProvider.value(value: _cart),
         Provider.value(value: _catalogue),
         Provider.value(value: _orders),
+        Provider.value(value: _addresses),
       ],
       child: MaterialApp(
         title: 'Delivery Hassen',

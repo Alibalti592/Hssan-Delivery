@@ -31,7 +31,11 @@ class CartController extends ChangeNotifier {
   bool belongsToDifferentRestaurant(int restaurantId) =>
       _restaurantId != null && _restaurantId != restaurantId;
 
-  void add(Product product, {required String restaurantName}) {
+  void add(
+    Product product, {
+    required String restaurantName,
+    int quantity = 1,
+  }) {
     if (belongsToDifferentRestaurant(product.restaurantId)) {
       _lines.clear();
     }
@@ -40,9 +44,9 @@ class CartController extends ChangeNotifier {
 
     final existing = _lines[product.id];
     if (existing != null) {
-      existing.quantity++;
+      existing.quantity += quantity;
     } else {
-      _lines[product.id] = CartLine(product: product, quantity: 1);
+      _lines[product.id] = CartLine(product: product, quantity: quantity);
     }
     notifyListeners();
   }

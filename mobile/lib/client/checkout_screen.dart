@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../addresses/address_models.dart';
 import '../cart/cart.dart';
 import '../core/api_exception.dart';
 import '../orders/order_models.dart';
 import '../orders/orders_repository.dart';
 import '../widgets/dark_header.dart';
+import 'addresses_screen.dart';
 import 'order_confirmed_screen.dart';
 
 class CheckoutScreen extends StatefulWidget {
@@ -35,6 +37,15 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     _address.dispose();
     _note.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickSavedAddress() async {
+    final picked = await Navigator.of(context).push<SavedAddress>(
+      MaterialPageRoute(builder: (_) => const AddressesScreen(pickMode: true)),
+    );
+    if (picked != null) {
+      setState(() => _address.text = picked.addressLine);
+    }
   }
 
   Future<void> _submit(CartController cart) async {
@@ -103,7 +114,15 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                             ? 'Adresse requise'
                             : null,
                       ),
-                      const SizedBox(height: 16),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: TextButton.icon(
+                          onPressed: _submitting ? null : _pickSavedAddress,
+                          icon: const Icon(Icons.place_outlined, size: 16),
+                          label: const Text('Choisir une adresse enregistrée'),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
                       FutureBuilder<List<DeliveryZoneOption>>(
                         future: _zonesFuture,
                         builder: (context, snapshot) {

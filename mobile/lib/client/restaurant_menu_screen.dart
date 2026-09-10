@@ -6,6 +6,7 @@ import '../catalogue/catalogue_models.dart';
 import '../catalogue/catalogue_repository.dart';
 import '../theme.dart';
 import 'cart_screen.dart';
+import 'product_detail_screen.dart';
 
 class RestaurantMenuScreen extends StatefulWidget {
   const RestaurantMenuScreen({required this.restaurant, super.key});
@@ -197,6 +198,14 @@ class _RestaurantMenuScreenState extends State<RestaurantMenuScreen> {
                           onAdd: () => _addToCart(product),
                           onIncrement: () => cart.increment(product.id),
                           onDecrement: () => cart.decrement(product.id),
+                          onTap: () => Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => ProductDetailScreen(
+                                product: product,
+                                restaurantName: widget.restaurant.name,
+                              ),
+                            ),
+                          ),
                         ),
                     ],
                   ],
@@ -269,6 +278,7 @@ class _ProductRow extends StatelessWidget {
     required this.onAdd,
     required this.onIncrement,
     required this.onDecrement,
+    required this.onTap,
   });
 
   final Product product;
@@ -276,102 +286,105 @@ class _ProductRow extends StatelessWidget {
   final VoidCallback onAdd;
   final VoidCallback onIncrement;
   final VoidCallback onDecrement;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 10),
-      decoration: const BoxDecoration(
-        border: Border(bottom: BorderSide(color: cardBorder)),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(6),
-            child: product.photoUrl != null
-                ? Image.network(
-                    product.photoUrl!,
-                    width: 44,
-                    height: 44,
-                    fit: BoxFit.cover,
-                  )
-                : Container(
-                    width: 44,
-                    height: 44,
-                    color: fieldFill,
-                    child: const Icon(
-                      Icons.restaurant_outlined,
-                      size: 18,
-                      color: Color(0xFF9FB0C4),
-                    ),
-                  ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  product.name,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
-                ),
-                if (product.description != null &&
-                    product.description!.isNotEmpty) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    product.description!,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                ],
-                const SizedBox(height: 4),
-                Text(
-                  '${product.price} DT',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: navy,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          quantity == 0
-              ? OutlinedButton(
-                  onPressed: onAdd,
-                  // The app-wide OutlinedButtonTheme sets minimumSize to
-                  // Size.fromHeight, i.e. an infinite width — fine for a
-                  // full-width Column button, but this one sits beside an
-                  // Expanded sibling in a Row, so it needs its own compact
-                  // bound or it swallows the row and starves the sibling.
-                  style: OutlinedButton.styleFrom(
-                    minimumSize: const Size(0, 34),
-                    padding: const EdgeInsets.symmetric(horizontal: 14),
-                  ),
-                  child: const Text('AJOUTER'),
-                )
-              : Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _QtyButton(icon: Icons.remove, onTap: onDecrement),
-                    SizedBox(
-                      width: 24,
-                      child: Text(
-                        '$quantity',
-                        textAlign: TextAlign.center,
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        decoration: const BoxDecoration(
+          border: Border(bottom: BorderSide(color: cardBorder)),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(6),
+              child: product.photoUrl != null
+                  ? Image.network(
+                      product.photoUrl!,
+                      width: 44,
+                      height: 44,
+                      fit: BoxFit.cover,
+                    )
+                  : Container(
+                      width: 44,
+                      height: 44,
+                      color: fieldFill,
+                      child: const Icon(
+                        Icons.restaurant_outlined,
+                        size: 18,
+                        color: Color(0xFF9FB0C4),
                       ),
                     ),
-                    _QtyButton(icon: Icons.add, onTap: onIncrement),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    product.name,
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  if (product.description != null &&
+                      product.description!.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      product.description!,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
                   ],
-                ),
-        ],
+                  const SizedBox(height: 4),
+                  Text(
+                    '${product.price} DT',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: navy,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            quantity == 0
+                ? OutlinedButton(
+                    onPressed: onAdd,
+                    // The app-wide OutlinedButtonTheme sets minimumSize to
+                    // Size.fromHeight, i.e. an infinite width — fine for a
+                    // full-width Column button, but this one sits beside an
+                    // Expanded sibling in a Row, so it needs its own compact
+                    // bound or it swallows the row and starves the sibling.
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size(0, 34),
+                      padding: const EdgeInsets.symmetric(horizontal: 14),
+                    ),
+                    child: const Text('AJOUTER'),
+                  )
+                : Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _QtyButton(icon: Icons.remove, onTap: onDecrement),
+                      SizedBox(
+                        width: 24,
+                        child: Text(
+                          '$quantity',
+                          textAlign: TextAlign.center,
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                      _QtyButton(icon: Icons.add, onTap: onIncrement),
+                    ],
+                  ),
+          ],
+        ),
       ),
     );
   }

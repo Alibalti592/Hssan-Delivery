@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../auth/auth_controller.dart';
 import '../theme.dart';
 import '../widgets/dark_header.dart';
+import 'addresses_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -76,6 +77,31 @@ class ProfileScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 16),
+              Card(
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(10),
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const AddressesScreen()),
+                  ),
+                  child: const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    child: Row(
+                      children: [
+                        Icon(Icons.place_outlined, size: 18, color: navy),
+                        SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            'Mes adresses',
+                            style: TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                        Icon(Icons.chevron_right, color: mutedText),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
               Card(
                 child: InkWell(
                   borderRadius: BorderRadius.circular(10),
