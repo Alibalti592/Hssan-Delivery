@@ -141,6 +141,16 @@ tr.row-link:hover td { background: #fafbfc; }
 .breadcrumb { font-size: 11px; color: #9aa0a6; margin-bottom: 6px; }
 .breadcrumb a:hover { color: #1b2437; text-decoration: underline; }
 
+/* ---- photo uploader ---- */
+.photo-row { display: flex; align-items: center; gap: 16px; margin-bottom: 18px; }
+.photo-box {
+  width: 96px; height: 96px; border-radius: 8px; background: #f7f9fb; border: 1px solid #e1e5eb;
+  display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0;
+}
+.photo-box img { width: 100%; height: 100%; object-fit: cover; }
+.photo-box .placeholder { font-size: 9.5px; color: #9aa0a6; text-align: center; padding: 0 6px; }
+.photo-actions { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+
 .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
 .detail-item .field-label { margin-bottom: 4px; }
 .detail-item .value { font-size: 13px; color: #1b2437; }

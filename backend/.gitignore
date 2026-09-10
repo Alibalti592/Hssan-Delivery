@@ -13,6 +13,10 @@
 # and on any bundle change, so it should never be committed.
 /config/reference.php
 
+# Admin-uploaded restaurant/product photos (PhotoUploader). Created on
+# demand; nothing here belongs in version control.
+/public/uploads/
+
 .env.dev
 
 ###> lexik/jwt-authentication-bundle ###

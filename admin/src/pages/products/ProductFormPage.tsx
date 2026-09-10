@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useParams } from 'react-router-dom';
 import { categoriesApi, productsApi, restaurantsApi } from '../../api/resources';
 import { PageHeader, Loading, ErrorBanner, Breadcrumb } from '../../components/ui';
+import { PhotoUploader } from '../../components/PhotoUploader';
 
 export default function ProductFormPage() {
   const { id, productId } = useParams();
@@ -69,9 +70,39 @@ export default function ProductFormPage() {
     },
   });
 
+  const uploadPhoto = useMutation({
+    mutationFn: (file: File) => productsApi.uploadPhoto(Number(productId), file),
+    onSuccess: (product) => {
+      queryClient.setQueryData(['products', 'detail', productId], product);
+      queryClient.invalidateQueries({ queryKey: ['products', restaurantId] });
+    },
+  });
+
+  const removePhoto = useMutation({
+    mutationFn: () => productsApi.removePhoto(Number(productId)),
+    onSuccess: (product) => {
+      queryClient.setQueryData(['products', 'detail', productId], product);
+      queryClient.invalidateQueries({ queryKey: ['products', restaurantId] });
+    },
+  });
+
+  const deleteProduct = useMutation({
+    mutationFn: () => productsApi.delete(Number(productId)),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['products', restaurantId] });
+      navigate(`/restaurants/${restaurantId}/products`);
+    },
+  });
+
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
     save.mutate();
+  }
+
+  function handleDelete() {
+    if (window.confirm(`Delete "${existing.data?.name}"? This cannot be undone.`)) {
+      deleteProduct.mutate();
+    }
   }
 
   if (isEdit && existing.isLoading) {
@@ -98,7 +129,20 @@ export default function ProductFormPage() {
           ]}
         />
         <div className="form-card">
-          <ErrorBanner error={save.error ?? existing.error} />
+          <ErrorBanner
+            error={save.error ?? existing.error ?? uploadPhoto.error ?? removePhoto.error ?? deleteProduct.error}
+          />
+
+          {isEdit && existing.data && (
+            <PhotoUploader
+              photoUrl={existing.data.photoUrl}
+              uploading={uploadPhoto.isPending}
+              removing={removePhoto.isPending}
+              onUpload={(file) => uploadPhoto.mutate(file)}
+              onRemove={() => removePhoto.mutate()}
+            />
+          )}
+
           <form onSubmit={handleSubmit}>
             <div className="field-group">
               <label className="field-label" htmlFor="name">
@@ -166,13 +210,25 @@ export default function ProductFormPage() {
                 Available to order
               </label>
             </div>
-            <button
-              type="submit"
-              className="btn"
-              disabled={save.isPending || !categoryId}
-            >
-              {save.isPending ? 'Saving…' : isEdit ? 'Save changes' : 'Create product'}
-            </button>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button
+                type="submit"
+                className="btn"
+                disabled={save.isPending || !categoryId}
+              >
+                {save.isPending ? 'Saving…' : isEdit ? 'Save changes' : 'Create product'}
+              </button>
+              {isEdit && (
+                <button
+                  type="button"
+                  className="btn danger"
+                  disabled={deleteProduct.isPending}
+                  onClick={handleDelete}
+                >
+                  {deleteProduct.isPending ? 'Deleting…' : 'Delete product'}
+                </button>
+              )}
+            </div>
           </form>
         </div>
       </div>

@@ -6,6 +6,7 @@ use App\Dto\Admin\CreateProductRequest;
 use App\Dto\Admin\ProductResponse;
 use App\Dto\Admin\UpdateProductAvailabilityRequest;
 use App\Dto\Admin\UpdateProductRequest;
+use App\Exception\InvalidOperationException;
 use App\Service\ProductService;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -168,5 +169,76 @@ final class AdminProductController extends AbstractApiController
         return $this->json(
             ProductResponse::fromEntity($product)
         );
+    }
+
+    #[Route(
+        '/products/{id}',
+        name: 'api_admin_product_delete',
+        methods: ['DELETE']
+    )]
+    public function delete(int $id): JsonResponse
+    {
+        $product = $this->productService->get($id);
+
+        if (null === $product) {
+            return $this->json(
+                ['message' => 'Product not found.'],
+                Response::HTTP_NOT_FOUND
+            );
+        }
+
+        $this->productService->delete($product);
+
+        return $this->json(null, Response::HTTP_NO_CONTENT);
+    }
+
+    #[Route(
+        '/products/{id}/photo',
+        name: 'api_admin_product_photo_upload',
+        methods: ['POST']
+    )]
+    public function uploadPhoto(
+        int $id,
+        Request $request,
+    ): JsonResponse {
+        $product = $this->productService->get($id);
+
+        if (null === $product) {
+            return $this->json(
+                ['message' => 'Product not found.'],
+                Response::HTTP_NOT_FOUND
+            );
+        }
+
+        $file = $request->files->get('photo');
+
+        if (null === $file) {
+            throw new InvalidOperationException('No photo was uploaded.');
+        }
+
+        $product = $this->productService->setPhoto($product, $file);
+
+        return $this->json(ProductResponse::fromEntity($product));
+    }
+
+    #[Route(
+        '/products/{id}/photo',
+        name: 'api_admin_product_photo_remove',
+        methods: ['DELETE']
+    )]
+    public function removePhoto(int $id): JsonResponse
+    {
+        $product = $this->productService->get($id);
+
+        if (null === $product) {
+            return $this->json(
+                ['message' => 'Product not found.'],
+                Response::HTTP_NOT_FOUND
+            );
+        }
+
+        $product = $this->productService->removePhoto($product);
+
+        return $this->json(ProductResponse::fromEntity($product));
     }
 }

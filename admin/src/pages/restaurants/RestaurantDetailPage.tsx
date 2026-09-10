@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { restaurantsApi } from '../../api/resources';
 import { PageHeader, Loading, ErrorBanner, Breadcrumb } from '../../components/ui';
+import { PhotoUploader } from '../../components/PhotoUploader';
 
 export default function RestaurantDetailPage() {
   const { id } = useParams();
@@ -39,9 +40,43 @@ export default function RestaurantDetailPage() {
     },
   });
 
+  const uploadPhoto = useMutation({
+    mutationFn: (file: File) => restaurantsApi.uploadPhoto(restaurantId, file),
+    onSuccess: (restaurant) => {
+      queryClient.setQueryData(['restaurants', restaurantId], restaurant);
+      queryClient.invalidateQueries({ queryKey: ['restaurants'] });
+    },
+  });
+
+  const removePhoto = useMutation({
+    mutationFn: () => restaurantsApi.removePhoto(restaurantId),
+    onSuccess: (restaurant) => {
+      queryClient.setQueryData(['restaurants', restaurantId], restaurant);
+      queryClient.invalidateQueries({ queryKey: ['restaurants'] });
+    },
+  });
+
+  const deleteRestaurant = useMutation({
+    mutationFn: () => restaurantsApi.delete(restaurantId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['restaurants'] });
+      navigate('/restaurants');
+    },
+  });
+
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
     update.mutate();
+  }
+
+  function handleDelete() {
+    if (
+      window.confirm(
+        `Delete "${data?.name}"? This also deletes its categories and products, and cannot be undone.`,
+      )
+    ) {
+      deleteRestaurant.mutate();
+    }
   }
 
   if (isLoading) {
@@ -85,7 +120,16 @@ export default function RestaurantDetailPage() {
         </div>
 
         <div className="form-card">
-          <ErrorBanner error={update.error} />
+          <ErrorBanner error={update.error ?? uploadPhoto.error ?? removePhoto.error ?? deleteRestaurant.error} />
+
+          <PhotoUploader
+            photoUrl={data.photoUrl}
+            uploading={uploadPhoto.isPending}
+            removing={removePhoto.isPending}
+            onUpload={(file) => uploadPhoto.mutate(file)}
+            onRemove={() => removePhoto.mutate()}
+          />
+
           <form onSubmit={handleSubmit}>
             <div className="field-group">
               <label className="field-label" htmlFor="name">
@@ -121,9 +165,19 @@ export default function RestaurantDetailPage() {
                 Open — accepting orders
               </label>
             </div>
-            <button type="submit" className="btn" disabled={update.isPending}>
-              {update.isPending ? 'Saving…' : 'Save changes'}
-            </button>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button type="submit" className="btn" disabled={update.isPending}>
+                {update.isPending ? 'Saving…' : 'Save changes'}
+              </button>
+              <button
+                type="button"
+                className="btn danger"
+                disabled={deleteRestaurant.isPending}
+                onClick={handleDelete}
+              >
+                {deleteRestaurant.isPending ? 'Deleting…' : 'Delete restaurant'}
+              </button>
+            </div>
           </form>
         </div>
       </div>

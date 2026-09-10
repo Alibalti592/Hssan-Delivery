@@ -1,6 +1,6 @@
 import type { ApiErrorBody } from './types';
 
-const API_URL = import.meta.env.VITE_API_URL ?? 'http://127.0.0.1:8000';
+export const API_URL = import.meta.env.VITE_API_URL ?? 'http://127.0.0.1:8000';
 
 const TOKEN_KEY = 'hssan_admin_token';
 
@@ -38,8 +38,13 @@ async function request<T>(
 ): Promise<T> {
   const token = getToken();
 
+  // FormData bodies (photo uploads) must NOT get a Content-Type here: the
+  // browser sets multipart/form-data with the correct boundary itself, and
+  // only when it's the one adding the header.
+  const isFormData = options.body instanceof FormData;
+
   const headers: Record<string, string> = {
-    ...(options.body ? { 'Content-Type': 'application/json' } : {}),
+    ...(options.body && !isFormData ? { 'Content-Type': 'application/json' } : {}),
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
   };
 
@@ -81,4 +86,11 @@ export const api = {
   patch: <T>(path: string, data: unknown) =>
     request<T>(path, { method: 'PATCH', body: JSON.stringify(data) }),
   delete: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
+  // No Content-Type header here: the browser sets multipart/form-data with
+  // the correct boundary itself, which it can only do when we don't set it.
+  upload: <T>(path: string, file: File, field = 'photo') => {
+    const body = new FormData();
+    body.append(field, file);
+    return request<T>(path, { method: 'POST', body });
+  },
 };

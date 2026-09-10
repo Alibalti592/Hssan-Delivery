@@ -3,6 +3,7 @@
 namespace App\Dto\Admin;
 
 use App\Entity\Product;
+use App\Service\PhotoUploader;
 
 final class ProductResponse
 {
@@ -14,6 +15,7 @@ final class ProductResponse
             'description' => $product->getDescription(),
             'price' => $product->getPrice(),
             'isAvailable' => $product->isAvailable(),
+            'photoUrl' => PhotoUploader::url($product->getPhotoFilename(), 'products'),
             'restaurantId' => $product->getRestaurant()?->getId(),
             'categoryId' => $product->getCategory()?->getId(),
             'createdAt' => $product->getCreatedAt()?->format(

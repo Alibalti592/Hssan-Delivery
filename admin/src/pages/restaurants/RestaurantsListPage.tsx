@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
+import { API_URL } from '../../api/client';
 import { restaurantsApi } from '../../api/resources';
 import { PageHeader, Loading, ErrorBanner, EmptyState, AvailabilityBadge, formatDate } from '../../components/ui';
 
@@ -39,6 +40,7 @@ export default function RestaurantsListPage() {
             <table>
               <thead>
                 <tr>
+                  <th></th>
                   <th>Name</th>
                   <th>Description</th>
                   <th>Status</th>
@@ -49,6 +51,17 @@ export default function RestaurantsListPage() {
               <tbody>
                 {data.map((r) => (
                   <tr key={r.id}>
+                    <td>
+                      <div className="photo-box" style={{ width: 36, height: 36 }}>
+                        {r.photoUrl ? (
+                          <img src={`${API_URL}${r.photoUrl}`} alt="" />
+                        ) : (
+                          <span className="placeholder" style={{ fontSize: 8 }}>
+                            No photo
+                          </span>
+                        )}
+                      </div>
+                    </td>
                     <td className="rname">{r.name}</td>
                     <td>{r.description ?? '—'}</td>
                     <td>

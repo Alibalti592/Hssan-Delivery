@@ -3,6 +3,7 @@ export interface Restaurant {
   name: string;
   description: string | null;
   isAvailable: boolean;
+  photoUrl: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -21,6 +22,7 @@ export interface Product {
   description: string | null;
   price: string;
   isAvailable: boolean;
+  photoUrl: string | null;
   restaurantId: number;
   categoryId: number;
   createdAt: string;

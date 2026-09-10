@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useParams } from 'react-router-dom';
+import { API_URL } from '../../api/client';
 import { categoriesApi, productsApi, restaurantsApi } from '../../api/resources';
 import { PageHeader, Loading, ErrorBanner, EmptyState, AvailabilityBadge, Breadcrumb, money } from '../../components/ui';
 
@@ -65,6 +66,7 @@ export default function ProductsListPage() {
             <table>
               <thead>
                 <tr>
+                  <th></th>
                   <th>Name</th>
                   <th>Category</th>
                   <th>Price</th>
@@ -75,6 +77,17 @@ export default function ProductsListPage() {
               <tbody>
                 {products.data.map((p) => (
                   <tr key={p.id}>
+                    <td>
+                      <div className="photo-box" style={{ width: 36, height: 36 }}>
+                        {p.photoUrl ? (
+                          <img src={`${API_URL}${p.photoUrl}`} alt="" />
+                        ) : (
+                          <span className="placeholder" style={{ fontSize: 8 }}>
+                            No photo
+                          </span>
+                        )}
+                      </div>
+                    </td>
                     <td className="rname">{p.name}</td>
                     <td>{categoryName(p.categoryId)}</td>
                     <td>{money(p.price)}</td>

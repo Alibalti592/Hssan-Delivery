@@ -5,9 +5,14 @@ namespace App\Tests\Integration;
 use App\Entity\Restaurant;
 use App\Entity\User;
 use App\Entity\Category;
+use App\Entity\DeliveryZone;
+use App\Entity\Order;
+use App\Entity\Product;
+use App\Enum\OrderStatus;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
+use Symfony\Component\HttpFoundation\File\UploadedFile;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
@@ -201,6 +206,437 @@ final class AdminRestaurantApiTest extends WebTestCase
             'errors',
             $response
         );
+    }
+
+    public function testAdminCanDeleteRestaurantWithoutOrders(): void
+    {
+        $client = static::createClient();
+
+        $this->entityManager = self::getContainer()
+            ->get(EntityManagerInterface::class);
+
+        $admin = $this->createTestUser(
+            'ROLE_ADMIN',
+            'Test Admin'
+        );
+
+        $restaurant = (new Restaurant())
+            ->setName('Deletable Restaurant')
+            ->setDescription(null)
+            ->setIsAvailable(true);
+
+        $this->entityManager->persist($restaurant);
+        $this->entityManager->flush();
+
+        $category = (new Category())
+            ->setName('Deletable Category')
+            ->setRestaurant($restaurant);
+
+        $this->entityManager->persist($category);
+
+        $product = (new Product())
+            ->setName('Deletable Product')
+            ->setPrice('10.000')
+            ->setIsAvailable(true)
+            ->setRestaurant($restaurant)
+            ->setCategory($category);
+
+        $this->entityManager->persist($product);
+        $this->entityManager->flush();
+
+        $restaurantId = $restaurant->getId();
+        $productId = $product->getId();
+        $categoryId = $category->getId();
+
+        $adminToken = $this->authenticateClient(
+            $client,
+            $admin
+        );
+
+        $client->request(
+            'DELETE',
+            '/api/admin/restaurants/'.$restaurantId,
+            server: [
+                'HTTP_AUTHORIZATION' => 'Bearer '.$adminToken,
+            ]
+        );
+
+        self::assertResponseStatusCodeSame(
+            Response::HTTP_NO_CONTENT
+        );
+
+        $this->entityManager->clear();
+
+        self::assertNull(
+            $this->entityManager->getRepository(Restaurant::class)->find($restaurantId)
+        );
+
+        self::assertNull(
+            $this->entityManager->getRepository(Product::class)->find($productId)
+        );
+
+        self::assertNull(
+            $this->entityManager->getRepository(Category::class)->find($categoryId)
+        );
+    }
+
+    public function testAdminCannotDeleteRestaurantWithOrders(): void
+    {
+        $client = static::createClient();
+
+        $this->entityManager = self::getContainer()
+            ->get(EntityManagerInterface::class);
+
+        $admin = $this->createTestUser(
+            'ROLE_ADMIN',
+            'Test Admin'
+        );
+
+        $clientUser = $this->createTestUser(
+            'ROLE_USER',
+            'Order Client'
+        );
+
+        $restaurant = (new Restaurant())
+            ->setName('Restaurant With Orders')
+            ->setDescription(null)
+            ->setIsAvailable(true);
+
+        $this->entityManager->persist($restaurant);
+
+        $deliveryZone = (new DeliveryZone())
+            ->setName('Zone '.random_int(1000, 9999))
+            ->setFee('4.000');
+
+        $this->entityManager->persist($deliveryZone);
+
+        $order = (new Order())
+            ->setUser($clientUser)
+            ->setRestaurant($restaurant)
+            ->setDeliveryAddress('Tunis, Tunisia')
+            ->setDeliveryZone($deliveryZone)
+            ->setDeliveryFee('4.000')
+            ->setTotalAmount('4.000')
+            ->setStatus(OrderStatus::PENDING);
+
+        $this->entityManager->persist($order);
+        $this->entityManager->flush();
+
+        $restaurantId = $restaurant->getId();
+
+        $adminToken = $this->authenticateClient(
+            $client,
+            $admin
+        );
+
+        $client->request(
+            'DELETE',
+            '/api/admin/restaurants/'.$restaurantId,
+            server: [
+                'HTTP_AUTHORIZATION' => 'Bearer '.$adminToken,
+            ]
+        );
+
+        self::assertResponseStatusCodeSame(
+            Response::HTTP_CONFLICT
+        );
+
+        $response = json_decode(
+            $client->getResponse()->getContent(),
+            true
+        );
+
+        self::assertSame(
+            'This restaurant has existing orders and cannot be deleted. Deactivate it instead.',
+            $response['message']
+        );
+
+        $this->entityManager->clear();
+
+        self::assertNotNull(
+            $this->entityManager->getRepository(Restaurant::class)->find($restaurantId)
+        );
+    }
+
+    public function testNonAdminCannotDeleteRestaurant(): void
+    {
+        $client = static::createClient();
+
+        $this->entityManager = self::getContainer()
+            ->get(EntityManagerInterface::class);
+
+        $clientUser = $this->createTestUser(
+            'ROLE_USER',
+            'Test Client'
+        );
+
+        $restaurant = (new Restaurant())
+            ->setName('Protected Restaurant')
+            ->setDescription(null)
+            ->setIsAvailable(true);
+
+        $this->entityManager->persist($restaurant);
+        $this->entityManager->flush();
+
+        $restaurantId = $restaurant->getId();
+
+        $token = $this->authenticateClient(
+            $client,
+            $clientUser
+        );
+
+        $client->request(
+            'DELETE',
+            '/api/admin/restaurants/'.$restaurantId,
+            server: [
+                'HTTP_AUTHORIZATION' => 'Bearer '.$token,
+            ]
+        );
+
+        self::assertResponseStatusCodeSame(
+            Response::HTTP_FORBIDDEN
+        );
+
+        $this->entityManager->clear();
+
+        self::assertNotNull(
+            $this->entityManager->getRepository(Restaurant::class)->find($restaurantId)
+        );
+    }
+
+    public function testAdminCanUploadAndReplaceAndRemoveRestaurantPhoto(): void
+    {
+        $client = static::createClient();
+
+        $this->entityManager = self::getContainer()
+            ->get(EntityManagerInterface::class);
+
+        $admin = $this->createTestUser(
+            'ROLE_ADMIN',
+            'Test Admin'
+        );
+
+        $restaurant = (new Restaurant())
+            ->setName('Photo Restaurant')
+            ->setDescription(null)
+            ->setIsAvailable(true);
+
+        $this->entityManager->persist($restaurant);
+        $this->entityManager->flush();
+
+        $restaurantId = $restaurant->getId();
+
+        $adminToken = $this->authenticateClient(
+            $client,
+            $admin
+        );
+
+        // Upload
+        $client->request(
+            'POST',
+            '/api/admin/restaurants/'.$restaurantId.'/photo',
+            server: [
+                'HTTP_AUTHORIZATION' => 'Bearer '.$adminToken,
+            ],
+            files: [
+                'photo' => $this->createPngUploadedFile(),
+            ]
+        );
+
+        self::assertResponseStatusCodeSame(
+            Response::HTTP_OK
+        );
+
+        $response = json_decode(
+            $client->getResponse()->getContent(),
+            true
+        );
+
+        self::assertIsString($response['photoUrl']);
+        self::assertStringStartsWith('/uploads/restaurants/', $response['photoUrl']);
+
+        $this->entityManager->clear();
+
+        $restaurant = $this->entityManager
+            ->getRepository(Restaurant::class)
+            ->find($restaurantId);
+
+        $firstFilename = $restaurant->getPhotoFilename();
+
+        self::assertNotNull($firstFilename);
+
+        $uploadsDir = self::getContainer()->getParameter('kernel.project_dir').'/public/uploads/restaurants';
+
+        self::assertFileExists($uploadsDir.'/'.$firstFilename);
+
+        // Replace
+        $client->request(
+            'POST',
+            '/api/admin/restaurants/'.$restaurantId.'/photo',
+            server: [
+                'HTTP_AUTHORIZATION' => 'Bearer '.$adminToken,
+            ],
+            files: [
+                'photo' => $this->createPngUploadedFile(),
+            ]
+        );
+
+        self::assertResponseStatusCodeSame(
+            Response::HTTP_OK
+        );
+
+        $this->entityManager->clear();
+
+        $restaurant = $this->entityManager
+            ->getRepository(Restaurant::class)
+            ->find($restaurantId);
+
+        $secondFilename = $restaurant->getPhotoFilename();
+
+        self::assertNotNull($secondFilename);
+        self::assertNotSame($firstFilename, $secondFilename);
+        self::assertFileDoesNotExist($uploadsDir.'/'.$firstFilename);
+        self::assertFileExists($uploadsDir.'/'.$secondFilename);
+
+        // Remove
+        $client->request(
+            'DELETE',
+            '/api/admin/restaurants/'.$restaurantId.'/photo',
+            server: [
+                'HTTP_AUTHORIZATION' => 'Bearer '.$adminToken,
+            ]
+        );
+
+        self::assertResponseStatusCodeSame(
+            Response::HTTP_OK
+        );
+
+        $response = json_decode(
+            $client->getResponse()->getContent(),
+            true
+        );
+
+        self::assertNull($response['photoUrl']);
+        self::assertFileDoesNotExist($uploadsDir.'/'.$secondFilename);
+    }
+
+    public function testUploadingNonImageRestaurantPhotoIsRejected(): void
+    {
+        $client = static::createClient();
+
+        $this->entityManager = self::getContainer()
+            ->get(EntityManagerInterface::class);
+
+        $admin = $this->createTestUser(
+            'ROLE_ADMIN',
+            'Test Admin'
+        );
+
+        $restaurant = (new Restaurant())
+            ->setName('Text File Restaurant')
+            ->setDescription(null)
+            ->setIsAvailable(true);
+
+        $this->entityManager->persist($restaurant);
+        $this->entityManager->flush();
+
+        $restaurantId = $restaurant->getId();
+
+        $adminToken = $this->authenticateClient(
+            $client,
+            $admin
+        );
+
+        $client->request(
+            'POST',
+            '/api/admin/restaurants/'.$restaurantId.'/photo',
+            server: [
+                'HTTP_AUTHORIZATION' => 'Bearer '.$adminToken,
+            ],
+            files: [
+                'photo' => $this->createTextUploadedFile(),
+            ]
+        );
+
+        self::assertResponseStatusCodeSame(
+            Response::HTTP_BAD_REQUEST
+        );
+
+        $response = json_decode(
+            $client->getResponse()->getContent(),
+            true
+        );
+
+        self::assertSame(
+            'Only JPEG, PNG or WebP images are allowed.',
+            $response['message']
+        );
+    }
+
+    public function testNonAdminCannotUploadRestaurantPhoto(): void
+    {
+        $client = static::createClient();
+
+        $this->entityManager = self::getContainer()
+            ->get(EntityManagerInterface::class);
+
+        $clientUser = $this->createTestUser(
+            'ROLE_USER',
+            'Test Client'
+        );
+
+        $restaurant = (new Restaurant())
+            ->setName('Protected Photo Restaurant')
+            ->setDescription(null)
+            ->setIsAvailable(true);
+
+        $this->entityManager->persist($restaurant);
+        $this->entityManager->flush();
+
+        $restaurantId = $restaurant->getId();
+
+        $token = $this->authenticateClient(
+            $client,
+            $clientUser
+        );
+
+        $client->request(
+            'POST',
+            '/api/admin/restaurants/'.$restaurantId.'/photo',
+            server: [
+                'HTTP_AUTHORIZATION' => 'Bearer '.$token,
+            ],
+            files: [
+                'photo' => $this->createPngUploadedFile(),
+            ]
+        );
+
+        self::assertResponseStatusCodeSame(
+            Response::HTTP_FORBIDDEN
+        );
+    }
+
+    private function createPngUploadedFile(): UploadedFile
+    {
+        $path = tempnam(sys_get_temp_dir(), 'photo').'.png';
+
+        file_put_contents(
+            $path,
+            base64_decode(
+                'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII='
+            )
+        );
+
+        return new UploadedFile($path, 'photo.png', 'image/png', null, true);
+    }
+
+    private function createTextUploadedFile(): UploadedFile
+    {
+        $path = tempnam(sys_get_temp_dir(), 'notes').'.txt';
+
+        file_put_contents($path, 'This is not an image.');
+
+        return new UploadedFile($path, 'notes.txt', 'text/plain', null, true);
     }
 
     private function createTestUser(

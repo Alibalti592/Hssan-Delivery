@@ -27,6 +27,10 @@ export const restaurantsApi = {
     api.put<Restaurant>(`/api/admin/restaurants/${id}`, data),
   setAvailability: (id: number, isAvailable: boolean) =>
     api.patch<Restaurant>(`/api/admin/restaurants/${id}/availability`, { isAvailable }),
+  delete: (id: number) => api.delete<void>(`/api/admin/restaurants/${id}`),
+  uploadPhoto: (id: number, file: File) =>
+    api.upload<Restaurant>(`/api/admin/restaurants/${id}/photo`, file),
+  removePhoto: (id: number) => api.delete<Restaurant>(`/api/admin/restaurants/${id}/photo`),
 };
 
 // Categories
@@ -55,6 +59,10 @@ export const productsApi = {
   ) => api.put<Product>(`/api/admin/products/${id}`, data),
   setAvailability: (id: number, isAvailable: boolean) =>
     api.patch<Product>(`/api/admin/products/${id}/availability`, { isAvailable }),
+  delete: (id: number) => api.delete<void>(`/api/admin/products/${id}`),
+  uploadPhoto: (id: number, file: File) =>
+    api.upload<Product>(`/api/admin/products/${id}/photo`, file),
+  removePhoto: (id: number) => api.delete<Product>(`/api/admin/products/${id}/photo`),
 };
 
 // Delivery zones

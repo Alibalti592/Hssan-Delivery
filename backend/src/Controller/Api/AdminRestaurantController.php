@@ -3,8 +3,10 @@
 namespace App\Controller\Api;
 
 use App\Dto\Admin\CreateRestaurantRequest;
+use App\Dto\Admin\RestaurantResponse;
 use App\Dto\Admin\UpdateRestaurantAvailabilityRequest;
 use App\Dto\Admin\UpdateRestaurantRequest;
+use App\Exception\InvalidOperationException;
 use App\Service\RestaurantService;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -35,18 +37,7 @@ final class AdminRestaurantController extends AbstractApiController
         $restaurant = $this->restaurantService->create($dto);
 
         return $this->json(
-            [
-                'id' => $restaurant->getId(),
-                'name' => $restaurant->getName(),
-                'description' => $restaurant->getDescription(),
-                'isAvailable' => $restaurant->isAvailable(),
-                'createdAt' => $restaurant->getCreatedAt()?->format(
-                    \DateTimeInterface::ATOM
-                ),
-                'updatedAt' => $restaurant->getUpdatedAt()?->format(
-                    \DateTimeInterface::ATOM
-                ),
-            ],
+            RestaurantResponse::fromEntity($restaurant),
             Response::HTTP_CREATED
         );
     }
@@ -58,18 +49,7 @@ final class AdminRestaurantController extends AbstractApiController
 
         return $this->json(
             array_map(
-                static fn ($restaurant) => [
-                    'id' => $restaurant->getId(),
-                    'name' => $restaurant->getName(),
-                    'description' => $restaurant->getDescription(),
-                    'isAvailable' => $restaurant->isAvailable(),
-                    'createdAt' => $restaurant->getCreatedAt()?->format(
-                        \DateTimeInterface::ATOM
-                    ),
-                    'updatedAt' => $restaurant->getUpdatedAt()?->format(
-                        \DateTimeInterface::ATOM
-                    ),
-                ],
+                static fn ($restaurant) => RestaurantResponse::fromEntity($restaurant),
                 $restaurants
             )
         );
@@ -87,18 +67,7 @@ final class AdminRestaurantController extends AbstractApiController
             );
         }
 
-        return $this->json([
-            'id' => $restaurant->getId(),
-            'name' => $restaurant->getName(),
-            'description' => $restaurant->getDescription(),
-            'isAvailable' => $restaurant->isAvailable(),
-            'createdAt' => $restaurant->getCreatedAt()?->format(
-                \DateTimeInterface::ATOM
-            ),
-            'updatedAt' => $restaurant->getUpdatedAt()?->format(
-                \DateTimeInterface::ATOM
-            ),
-        ]);
+        return $this->json(RestaurantResponse::fromEntity($restaurant));
     }
 
     #[Route('/{id}', name: 'api_admin_restaurant_update', methods: ['PUT'])]
@@ -123,18 +92,24 @@ final class AdminRestaurantController extends AbstractApiController
             $dto
         );
 
-        return $this->json([
-            'id' => $restaurant->getId(),
-            'name' => $restaurant->getName(),
-            'description' => $restaurant->getDescription(),
-            'isAvailable' => $restaurant->isAvailable(),
-            'createdAt' => $restaurant->getCreatedAt()?->format(
-                \DateTimeInterface::ATOM
-            ),
-            'updatedAt' => $restaurant->getUpdatedAt()?->format(
-                \DateTimeInterface::ATOM
-            ),
-        ]);
+        return $this->json(RestaurantResponse::fromEntity($restaurant));
+    }
+
+    #[Route('/{id}', name: 'api_admin_restaurant_delete', methods: ['DELETE'])]
+    public function delete(int $id): JsonResponse
+    {
+        $restaurant = $this->restaurantService->get($id);
+
+        if (null === $restaurant) {
+            return $this->json(
+                ['message' => 'Restaurant not found.'],
+                Response::HTTP_NOT_FOUND
+            );
+        }
+
+        $this->restaurantService->delete($restaurant);
+
+        return $this->json(null, Response::HTTP_NO_CONTENT);
     }
 
     #[Route(
@@ -163,17 +138,56 @@ final class AdminRestaurantController extends AbstractApiController
             $dto->isAvailable
         );
 
-        return $this->json([
-            'id' => $restaurant->getId(),
-            'name' => $restaurant->getName(),
-            'description' => $restaurant->getDescription(),
-            'isAvailable' => $restaurant->isAvailable(),
-            'createdAt' => $restaurant->getCreatedAt()?->format(
-                \DateTimeInterface::ATOM
-            ),
-            'updatedAt' => $restaurant->getUpdatedAt()?->format(
-                \DateTimeInterface::ATOM
-            ),
-        ]);
+        return $this->json(RestaurantResponse::fromEntity($restaurant));
+    }
+
+    #[Route(
+        '/{id}/photo',
+        name: 'api_admin_restaurant_photo_upload',
+        methods: ['POST']
+    )]
+    public function uploadPhoto(
+        int $id,
+        Request $request,
+    ): JsonResponse {
+        $restaurant = $this->restaurantService->get($id);
+
+        if (null === $restaurant) {
+            return $this->json(
+                ['message' => 'Restaurant not found.'],
+                Response::HTTP_NOT_FOUND
+            );
+        }
+
+        $file = $request->files->get('photo');
+
+        if (null === $file) {
+            throw new InvalidOperationException('No photo was uploaded.');
+        }
+
+        $restaurant = $this->restaurantService->setPhoto($restaurant, $file);
+
+        return $this->json(RestaurantResponse::fromEntity($restaurant));
+    }
+
+    #[Route(
+        '/{id}/photo',
+        name: 'api_admin_restaurant_photo_remove',
+        methods: ['DELETE']
+    )]
+    public function removePhoto(int $id): JsonResponse
+    {
+        $restaurant = $this->restaurantService->get($id);
+
+        if (null === $restaurant) {
+            return $this->json(
+                ['message' => 'Restaurant not found.'],
+                Response::HTTP_NOT_FOUND
+            );
+        }
+
+        $restaurant = $this->restaurantService->removePhoto($restaurant);
+
+        return $this->json(RestaurantResponse::fromEntity($restaurant));
     }
 }
