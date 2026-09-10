@@ -74,6 +74,13 @@
         "test": [
             "@test-db-reset",
             "php bin/phpunit"
+        ],
+        "fixtures": "php bin/console doctrine:fixtures:load --append --no-interaction",
+        "db-reset": [
+            "php bin/console doctrine:database:drop --force --if-exists",
+            "php bin/console doctrine:database:create",
+            "php bin/console doctrine:migrations:migrate --no-interaction",
+            "@fixtures"
         ]
     },
     "conflict": {
@@ -86,6 +93,7 @@
         }
     },
     "require-dev": {
+        "doctrine/doctrine-fixtures-bundle": "^4.3",
         "friendsofphp/php-cs-fixer": "^3.95",
         "phpunit/phpunit": "^11.5",
         "symfony/browser-kit": "7.4.*",

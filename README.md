@@ -304,6 +304,28 @@ php bin/console doctrine:migrations:migrate
 Clear the Symfony cache:
 
 php bin/console cache:clear
+Seed data (dev / test)
+
+Load a reproducible set of demo data — one account per role, a small
+catalogue, and a few orders/deliveries in different states:
+
+composer fixtures
+
+Or rebuild the whole local database from scratch (drop, create, migrate,
+seed) in one step:
+
+composer db-reset
+
+The fixture is idempotent: if its admin account already exists it does
+nothing, so `composer fixtures` is safe to re-run. It never touches the
+migration-seeded delivery zones. Seeded credentials (phone / password):
+
+admin     20000000 / admin1234
+courier   21000001 / courier1234   (active)
+courier   21000002 / courier1234   (deactivated)
+client    22000001 / client1234
+client    22000002 / client1234
+
 Run the backend
 
 Using the Symfony CLI:
