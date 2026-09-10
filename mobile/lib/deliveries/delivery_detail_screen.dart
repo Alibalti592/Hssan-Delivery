@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../widgets/decorative_map.dart';
 import '../widgets/status_chip.dart';
 import 'deliveries_controller.dart';
 import 'delivery.dart';
@@ -26,91 +27,109 @@ class DeliveryDetailScreen extends StatelessWidget {
 
     final order = delivery.order;
     final busy = controller.actingOnId == delivery.id;
+    final onTheRoad =
+        delivery.status == DeliveryStatus.accepted ||
+        delivery.status == DeliveryStatus.pickedUp ||
+        delivery.status == DeliveryStatus.onTheWay;
 
     return Scaffold(
       appBar: AppBar(title: Text('Course #${delivery.id}')),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
+      body: Column(
         children: [
-          Row(
-            children: [
-              Text('Statut', style: Theme.of(context).textTheme.titleMedium),
-              const Spacer(),
-              StatusChip(delivery.status),
-            ],
-          ),
-          const SizedBox(height: 16),
-          if (order != null) ...[
-            _Section(
-              icon: Icons.storefront_outlined,
-              title: 'Récupérer chez',
-              child: Text(
-                order.restaurantName,
-                style: Theme.of(context).textTheme.bodyLarge,
-              ),
-            ),
-            _Section(
-              icon: Icons.place_outlined,
-              title: 'Livrer à',
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    order.deliveryAddress,
-                    style: Theme.of(context).textTheme.bodyLarge,
-                  ),
-                  if (order.note != null && order.note!.trim().isNotEmpty) ...[
-                    const SizedBox(height: 6),
+          if (onTheRoad) const DecorativeMap(),
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
+                Row(
+                  children: [
                     Text(
-                      'Note : ${order.note}',
-                      style: Theme.of(context).textTheme.bodySmall,
+                      'Statut',
+                      style: Theme.of(context).textTheme.titleMedium,
                     ),
+                    const Spacer(),
+                    StatusChip(delivery.status),
                   ],
-                ],
-              ),
-            ),
-            _Section(
-              icon: Icons.person_outline,
-              title: 'Client',
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    order.customerName,
-                    style: Theme.of(context).textTheme.bodyLarge,
+                ),
+                const SizedBox(height: 16),
+                if (order != null) ...[
+                  _Section(
+                    icon: Icons.storefront_outlined,
+                    title: 'Récupérer chez',
+                    child: Text(
+                      order.restaurantName,
+                      style: Theme.of(context).textTheme.bodyLarge,
+                    ),
                   ),
-                  if (order.customerPhone.isNotEmpty) ...[
-                    const SizedBox(height: 8),
-                    OutlinedButton.icon(
-                      onPressed: () => _call(context, order.customerPhone),
-                      icon: const Icon(Icons.phone),
-                      label: Text(order.customerPhone),
+                  _Section(
+                    icon: Icons.place_outlined,
+                    title: 'Livrer à',
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          order.deliveryAddress,
+                          style: Theme.of(context).textTheme.bodyLarge,
+                        ),
+                        if (order.note != null &&
+                            order.note!.trim().isNotEmpty) ...[
+                          const SizedBox(height: 6),
+                          Text(
+                            'Note : ${order.note}',
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                        ],
+                      ],
                     ),
-                  ],
-                ],
-              ),
-            ),
-            _Section(
-              icon: Icons.receipt_long_outlined,
-              title: 'Commande',
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  for (final item in order.items)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 4),
-                      child: Text('${item.quantity}× ${item.productName}'),
+                  ),
+                  _Section(
+                    icon: Icons.person_outline,
+                    title: 'Client',
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          order.customerName,
+                          style: Theme.of(context).textTheme.bodyLarge,
+                        ),
+                        if (order.customerPhone.isNotEmpty) ...[
+                          const SizedBox(height: 8),
+                          OutlinedButton.icon(
+                            onPressed: () =>
+                                _call(context, order.customerPhone),
+                            icon: const Icon(Icons.phone),
+                            label: Text(order.customerPhone),
+                          ),
+                        ],
+                      ],
                     ),
-                  const Divider(height: 20),
-                  _MoneyRow('Frais de livraison', order.deliveryFee),
-                  _MoneyRow('Total', order.totalAmount, bold: true),
-                ],
-              ),
+                  ),
+                  _Section(
+                    icon: Icons.receipt_long_outlined,
+                    title: 'Commande',
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        for (final item in order.items)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 4),
+                            child: Text(
+                              '${item.quantity}× ${item.productName}',
+                            ),
+                          ),
+                        const Divider(height: 20),
+                        _MoneyRow('Frais de livraison', order.deliveryFee),
+                        _MoneyRow('Total', order.totalAmount, bold: true),
+                      ],
+                    ),
+                  ),
+                ] else
+                  const Text('Les détails de la commande sont indisponibles.'),
+                const SizedBox(height: 8),
+                _ActionBar(delivery: delivery, busy: busy),
+              ],
             ),
-          ] else
-            const Text('Les détails de la commande sont indisponibles.'),
-          const SizedBox(height: 8),
-          _ActionBar(delivery: delivery, busy: busy),
+          ),
         ],
       ),
     );

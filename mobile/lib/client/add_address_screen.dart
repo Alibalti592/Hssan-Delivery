@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../addresses/address_repository.dart';
 import '../core/api_exception.dart';
 import '../widgets/dark_header.dart';
+import '../widgets/decorative_map.dart';
 
 class AddAddressScreen extends StatefulWidget {
   const AddAddressScreen({super.key});
@@ -63,6 +64,7 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
               title: 'Ajouter une adresse',
               onBack: _saving ? null : () => Navigator.of(context).pop(),
             ),
+            const DecorativeMap(height: 130, twoPins: false),
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(24),
