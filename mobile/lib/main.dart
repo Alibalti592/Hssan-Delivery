@@ -9,10 +9,13 @@ import 'cart/cart.dart';
 import 'catalogue/catalogue_repository.dart';
 import 'client/client_home_screen.dart';
 import 'core/api_client.dart';
+import 'core/onboarding_storage.dart';
 import 'core/token_storage.dart';
 import 'dashboard/dashboard_screen.dart';
 import 'deliveries/deliveries_controller.dart';
 import 'deliveries/delivery_repository.dart';
+import 'onboarding/onboarding_screen.dart';
+import 'onboarding/splash_screen.dart';
 import 'orders/orders_repository.dart';
 import 'theme.dart';
 
@@ -90,8 +93,29 @@ class _HssanDeliveryAppState extends State<HssanDeliveryApp> {
   }
 }
 
-class _Root extends StatelessWidget {
+class _Root extends StatefulWidget {
   const _Root();
+
+  @override
+  State<_Root> createState() => _RootState();
+}
+
+class _RootState extends State<_Root> {
+  final _onboardingStorage = OnboardingStorage();
+  bool? _onboardingSeen;
+
+  @override
+  void initState() {
+    super.initState();
+    _onboardingStorage.hasSeenOnboarding().then((seen) {
+      if (mounted) setState(() => _onboardingSeen = seen);
+    });
+  }
+
+  void _completeOnboarding() {
+    _onboardingStorage.markSeen();
+    setState(() => _onboardingSeen = true);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -99,8 +123,12 @@ class _Root extends StatelessWidget {
 
     switch (auth.status) {
       case AuthStatus.unknown:
-        return const Scaffold(body: Center(child: CircularProgressIndicator()));
+        return const SplashScreen();
       case AuthStatus.signedOut:
+        if (_onboardingSeen == null) return const SplashScreen();
+        if (!_onboardingSeen!) {
+          return OnboardingScreen(onDone: _completeOnboarding);
+        }
         return const LoginScreen();
       case AuthStatus.signedIn:
         return auth.account!.isCourier

@@ -4,6 +4,13 @@ Flutter application serving both end-user personas, UI in French. The
 signed-in account's role decides which half of the app is shown — no
 separate builds or flavors.
 
+- **Splash** — branded loading state shown while a stored session is restored
+  on launch.
+- **Onboarding** — a 2-slide carousel shown once on first launch (persisted
+  via secure storage), covering restaurant browsing and order tracking —
+  the only two capabilities that exist today. The platform's other planned
+  services (see the root README's roadmap) aren't advertised here since
+  they aren't built yet.
 - **Login / register** — phone + password against `POST /api/auth/login`;
   new clients can self-register via `POST /api/auth/register`
   (`ROLE_CLIENT`). Courier accounts are still admin-provisioned only. An
@@ -95,7 +102,8 @@ drives the auth and delivery controllers against a mocked HTTP client.
 lib/
   config.dart              API base URL (--dart-define)
   theme.dart               Material 3 theme (navy brand) + status colours
-  core/                    HTTP client, typed errors, secure token storage
+  core/                    HTTP client, typed errors, secure token/onboarding storage
+  onboarding/              splash screen, first-launch onboarding carousel
   auth/                    login/register: repository, ChangeNotifier controller, screens
   dashboard/               courier landing screen after login
   deliveries/              courier queue, available-deliveries, detail, confirmation:
