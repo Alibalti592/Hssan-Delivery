@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../theme.dart';
 import 'available_deliveries_screen.dart';
 import 'delivery.dart';
 
@@ -22,15 +23,11 @@ class DeliveryConfirmedScreen extends StatelessWidget {
               Container(
                 width: 96,
                 height: 96,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF2E7D52).withValues(alpha: 0.12),
+                decoration: const BoxDecoration(
+                  color: successBg,
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(
-                  Icons.check,
-                  color: Color(0xFF2E7D52),
-                  size: 48,
-                ),
+                child: const Icon(Icons.check, color: successText, size: 48),
               ),
               const SizedBox(height: 24),
               Text(

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../widgets/dark_header.dart';
 import 'deliveries_controller.dart';
 import 'delivery.dart';
 import 'delivery_detail_screen.dart';
@@ -43,49 +44,69 @@ class _AvailableDeliveriesScreenState extends State<AvailableDeliveriesScreen> {
         .toList(growable: false);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Courses disponibles')),
-      body: RefreshIndicator(
-        onRefresh: controller.refresh,
-        child: proposals.isEmpty
-            ? ListView(
-                children: const [
-                  SizedBox(height: 100),
-                  Center(
-                    child: Text('Aucune course disponible pour le moment.'),
-                  ),
-                ],
-              )
-            : ListView.separated(
-                padding: const EdgeInsets.all(16),
-                itemCount: proposals.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 12),
-                itemBuilder: (context, index) {
-                  final delivery = proposals[index];
-                  final busy = controller.actingOnId == delivery.id;
-                  return _ProposalCard(
-                    delivery: delivery,
-                    busy: busy,
-                    onAccept: () async {
-                      final messenger = ScaffoldMessenger.of(context);
-                      final navigator = Navigator.of(context);
-                      final error = await context
-                          .read<DeliveriesController>()
-                          .perform(delivery, DeliveryAction.accept);
-                      if (error != null) {
-                        messenger.showSnackBar(SnackBar(content: Text(error)));
-                        return;
-                      }
-                      navigator.push(
-                        MaterialPageRoute(
-                          builder: (_) =>
-                              DeliveryDetailScreen(deliveryId: delivery.id),
-                        ),
-                      );
-                    },
-                    onDecline: () => _decline(delivery),
-                  );
-                },
+      body: SafeArea(
+        bottom: false,
+        child: Column(
+          children: [
+            DarkHeader(
+              title: 'Courses disponibles',
+              subtitle: proposals.isEmpty
+                  ? 'Aucune proposition'
+                  : '${proposals.length} proposition(s)',
+              onBack: () => Navigator.of(context).pop(),
+            ),
+            Expanded(
+              child: RefreshIndicator(
+                onRefresh: controller.refresh,
+                child: proposals.isEmpty
+                    ? ListView(
+                        children: const [
+                          SizedBox(height: 100),
+                          Center(
+                            child: Text(
+                              'Aucune course disponible pour le moment.',
+                            ),
+                          ),
+                        ],
+                      )
+                    : ListView.separated(
+                        padding: const EdgeInsets.all(16),
+                        itemCount: proposals.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 12),
+                        itemBuilder: (context, index) {
+                          final delivery = proposals[index];
+                          final busy = controller.actingOnId == delivery.id;
+                          return _ProposalCard(
+                            delivery: delivery,
+                            busy: busy,
+                            onAccept: () async {
+                              final messenger = ScaffoldMessenger.of(context);
+                              final navigator = Navigator.of(context);
+                              final error = await context
+                                  .read<DeliveriesController>()
+                                  .perform(delivery, DeliveryAction.accept);
+                              if (error != null) {
+                                messenger.showSnackBar(
+                                  SnackBar(content: Text(error)),
+                                );
+                                return;
+                              }
+                              navigator.push(
+                                MaterialPageRoute(
+                                  builder: (_) => DeliveryDetailScreen(
+                                    deliveryId: delivery.id,
+                                  ),
+                                ),
+                              );
+                            },
+                            onDecline: () => _decline(delivery),
+                          );
+                        },
+                      ),
               ),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -25,7 +25,11 @@ class Restaurant {
 }
 
 class MenuCategory {
-  MenuCategory({required this.id, required this.name, required this.restaurantId});
+  MenuCategory({
+    required this.id,
+    required this.name,
+    required this.restaurantId,
+  });
 
   final int id;
   final String name;

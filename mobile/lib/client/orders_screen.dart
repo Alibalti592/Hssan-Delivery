@@ -66,8 +66,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
             );
           }
 
-          final sorted = [...orders]
-            ..sort((a, b) => b.id.compareTo(a.id));
+          final sorted = [...orders]..sort((a, b) => b.id.compareTo(a.id));
 
           return ListView.separated(
             padding: const EdgeInsets.all(16),

@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../catalogue/catalogue_models.dart';
 import '../catalogue/catalogue_repository.dart';
+import '../theme.dart';
 import 'restaurant_menu_screen.dart';
 
 class RestaurantsScreen extends StatefulWidget {
@@ -72,7 +73,9 @@ class _RestaurantsScreenState extends State<RestaurantsScreen> {
             return ListView(
               children: const [
                 SizedBox(height: 100),
-                Center(child: Text('Aucun restaurant disponible pour le moment.')),
+                Center(
+                  child: Text('Aucun restaurant disponible pour le moment.'),
+                ),
               ],
             );
           }
@@ -87,7 +90,8 @@ class _RestaurantsScreenState extends State<RestaurantsScreen> {
                 restaurant: restaurant,
                 onTap: () => Navigator.of(context).push(
                   MaterialPageRoute(
-                    builder: (_) => RestaurantMenuScreen(restaurant: restaurant),
+                    builder: (_) =>
+                        RestaurantMenuScreen(restaurant: restaurant),
                   ),
                 ),
               );
@@ -134,11 +138,35 @@ class _RestaurantCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    restaurant.name,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          restaurant.name,
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: successBg,
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: const Text(
+                          'Ouvert',
+                          style: TextStyle(
+                            color: successText,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 10,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                   if (restaurant.description != null &&
                       restaurant.description!.isNotEmpty) ...[

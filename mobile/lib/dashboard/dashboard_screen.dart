@@ -8,6 +8,7 @@ import '../deliveries/deliveries_screen.dart';
 import '../deliveries/delivery.dart';
 import '../deliveries/delivery_detail_screen.dart';
 import '../theme.dart';
+import '../widgets/dark_header.dart';
 import '../widgets/status_chip.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -90,153 +91,142 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     return Scaffold(
       body: SafeArea(
-        child: RefreshIndicator(
-          onRefresh: controller.refresh,
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Bonjour, $firstName',
-                          style: Theme.of(context).textTheme.headlineSmall
-                              ?.copyWith(fontWeight: FontWeight.w800),
+        bottom: false,
+        child: Column(
+          children: [
+            DarkHeader(
+              title: 'Bonjour, $firstName',
+              subtitle: _available
+                  ? 'Vous êtes disponible'
+                  : 'Vous êtes hors-ligne',
+              trailing: IconButton(
+                tooltip: 'Se déconnecter',
+                onPressed: _confirmSignOut,
+                icon: const Icon(Icons.logout, color: Colors.white),
+              ),
+            ),
+            Expanded(
+              child: RefreshIndicator(
+                onRefresh: controller.refresh,
+                child: ListView(
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+                  children: [
+                    Card(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 4,
                         ),
-                        const SizedBox(height: 2),
-                        Text(
-                          _available
-                              ? 'Vous êtes disponible'
-                              : 'Vous êtes hors-ligne',
-                          style: Theme.of(context).textTheme.bodySmall,
+                        child: Row(
+                          children: [
+                            const Expanded(
+                              child: Text(
+                                'Disponible',
+                                style: TextStyle(fontWeight: FontWeight.w600),
+                              ),
+                            ),
+                            Switch(
+                              value: _available,
+                              onChanged: (value) =>
+                                  setState(() => _available = value),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _StatTile(
+                            value: '$deliveredToday',
+                            label: "Livrées\naujourd'hui",
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _StatTile(
+                            value: '$proposals',
+                            label: 'Propositions\nen attente',
+                          ),
                         ),
                       ],
                     ),
-                  ),
-                  IconButton(
-                    tooltip: 'Se déconnecter',
-                    onPressed: _confirmSignOut,
-                    icon: const Icon(Icons.logout),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 4,
-                  ),
-                  child: Row(
-                    children: [
-                      const Expanded(
-                        child: Text(
-                          'Disponible',
-                          style: TextStyle(fontWeight: FontWeight.w600),
-                        ),
+                    const SizedBox(height: 24),
+                    if (inProgress != null) ...[
+                      Text(
+                        'Course en cours',
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.w700),
                       ),
-                      Switch(
-                        value: _available,
-                        onChanged: (value) =>
-                            setState(() => _available = value),
+                      const SizedBox(height: 12),
+                      _InProgressCard(
+                        delivery: inProgress,
+                        onContinue: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => DeliveryDetailScreen(
+                                deliveryId: inProgress.id,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ] else ...[
+                      Text(
+                        'Aucune course en cours',
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.w700),
+                      ),
+                      const SizedBox(height: 12),
+                      Card(
+                        child: Padding(
+                          padding: const EdgeInsets.all(20),
+                          child: Column(
+                            children: [
+                              Icon(
+                                proposals > 0
+                                    ? Icons.local_shipping_outlined
+                                    : Icons.nightlight_outlined,
+                                color: Theme.of(context).colorScheme.outline,
+                                size: 32,
+                              ),
+                              const SizedBox(height: 12),
+                              Text(
+                                proposals > 0
+                                    ? '$proposals nouvelle(s) course(s) disponible(s)'
+                                    : 'Aucune course disponible pour le moment',
+                                textAlign: TextAlign.center,
+                                style: Theme.of(context).textTheme.bodyMedium,
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
                     ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: _StatTile(
-                      value: '$deliveredToday',
-                      label: "Livrées\naujourd'hui",
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _StatTile(
-                      value: '$proposals',
-                      label: 'Propositions\nen attente',
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 24),
-              if (inProgress != null) ...[
-                Text(
-                  'Course en cours',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                _InProgressCard(
-                  delivery: inProgress,
-                  onContinue: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) =>
-                            DeliveryDetailScreen(deliveryId: inProgress.id),
+                    const SizedBox(height: 20),
+                    FilledButton(
+                      onPressed: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const AvailableDeliveriesScreen(),
+                        ),
                       ),
-                    );
-                  },
-                ),
-              ] else ...[
-                Text(
-                  'Aucune course en cours',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: Column(
-                      children: [
-                        Icon(
-                          proposals > 0
-                              ? Icons.local_shipping_outlined
-                              : Icons.nightlight_outlined,
-                          color: Theme.of(context).colorScheme.outline,
-                          size: 32,
-                        ),
-                        const SizedBox(height: 12),
-                        Text(
-                          proposals > 0
-                              ? '$proposals nouvelle(s) course(s) disponible(s)'
-                              : 'Aucune course disponible pour le moment',
-                          textAlign: TextAlign.center,
-                          style: Theme.of(context).textTheme.bodyMedium,
-                        ),
-                      ],
+                      child: const Text('Voir les courses disponibles'),
                     ),
-                  ),
+                    const SizedBox(height: 12),
+                    OutlinedButton(
+                      onPressed: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const DeliveriesScreen(),
+                        ),
+                      ),
+                      child: const Text('Toutes mes courses'),
+                    ),
+                  ],
                 ),
-              ],
-              const SizedBox(height: 20),
-              FilledButton(
-                onPressed: () => Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => const AvailableDeliveriesScreen(),
-                  ),
-                ),
-                child: const Text('Voir les courses disponibles'),
               ),
-              const SizedBox(height: 12),
-              OutlinedButton(
-                onPressed: () => Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const DeliveriesScreen()),
-                ),
-                child: const Text('Toutes mes courses'),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../orders/order_models.dart';
+import '../theme.dart';
 import 'client_home_screen.dart';
 
 class OrderConfirmedScreen extends StatelessWidget {
@@ -20,22 +21,18 @@ class OrderConfirmedScreen extends StatelessWidget {
               Container(
                 width: 96,
                 height: 96,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF2E7D52).withValues(alpha: 0.12),
+                decoration: const BoxDecoration(
+                  color: successBg,
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(
-                  Icons.check,
-                  color: Color(0xFF2E7D52),
-                  size: 48,
-                ),
+                child: const Icon(Icons.check, color: successText, size: 48),
               ),
               const SizedBox(height: 24),
               Text(
                 'Commande envoyée',
-                style: Theme.of(
-                  context,
-                ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
               ),
               const SizedBox(height: 8),
               Text(

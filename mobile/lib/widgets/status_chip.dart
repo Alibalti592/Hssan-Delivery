@@ -14,15 +14,15 @@ class StatusChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
+        color: statusBgColor(status),
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
         status.label,
         style: TextStyle(
           color: color,
-          fontWeight: FontWeight.w600,
-          fontSize: 12,
+          fontWeight: FontWeight.w700,
+          fontSize: 11,
         ),
       ),
     );

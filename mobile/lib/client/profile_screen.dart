@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../auth/auth_controller.dart';
+import '../theme.dart';
+import '../widgets/dark_header.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -32,37 +34,72 @@ class ProfileScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final account = context.watch<AuthController>().account;
 
-    return ListView(
-      padding: const EdgeInsets.all(24),
+    return Column(
       children: [
-        CircleAvatar(
-          radius: 36,
-          child: Text(
-            (account?.name.isNotEmpty ?? false) ? account!.name[0] : '?',
-            style: const TextStyle(fontSize: 28),
+        const DarkHeader(title: 'Mon profil'),
+        Expanded(
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+            children: [
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 20),
+                  child: Column(
+                    children: [
+                      CircleAvatar(
+                        radius: 28,
+                        backgroundColor: fieldFill,
+                        child: Text(
+                          (account?.name.isNotEmpty ?? false)
+                              ? account!.name[0]
+                              : '?',
+                          style: const TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w700,
+                            color: navy,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        account?.name ?? '',
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.w800),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        account?.phone ?? '',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Card(
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(10),
+                  onTap: () => _confirmSignOut(context),
+                  child: const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    child: Row(
+                      children: [
+                        Icon(Icons.logout, size: 18, color: navy),
+                        SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            'Se déconnecter',
+                            style: TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                        Icon(Icons.chevron_right, color: mutedText),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
-        ),
-        const SizedBox(height: 16),
-        Center(
-          child: Text(
-            account?.name ?? '',
-            style: Theme.of(
-              context,
-            ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
-          ),
-        ),
-        const SizedBox(height: 4),
-        Center(
-          child: Text(
-            account?.phone ?? '',
-            style: Theme.of(context).textTheme.bodyMedium,
-          ),
-        ),
-        const SizedBox(height: 32),
-        OutlinedButton.icon(
-          onPressed: () => _confirmSignOut(context),
-          icon: const Icon(Icons.logout),
-          label: const Text('Se déconnecter'),
         ),
       ],
     );
