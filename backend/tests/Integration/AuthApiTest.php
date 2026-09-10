@@ -266,7 +266,7 @@ final class AuthApiTest extends WebTestCase
 
         self::assertSame(
             'An account with this phone number already exists.',
-            $response['error']
+            $response['message']
         );
     }
 

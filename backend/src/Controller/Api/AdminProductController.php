@@ -48,17 +48,10 @@ final class AdminProductController extends AbstractApiController
         /** @var CreateProductRequest $dto */
         $dto = $this->deserializeAndValidate($request, CreateProductRequest::class);
 
-        try {
-            $product = $this->productService->create(
-                $restaurant,
-                $dto
-            );
-        } catch (\RuntimeException $exception) {
-            return $this->json(
-                ['message' => $exception->getMessage()],
-                Response::HTTP_BAD_REQUEST
-            );
-        }
+        $product = $this->productService->create(
+            $restaurant,
+            $dto
+        );
 
         return $this->json(
             ProductResponse::fromEntity($product),
@@ -136,17 +129,10 @@ final class AdminProductController extends AbstractApiController
         /** @var UpdateProductRequest $dto */
         $dto = $this->deserializeAndValidate($request, UpdateProductRequest::class);
 
-        try {
-            $product = $this->productService->update(
-                $product,
-                $dto
-            );
-        } catch (\RuntimeException $exception) {
-            return $this->json(
-                ['message' => $exception->getMessage()],
-                Response::HTTP_BAD_REQUEST
-            );
-        }
+        $product = $this->productService->update(
+            $product,
+            $dto
+        );
 
         return $this->json(
             ProductResponse::fromEntity($product)

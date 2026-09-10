@@ -7,6 +7,7 @@ use App\Dto\Admin\UpdateProductRequest;
 use App\Entity\Category;
 use App\Entity\Product;
 use App\Entity\Restaurant;
+use App\Exception\InvalidOperationException;
 use App\Repository\CategoryRepository;
 use App\Repository\ProductRepository;
 use Doctrine\ORM\EntityManagerInterface;
@@ -73,7 +74,7 @@ final class ProductService
         $restaurant = $product->getRestaurant();
 
         if (null === $restaurant) {
-            throw new \RuntimeException(
+            throw new InvalidOperationException(
                 'Product is not associated with a restaurant.'
             );
         }
@@ -115,7 +116,7 @@ final class ProductService
         Restaurant $restaurant
     ): Category {
         if (null === $categoryId) {
-            throw new \RuntimeException(
+            throw new InvalidOperationException(
                 'Category is required.'
             );
         }
@@ -123,7 +124,7 @@ final class ProductService
         $category = $this->categoryRepository->find($categoryId);
 
         if (null === $category) {
-            throw new \RuntimeException(
+            throw new InvalidOperationException(
                 'Category not found.'
             );
         }
@@ -132,7 +133,7 @@ final class ProductService
             $category->getRestaurant()?->getId()
             !== $restaurant->getId()
         ) {
-            throw new \RuntimeException(
+            throw new InvalidOperationException(
                 'Category does not belong to this restaurant.'
             );
         }

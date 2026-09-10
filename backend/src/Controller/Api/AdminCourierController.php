@@ -34,14 +34,7 @@ final class AdminCourierController extends AbstractApiController
         /** @var CreateCourierRequest $dto */
         $dto = $this->deserializeAndValidate($request, CreateCourierRequest::class);
 
-        try {
-            $courier = $this->authService->createCourier($dto);
-        } catch (\RuntimeException $exception) {
-            return $this->json(
-                ['message' => $exception->getMessage()],
-                Response::HTTP_CONFLICT
-            );
-        }
+        $courier = $this->authService->createCourier($dto);
 
         return $this->json(
             CourierResponse::fromEntity($courier),

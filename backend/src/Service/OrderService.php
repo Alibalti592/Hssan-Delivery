@@ -9,6 +9,7 @@ use App\Entity\OrderItem;
 use App\Entity\User;
 use App\Enum\DeliveryStatus;
 use App\Enum\OrderStatus;
+use App\Exception\InvalidOperationException;
 use App\Repository\DeliveryZoneRepository;
 use App\Repository\OrderRepository;
 use App\Repository\ProductRepository;
@@ -34,17 +35,17 @@ final class OrderService
         $restaurant = $this->restaurantRepository->find($dto->restaurantId);
 
         if (null === $restaurant) {
-            throw new \RuntimeException('Restaurant not found.');
+            throw new InvalidOperationException('Restaurant not found.');
         }
 
         if (!$restaurant->isAvailable()) {
-            throw new \RuntimeException('Restaurant is currently unavailable.');
+            throw new InvalidOperationException('Restaurant is currently unavailable.');
         }
 
         $deliveryZone = $this->deliveryZoneRepository->find($dto->deliveryZoneId);
 
         if (null === $deliveryZone) {
-            throw new \RuntimeException('Delivery zone not found.');
+            throw new InvalidOperationException('Delivery zone not found.');
         }
 
         $order = new Order();
@@ -62,21 +63,21 @@ final class OrderService
             $product = $this->productRepository->find($itemDto->productId);
 
             if (null === $product) {
-                throw new \RuntimeException("Product {$itemDto->productId} not found.");
+                throw new InvalidOperationException("Product {$itemDto->productId} not found.");
             }
 
             if ($product->getRestaurant()?->getId() !== $restaurant->getId()) {
-                throw new \RuntimeException("Product {$itemDto->productId} does not belong to this restaurant.");
+                throw new InvalidOperationException("Product {$itemDto->productId} does not belong to this restaurant.");
             }
 
             if (!$product->isAvailable()) {
-                throw new \RuntimeException("Product {$itemDto->productId} is currently unavailable.");
+                throw new InvalidOperationException("Product {$itemDto->productId} is currently unavailable.");
             }
 
             $unitPrice = $product->getPrice();
 
             if (null === $unitPrice) {
-                throw new \RuntimeException("Product {$itemDto->productId} has no price.");
+                throw new InvalidOperationException("Product {$itemDto->productId} has no price.");
             }
 
             $priceMillimes = Money::toMillimes($unitPrice);
@@ -96,7 +97,7 @@ final class OrderService
         }
 
         if ($totalMillimes <= 0) {
-            throw new \RuntimeException('Order total must be greater than zero.');
+            throw new InvalidOperationException('Order total must be greater than zero.');
         }
 
         $deliveryFeeMillimes = Money::toMillimes($deliveryZone->getFee());

@@ -32,14 +32,7 @@ class AuthController extends AbstractApiController
         /** @var RegisterUserRequest $dto */
         $dto = $this->deserializeAndValidate($request, RegisterUserRequest::class);
 
-        try {
-            $user = $this->authService->register($dto);
-        } catch (\RuntimeException $exception) {
-            return new JsonResponse(
-                ['error' => $exception->getMessage()],
-                Response::HTTP_CONFLICT
-            );
-        }
+        $user = $this->authService->register($dto);
 
         return new JsonResponse(
             UserResponse::fromEntity($user),

@@ -5,6 +5,7 @@ namespace App\Service;
 use App\Dto\Admin\CreateDeliveryZoneRequest;
 use App\Dto\Admin\UpdateDeliveryZoneRequest;
 use App\Entity\DeliveryZone;
+use App\Exception\ConflictException;
 use App\Repository\DeliveryZoneRepository;
 use Doctrine\ORM\EntityManagerInterface;
 
@@ -67,7 +68,7 @@ final class DeliveryZoneService
     private function assertNameIsAvailable(string $name): void
     {
         if (null !== $this->deliveryZoneRepository->findOneBy(['name' => $name])) {
-            throw new \RuntimeException('A delivery zone with this name already exists.');
+            throw new ConflictException('A delivery zone with this name already exists.');
         }
     }
 }

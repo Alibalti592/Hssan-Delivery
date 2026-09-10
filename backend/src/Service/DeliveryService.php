@@ -5,6 +5,7 @@ namespace App\Service;
 use App\Entity\Delivery;
 use App\Entity\User;
 use App\Enum\DeliveryStatus;
+use App\Exception\InvalidOperationException;
 use Doctrine\DBAL\LockMode;
 use Doctrine\ORM\EntityManagerInterface;
 
@@ -21,15 +22,15 @@ final class DeliveryService
     ): Delivery {
         return $this->transitionWithLock($delivery, function (Delivery $delivery) use ($courier) {
             if (DeliveryStatus::PENDING !== $delivery->getStatus()) {
-                throw new \RuntimeException('Only pending deliveries can be assigned.');
+                throw new InvalidOperationException('Only pending deliveries can be assigned.');
             }
 
             if (!in_array('ROLE_LIVREUR', $courier->getRoles(), true)) {
-                throw new \RuntimeException('The selected user is not a courier.');
+                throw new InvalidOperationException('The selected user is not a courier.');
             }
 
             if (!$courier->isActive()) {
-                throw new \RuntimeException('This courier has been deactivated.');
+                throw new InvalidOperationException('This courier has been deactivated.');
             }
 
             $delivery->setCourier($courier);
@@ -46,7 +47,7 @@ final class DeliveryService
     ): Delivery {
         return $this->transitionWithLock($delivery, function (Delivery $delivery) use ($courier) {
             if (DeliveryStatus::ASSIGNED !== $delivery->getStatus()) {
-                throw new \RuntimeException('Only assigned deliveries can be accepted.');
+                throw new InvalidOperationException('Only assigned deliveries can be accepted.');
             }
 
             $this->assertAssignedCourier($delivery, $courier);
@@ -64,7 +65,7 @@ final class DeliveryService
     ): Delivery {
         return $this->transitionWithLock($delivery, function (Delivery $delivery) use ($courier) {
             if (DeliveryStatus::ACCEPTED !== $delivery->getStatus()) {
-                throw new \RuntimeException('Only accepted deliveries can be marked as picked up.');
+                throw new InvalidOperationException('Only accepted deliveries can be marked as picked up.');
             }
 
             $this->assertAssignedCourier($delivery, $courier);
@@ -82,7 +83,7 @@ final class DeliveryService
     ): Delivery {
         return $this->transitionWithLock($delivery, function (Delivery $delivery) use ($courier) {
             if (DeliveryStatus::PICKED_UP !== $delivery->getStatus()) {
-                throw new \RuntimeException('Only picked-up deliveries can be marked as on the way.');
+                throw new InvalidOperationException('Only picked-up deliveries can be marked as on the way.');
             }
 
             $this->assertAssignedCourier($delivery, $courier);
@@ -99,7 +100,7 @@ final class DeliveryService
     ): Delivery {
         return $this->transitionWithLock($delivery, function (Delivery $delivery) use ($courier) {
             if (DeliveryStatus::ON_THE_WAY !== $delivery->getStatus()) {
-                throw new \RuntimeException('Only deliveries that are on the way can be marked as delivered.');
+                throw new InvalidOperationException('Only deliveries that are on the way can be marked as delivered.');
             }
 
             $this->assertAssignedCourier($delivery, $courier);
@@ -122,7 +123,7 @@ final class DeliveryService
                 ],
                 true
             )) {
-                throw new \RuntimeException('This delivery cannot be cancelled at its current status.');
+                throw new InvalidOperationException('This delivery cannot be cancelled at its current status.');
             }
 
             $delivery->setStatus(DeliveryStatus::CANCELLED);
@@ -145,7 +146,7 @@ final class DeliveryService
                 ],
                 true
             )) {
-                throw new \RuntimeException('This delivery cannot be marked as failed at its current status.');
+                throw new InvalidOperationException('This delivery cannot be marked as failed at its current status.');
             }
 
             $this->assertAssignedCourier($delivery, $courier);
@@ -183,7 +184,7 @@ final class DeliveryService
         User $courier,
     ): void {
         if ($delivery->getCourier()?->getId() !== $courier->getId()) {
-            throw new \RuntimeException('You are not assigned to this delivery.');
+            throw new InvalidOperationException('You are not assigned to this delivery.');
         }
     }
 
@@ -192,7 +193,9 @@ final class DeliveryService
         $order = $delivery->getOrder();
 
         if (null === $order) {
-            throw new \RuntimeException('Delivery must be associated with an order.');
+            // Data-integrity invariant: every delivery is created with an order.
+            // If this is ever null something is broken server-side, not a client error.
+            throw new \LogicException('Delivery must be associated with an order.');
         }
 
         $order->setStatus($delivery->getStatus()->toOrderStatus());

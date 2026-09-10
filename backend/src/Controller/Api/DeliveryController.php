@@ -74,21 +74,14 @@ final class DeliveryController extends AbstractController
             );
         }
 
-        try {
-            $delivery = $this->deliveryService->assignCourier(
-                $delivery,
-                $courier
-            );
+        $delivery = $this->deliveryService->assignCourier(
+            $delivery,
+            $courier
+        );
 
-            return $this->json(
-                DeliveryResponse::fromEntity($delivery)
-            );
-        } catch (\RuntimeException $exception) {
-            return $this->json(
-                ['message' => $exception->getMessage()],
-                Response::HTTP_BAD_REQUEST
-            );
-        }
+        return $this->json(
+            DeliveryResponse::fromEntity($delivery)
+        );
     }
 
     #[Route(
@@ -164,19 +157,12 @@ final class DeliveryController extends AbstractController
             );
         }
 
-        try {
-            $delivery = $this->deliveryService
-                ->cancelDelivery($delivery);
+        $delivery = $this->deliveryService
+            ->cancelDelivery($delivery);
 
-            return $this->json(
-                DeliveryResponse::fromEntity($delivery)
-            );
-        } catch (\RuntimeException $exception) {
-            return $this->json(
-                ['message' => $exception->getMessage()],
-                Response::HTTP_BAD_REQUEST
-            );
-        }
+        return $this->json(
+            DeliveryResponse::fromEntity($delivery)
+        );
     }
 
     #[Route(
@@ -212,17 +198,10 @@ final class DeliveryController extends AbstractController
         /** @var User $courier */
         $courier = $this->getUser();
 
-        try {
-            $delivery = $transition($delivery, $courier);
+        $delivery = $transition($delivery, $courier);
 
-            return $this->json(
-                DeliveryResponse::fromEntity($delivery)
-            );
-        } catch (\RuntimeException $exception) {
-            return $this->json(
-                ['message' => $exception->getMessage()],
-                Response::HTTP_BAD_REQUEST
-            );
-        }
+        return $this->json(
+            DeliveryResponse::fromEntity($delivery)
+        );
     }
 }

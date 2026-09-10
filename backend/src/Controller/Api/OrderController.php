@@ -86,18 +86,11 @@ final class OrderController extends AbstractApiController
             );
         }
 
-        try {
-            $order = $this->orderService->createOrder($dto, $user);
+        $order = $this->orderService->createOrder($dto, $user);
 
-            return $this->json(
-                OrderResponse::fromEntity($order),
-                Response::HTTP_CREATED
-            );
-        } catch (\RuntimeException $exception) {
-            return $this->json(
-                ['message' => $exception->getMessage()],
-                Response::HTTP_BAD_REQUEST
-            );
-        }
+        return $this->json(
+            OrderResponse::fromEntity($order),
+            Response::HTTP_CREATED
+        );
     }
 }

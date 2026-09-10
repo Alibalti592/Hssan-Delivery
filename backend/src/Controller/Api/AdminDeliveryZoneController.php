@@ -32,14 +32,7 @@ final class AdminDeliveryZoneController extends AbstractApiController
         /** @var CreateDeliveryZoneRequest $dto */
         $dto = $this->deserializeAndValidate($request, CreateDeliveryZoneRequest::class);
 
-        try {
-            $zone = $this->deliveryZoneService->create($dto);
-        } catch (\RuntimeException $exception) {
-            return $this->json(
-                ['message' => $exception->getMessage()],
-                Response::HTTP_CONFLICT
-            );
-        }
+        $zone = $this->deliveryZoneService->create($dto);
 
         return $this->json(
             DeliveryZoneResponse::fromEntity($zone),
@@ -94,14 +87,7 @@ final class AdminDeliveryZoneController extends AbstractApiController
         /** @var UpdateDeliveryZoneRequest $dto */
         $dto = $this->deserializeAndValidate($request, UpdateDeliveryZoneRequest::class);
 
-        try {
-            $zone = $this->deliveryZoneService->update($zone, $dto);
-        } catch (\RuntimeException $exception) {
-            return $this->json(
-                ['message' => $exception->getMessage()],
-                Response::HTTP_CONFLICT
-            );
-        }
+        $zone = $this->deliveryZoneService->update($zone, $dto);
 
         return $this->json(
             DeliveryZoneResponse::fromEntity($zone)

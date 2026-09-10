@@ -5,6 +5,7 @@ namespace App\Service;
 use App\Dto\Admin\CreateCourierRequest;
 use App\Dto\Auth\RegisterUserRequest;
 use App\Entity\User;
+use App\Exception\ConflictException;
 use App\Repository\UserRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
@@ -25,7 +26,7 @@ final class AuthService
                 'phone' => $dto->phone,
             ]) !== null
         ) {
-            throw new \RuntimeException(
+            throw new ConflictException(
                 'An account with this phone number already exists.'
             );
         }
@@ -59,7 +60,7 @@ final class AuthService
                 'phone' => $dto->phone,
             ]) !== null
         ) {
-            throw new \RuntimeException(
+            throw new ConflictException(
                 'An account with this phone number already exists.'
             );
         }
