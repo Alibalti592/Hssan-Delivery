@@ -443,34 +443,23 @@ integration tests
 GitHub Actions CI
 Mobile
 
-The Flutter application is still under development.
+The Flutter application (`mobile/`) currently implements the **courier app** —
+see `mobile/README.md`:
 
-Planned client features:
+courier authentication (ROLE_LIVREUR only)
+delivery queue (GET /api/deliveries/mine, active vs. history)
+delivery details (pickup, drop-off, customer, items, pricing)
+accept / pickup / on-the-way / delivered / fail actions
+tap-to-call the customer
 
-authentication
-restaurant browsing
-categories
-product browsing
-cart
-checkout
-order history
-order tracking
-notifications
-profile
-address management
+Not yet in the app:
 
-Planned courier features:
+the entire client persona (browsing, cart, checkout, order tracking)
+push notifications
+map / navigation integration
 
-courier authentication
-delivery queue
-delivery details
-accept delivery
-pickup
-on-the-way
-delivered
-failed delivery
-notifications
-map/navigation integration
+The client persona is also blocked on the backend: there is no public
+catalogue endpoint yet (restaurant/product listing is ROLE_ADMIN only).
 Admin dashboard
 
 The React/Vite admin dashboard (`admin/`) is implemented and covers:
