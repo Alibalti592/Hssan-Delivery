@@ -383,38 +383,17 @@ first (`composer test`, or the `test-db-reset` composer script) can fail on
 leftover data from the previous run.
 Continuous Integration
 
-GitHub Actions runs the backend CI workflow on pushes and pull requests targeting:
+GitHub Actions runs three workflows on pushes and pull requests targeting
+`dev` and `main`, one per component:
 
-dev
-main
+.github/workflows/backend.yml   PHP 8.2 · PostgreSQL 16 · composer validate ·
+                                temporary JWT keys · migrate · schema:validate ·
+                                PHPUnit
+.github/workflows/admin.yml     Node 20 · npm ci · oxlint · tsc + vite build
+.github/workflows/mobile.yml    Flutter stable · pub get · dart format check ·
+                                flutter analyze · flutter test
 
-Workflow file:
-
-.github/workflows/backend.yml
-
-The CI pipeline performs:
-
-Checkout
-   ↓
-PHP 8.2
-   ↓
-PostgreSQL 16
-   ↓
-Composer validation
-   ↓
-Composer install
-   ↓
-Generate temporary JWT test keys
-   ↓
-Create test database
-   ↓
-Run migrations
-   ↓
-Validate Doctrine schema
-   ↓
-Run PHPUnit
-
-The CI environment uses temporary JWT credentials and an isolated PostgreSQL database.
+The backend job uses temporary JWT credentials and an isolated PostgreSQL database.
 
 Security
 
