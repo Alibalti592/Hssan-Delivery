@@ -111,39 +111,42 @@ void main() {
       expect(await storage.read(), 'jwt-456');
     });
 
-    test('rejects an account with neither role, without persisting a token', () async {
-      final storage = _MemoryTokenStorage();
-      final mock = MockClient((request) async {
-        if (request.url.path == '/api/auth/login') {
-          return _json({'token': 'jwt-xyz'});
-        }
-        return _json({
-          'id': 1,
-          'name': 'Admin',
-          'phone': '20000000',
-          'roles': ['ROLE_ADMIN', 'ROLE_USER'],
-          'isVerified': true,
+    test(
+      'rejects an account with neither role, without persisting a token',
+      () async {
+        final storage = _MemoryTokenStorage();
+        final mock = MockClient((request) async {
+          if (request.url.path == '/api/auth/login') {
+            return _json({'token': 'jwt-xyz'});
+          }
+          return _json({
+            'id': 1,
+            'name': 'Admin',
+            'phone': '20000000',
+            'roles': ['ROLE_ADMIN', 'ROLE_USER'],
+            'isVerified': true,
+          });
         });
-      });
 
-      late final AuthController auth;
-      auth = AuthController(
-        repository: AuthRepository(
-          ApiClient(
-            tokenProvider: () => auth.token,
-            onUnauthorized: () {},
-            httpClient: mock,
+        late final AuthController auth;
+        auth = AuthController(
+          repository: AuthRepository(
+            ApiClient(
+              tokenProvider: () => auth.token,
+              onUnauthorized: () {},
+              httpClient: mock,
+            ),
           ),
-        ),
-        storage: storage,
-      );
+          storage: storage,
+        );
 
-      final error = await auth.signIn('20000000', 'admin1234');
+        final error = await auth.signIn('20000000', 'admin1234');
 
-      expect(error, contains('client'));
-      expect(auth.status, isNot(AuthStatus.signedIn));
-      expect(await storage.read(), isNull);
-    });
+        expect(error, contains('client'));
+        expect(auth.status, isNot(AuthStatus.signedIn));
+        expect(await storage.read(), isNull);
+      },
+    );
 
     test('register creates the account then signs in', () async {
       final storage = _MemoryTokenStorage();
