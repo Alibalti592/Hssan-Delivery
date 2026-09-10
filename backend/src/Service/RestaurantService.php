@@ -46,6 +46,18 @@ final class RestaurantService
             ->findBy([], ['createdAt' => 'DESC']);
     }
 
+    /**
+     * The public catalogue: open restaurants only, alphabetical for browsing.
+     *
+     * @return Restaurant[]
+     */
+    public function listAvailable(): array
+    {
+        return $this->entityManager
+            ->getRepository(Restaurant::class)
+            ->findBy(['isAvailable' => true], ['name' => 'ASC']);
+    }
+
     public function get(int $id): ?Restaurant
     {
         return $this->entityManager

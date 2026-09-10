@@ -69,6 +69,20 @@ final class ProductService
         );
     }
 
+    /**
+     * The public catalogue: only what a client could actually order.
+     *
+     * @return Product[]
+     */
+    public function listAvailableForRestaurant(
+        Restaurant $restaurant
+    ): array {
+        return $this->productRepository->findBy(
+            ['restaurant' => $restaurant, 'isAvailable' => true],
+            ['createdAt' => 'ASC']
+        );
+    }
+
     public function get(int $id): ?Product
     {
         return $this->productRepository->find($id);

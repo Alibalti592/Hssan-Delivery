@@ -157,7 +157,10 @@ POST   /api/admin/restaurants
 GET    /api/admin/restaurants
 GET    /api/admin/restaurants/{id}
 PUT    /api/admin/restaurants/{id}
+DELETE /api/admin/restaurants/{id}
 PATCH  /api/admin/restaurants/{id}/availability
+POST   /api/admin/restaurants/{id}/photo
+DELETE /api/admin/restaurants/{id}/photo
 Admin category management
 POST /api/admin/restaurants/{restaurantId}/categories
 GET  /api/admin/restaurants/{restaurantId}/categories
@@ -168,7 +171,14 @@ POST   /api/admin/restaurants/{restaurantId}/products
 GET    /api/admin/restaurants/{restaurantId}/products
 GET    /api/admin/products/{id}
 PUT    /api/admin/products/{id}
+DELETE /api/admin/products/{id}
 PATCH  /api/admin/products/{id}/availability
+POST   /api/admin/products/{id}/photo
+DELETE /api/admin/products/{id}/photo
+
+Deleting a restaurant or product that has existing orders is refused (409) —
+deactivate it instead. Deleting a restaurant with no orders cascades to its
+categories and products.
 Admin delivery zone management
 POST /api/admin/delivery-zones
 GET  /api/admin/delivery-zones
@@ -199,6 +209,16 @@ Orders
 POST /api/orders
 GET  /api/orders
 GET  /api/orders/{id}
+Catalogue (what a signed-in client browses before ordering)
+GET /api/restaurants
+GET /api/restaurants/{id}
+GET /api/restaurants/{id}/categories
+GET /api/restaurants/{id}/products
+
+Requires any authenticated account (ROLE_USER, same as /api/orders — no
+separate role check), but not ROLE_ADMIN. Closed restaurants and
+unavailable products are left out entirely, matching what OrderService
+will actually accept.
 Delivery zones
 GET  /api/delivery-zones
 Addresses
@@ -353,6 +373,9 @@ admin courier creation
 courier authentication
 courier authorization
 admin restaurant, category, product and delivery zone management
+restaurant/product photo upload, replace and remove
+restaurant/product delete, including the has-existing-orders conflict guard
+public catalogue (available restaurants/categories/products only, any signed-in role)
 admin order and delivery visibility
 admin courier listing and deactivation
 deactivated accounts cannot log in
@@ -380,8 +403,8 @@ php bin/phpunit
 
 Current baseline:
 
-136 tests
-827 assertions
+158 tests
+956 assertions
 
 Tests share a single Postgres database rather than running each in its own
 transaction, so re-running `php bin/phpunit` without resetting the database
@@ -429,7 +452,8 @@ JWT authentication
 client registration
 login
 authenticated profile endpoint
-restaurant/product foundations
+restaurant/product management, including photos, for admins
+public catalogue for browsing/ordering (any signed-in account)
 saved delivery addresses
 order creation
 zone-based delivery pricing
@@ -463,8 +487,10 @@ the entire client persona (browsing, cart, checkout, order tracking)
 push notifications
 map / navigation integration
 
-The client persona is also blocked on the backend: there is no public
-catalogue endpoint yet (restaurant/product listing is ROLE_ADMIN only).
+The backend is no longer the blocker for the client persona: a public
+catalogue (GET /api/restaurants, .../categories, .../products, see
+"Catalogue" above) now exists for any signed-in account. What's missing is
+purely the client screens themselves in the Flutter app.
 Admin dashboard
 
 The React/Vite admin dashboard (`admin/`) is implemented and covers:
@@ -475,15 +501,14 @@ order visibility (list + detail)
 delivery monitoring (list + detail)
 delivery assignment / cancellation
 courier management (list, create, activate/deactivate)
-restaurant management
+restaurant management (including delete and photo upload/replace/remove)
 category management
-product/menu management
+product/menu management (including delete and photo upload/replace/remove)
 delivery zone management
 
 Not yet implemented in the dashboard:
 
 operational statistics beyond simple counts
-image/photo upload for restaurants or products
 pagination on any list (matches the backend, which doesn't paginate yet either)
 Future services
 
