@@ -55,7 +55,7 @@ class ApiClient {
     } on SocketException {
       throw NetworkException();
     } on TimeoutException {
-      throw NetworkException('The server took too long to respond.');
+      throw NetworkException('Le serveur met trop de temps à répondre.');
     } on http.ClientException {
       throw NetworkException();
     }
@@ -85,7 +85,7 @@ class ApiClient {
 
     final message = (json is Map && json['message'] is String)
         ? json['message'] as String
-        : 'Request failed ($status).';
+        : 'La requête a échoué ($status).';
 
     throw ApiException(status, message);
   }

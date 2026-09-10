@@ -801,6 +801,168 @@ final class DeliveryApiTest extends WebTestCase
         );
     }
 
+    public function testCourierCanDeclineAssignedDelivery(): void
+    {
+        $client = static::createClient();
+
+        $this->entityManager = self::getContainer()
+            ->get(EntityManagerInterface::class);
+
+        $admin = $this->createTestUser(
+            'ROLE_ADMIN',
+            'Test Admin'
+        );
+
+        $courier = $this->createTestUser(
+            'ROLE_LIVREUR',
+            'Test Courier'
+        );
+
+        $delivery = $this->createTestDelivery();
+
+        $orderId = $delivery->getOrder()->getId();
+
+        $adminToken = $this->authenticateClient(
+            $client,
+            $admin
+        );
+
+        $client->request(
+            'POST',
+            sprintf(
+                '/api/deliveries/%d/assign/%d',
+                $delivery->getId(),
+                $courier->getId()
+            ),
+            server: [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_AUTHORIZATION' => 'Bearer ' . $adminToken,
+            ]
+        );
+
+        self::assertResponseStatusCodeSame(
+            Response::HTTP_OK
+        );
+
+        $courierToken = $this->authenticateClient(
+            $client,
+            $courier
+        );
+
+        $client->request(
+            'POST',
+            sprintf(
+                '/api/deliveries/%d/decline',
+                $delivery->getId()
+            ),
+            server: [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_AUTHORIZATION' => 'Bearer ' . $courierToken,
+            ]
+        );
+
+        self::assertResponseStatusCodeSame(
+            Response::HTTP_OK
+        );
+
+        $response = json_decode(
+            $client->getResponse()->getContent(),
+            true
+        );
+
+        self::assertSame(
+            DeliveryStatus::PENDING->value,
+            $response['status']
+        );
+
+        self::assertNull(
+            $response['courierId']
+        );
+
+        $this->assertOrderStatus(
+            $orderId,
+            OrderStatus::PENDING
+        );
+    }
+
+    public function testCourierCannotDeclineDeliveryAssignedToSomeoneElse(): void
+    {
+        $client = static::createClient();
+
+        $this->entityManager = self::getContainer()
+            ->get(EntityManagerInterface::class);
+
+        $admin = $this->createTestUser(
+            'ROLE_ADMIN',
+            'Test Admin'
+        );
+
+        $courier = $this->createTestUser(
+            'ROLE_LIVREUR',
+            'Assigned Courier'
+        );
+
+        $otherCourier = $this->createTestUser(
+            'ROLE_LIVREUR',
+            'Other Courier'
+        );
+
+        $delivery = $this->createTestDelivery();
+
+        $adminToken = $this->authenticateClient(
+            $client,
+            $admin
+        );
+
+        $client->request(
+            'POST',
+            sprintf(
+                '/api/deliveries/%d/assign/%d',
+                $delivery->getId(),
+                $courier->getId()
+            ),
+            server: [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_AUTHORIZATION' => 'Bearer ' . $adminToken,
+            ]
+        );
+
+        self::assertResponseStatusCodeSame(
+            Response::HTTP_OK
+        );
+
+        $otherCourierToken = $this->authenticateClient(
+            $client,
+            $otherCourier
+        );
+
+        $client->request(
+            'POST',
+            sprintf(
+                '/api/deliveries/%d/decline',
+                $delivery->getId()
+            ),
+            server: [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_AUTHORIZATION' => 'Bearer ' . $otherCourierToken,
+            ]
+        );
+
+        self::assertResponseStatusCodeSame(
+            Response::HTTP_BAD_REQUEST
+        );
+
+        $response = json_decode(
+            $client->getResponse()->getContent(),
+            true
+        );
+
+        self::assertSame(
+            'You are not assigned to this delivery.',
+            $response['message']
+        );
+    }
+
     public function testCourierCanFailAcceptedDelivery(): void
     {
         $client = static::createClient();

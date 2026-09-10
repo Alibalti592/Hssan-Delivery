@@ -13,7 +13,7 @@ class ApiException implements Exception {
 
 /// The request never reached the server (no connection, DNS failure, timeout).
 class NetworkException implements Exception {
-  NetworkException([this.message = 'Could not reach the server.']);
+  NetworkException([this.message = 'Impossible de contacter le serveur.']);
 
   final String message;
 

@@ -44,15 +44,23 @@ class DeliveriesController extends ChangeNotifier {
   }
 
   /// Runs a lifecycle action. Returns an error message, or null on success.
+  ///
+  /// A decline unassigns the courier, so the delivery is no longer "mine":
+  /// it is dropped from the list rather than replaced in place.
   Future<String?> perform(Delivery delivery, DeliveryAction action) async {
     _actingOnId = delivery.id;
     notifyListeners();
     try {
       final updated = await _repository.act(delivery.id, action);
-      _deliveries = _sorted([
-        for (final d in _deliveries)
-          if (d.id == updated.id) updated else d,
-      ]);
+      _deliveries = action == DeliveryAction.decline
+          ? _sorted([
+              for (final d in _deliveries)
+                if (d.id != updated.id) d,
+            ])
+          : _sorted([
+              for (final d in _deliveries)
+                if (d.id == updated.id) updated else d,
+            ]);
       return null;
     } on ApiException catch (e) {
       return e.message;

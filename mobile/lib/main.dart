@@ -6,8 +6,8 @@ import 'auth/auth_repository.dart';
 import 'auth/login_screen.dart';
 import 'core/api_client.dart';
 import 'core/token_storage.dart';
+import 'dashboard/dashboard_screen.dart';
 import 'deliveries/deliveries_controller.dart';
-import 'deliveries/deliveries_screen.dart';
 import 'deliveries/delivery_repository.dart';
 import 'theme.dart';
 
@@ -62,7 +62,7 @@ class _CourierAppState extends State<CourierApp> {
         ChangeNotifierProvider.value(value: _deliveries),
       ],
       child: MaterialApp(
-        title: 'Hssan Courier',
+        title: 'Delivery Hassen — Livreur',
         debugShowCheckedModeBanner: false,
         theme: buildTheme(Brightness.light),
         darkTheme: buildTheme(Brightness.dark),
@@ -85,7 +85,7 @@ class _Root extends StatelessWidget {
       case AuthStatus.signedOut:
         return const LoginScreen();
       case AuthStatus.signedIn:
-        return const DeliveriesScreen();
+        return const DashboardScreen();
     }
   }
 }

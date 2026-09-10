@@ -1,18 +1,24 @@
 # Hssan Delivery — Courier App
 
-Flutter application for couriers (`ROLE_LIVREUR`). It covers the courier half of
-the delivery workflow end to end:
+Flutter application for couriers (`ROLE_LIVREUR`), UI in French. It covers the
+courier half of the delivery workflow end to end:
 
-- **Login** — phone + password against `POST /api/auth/login`; non-courier
-  accounts are rejected.
-- **My deliveries** — the courier's queue from `GET /api/deliveries/mine`, split
-  into active and history, pull to refresh.
+- **Login** (`Espace livreur`) — phone + password against
+  `POST /api/auth/login`; non-courier accounts are rejected.
+- **Dashboard** (`Tableau de bord`) — greeting, a local availability toggle,
+  today's delivered count and pending-proposal count, and a shortcut to the
+  in-progress delivery if there is one.
+- **Available deliveries** (`Courses disponibles`) — deliveries `ASSIGNED` to
+  the courier, awaiting a decision: `Accepter` or `Refuser`.
+- **My deliveries** (`Toutes mes courses`) — the full queue from
+  `GET /api/deliveries/mine`, split into active and history, pull to refresh.
 - **Delivery detail** — pickup restaurant, drop-off address and note, customer
   name with a tap-to-call button, the item list and pricing.
-- **Lifecycle actions** — accept / confirm pickup / start delivery / mark
-  delivered, plus "report a problem" (fail), each hitting the matching
+- **Lifecycle actions** — accept / decline / confirm pickup / start delivery /
+  mark delivered, plus "report a problem" (fail), each hitting the matching
   `POST /api/deliveries/{id}/…` endpoint. The buttons shown depend on the
-  current status.
+  current status. Marking a delivery delivered opens a confirmation screen
+  (`Livraison confirmée`) showing the amount collected.
 
 The client persona (browsing, cart, checkout, tracking) is not part of this app.
 
@@ -57,10 +63,12 @@ drives the auth and delivery controllers against a mocked HTTP client.
 ```
 lib/
   config.dart              API base URL (--dart-define)
-  theme.dart               Material 3 theme + status colours
+  theme.dart               Material 3 theme (navy brand) + status colours
   core/                    HTTP client, typed errors, secure token storage
   auth/                    login: repository, ChangeNotifier controller, screen
-  deliveries/              queue + detail: models, repository, controller, screens
+  dashboard/               landing screen after login
+  deliveries/              queue, available-deliveries, detail, confirmation:
+                           models, repository, controller, screens
   widgets/                 shared UI (status chip)
 ```
 

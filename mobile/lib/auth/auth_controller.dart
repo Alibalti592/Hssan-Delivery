@@ -63,7 +63,7 @@ class AuthController extends ChangeNotifier {
       final courier = await _repository.me();
       if (!courier.isCourier) {
         _token = null;
-        return 'This account is not a courier account.';
+        return "Ce compte n'est pas un compte livreur.";
       }
 
       await _storage.write(token);
@@ -73,7 +73,7 @@ class AuthController extends ChangeNotifier {
     } on ApiException catch (e) {
       _token = null;
       return e.statusCode == 401
-          ? 'Wrong phone number or password.'
+          ? 'Numéro ou mot de passe incorrect.'
           : e.message;
     } on NetworkException catch (e) {
       _token = null;

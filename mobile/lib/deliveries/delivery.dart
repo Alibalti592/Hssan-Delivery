@@ -1,13 +1,13 @@
 /// Delivery lifecycle, mirrors the backend `DeliveryStatus` enum.
 enum DeliveryStatus {
-  pending('PENDING', 'Pending'),
-  assigned('ASSIGNED', 'Assigned'),
-  accepted('ACCEPTED', 'Accepted'),
-  pickedUp('PICKED_UP', 'Picked up'),
-  onTheWay('ON_THE_WAY', 'On the way'),
-  delivered('DELIVERED', 'Delivered'),
-  cancelled('CANCELLED', 'Cancelled'),
-  failed('FAILED', 'Failed');
+  pending('PENDING', 'En attente'),
+  assigned('ASSIGNED', 'Nouvelle'),
+  accepted('ACCEPTED', 'Acceptée'),
+  pickedUp('PICKED_UP', 'Récupérée'),
+  onTheWay('ON_THE_WAY', 'En route'),
+  delivered('DELIVERED', 'Livrée'),
+  cancelled('CANCELLED', 'Annulée'),
+  failed('FAILED', 'Échouée');
 
   const DeliveryStatus(this.wire, this.label);
 
@@ -29,24 +29,28 @@ enum DeliveryStatus {
 
 /// A step a courier can take from the current status.
 enum DeliveryAction {
-  accept('accept', 'Accept'),
-  pickup('pickup', 'Confirm pickup'),
-  onTheWay('on-the-way', 'Start delivery'),
-  delivered('delivered', 'Mark delivered'),
-  fail('fail', 'Report a problem');
+  accept('accept', 'Accepter'),
+  decline('decline', 'Refuser'),
+  pickup('pickup', 'Confirmer la récupération'),
+  onTheWay('on-the-way', 'Démarrer la course'),
+  delivered('delivered', 'Confirmer la livraison'),
+  fail('fail', 'Signaler un problème');
 
   const DeliveryAction(this.pathSegment, this.label);
 
   final String pathSegment;
   final String label;
+
+  /// Destructive actions get a red outline and a confirmation dialog.
+  bool get isDestructive => this == fail || this == decline;
 }
 
 /// Actions offered for a given status. The first entry is the primary step;
-/// [DeliveryAction.fail] (when present) is the destructive fallback.
+/// a trailing destructive action (when present) is the secondary/fallback.
 List<DeliveryAction> actionsFor(DeliveryStatus status) {
   switch (status) {
     case DeliveryStatus.assigned:
-      return const [DeliveryAction.accept];
+      return const [DeliveryAction.accept, DeliveryAction.decline];
     case DeliveryStatus.accepted:
       return const [DeliveryAction.pickup, DeliveryAction.fail];
     case DeliveryStatus.pickedUp:

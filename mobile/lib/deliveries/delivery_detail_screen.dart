@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../widgets/status_chip.dart';
 import 'deliveries_controller.dart';
 import 'delivery.dart';
+import 'delivery_confirmed_screen.dart';
 
 class DeliveryDetailScreen extends StatelessWidget {
   const DeliveryDetailScreen({required this.deliveryId, super.key});
@@ -18,10 +19,8 @@ class DeliveryDetailScreen extends StatelessWidget {
 
     if (delivery == null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Delivery')),
-        body: const Center(
-          child: Text('This delivery is no longer available.'),
-        ),
+        appBar: AppBar(title: const Text('Course')),
+        body: const Center(child: Text('Cette course n\'est plus disponible.')),
       );
     }
 
@@ -29,13 +28,13 @@ class DeliveryDetailScreen extends StatelessWidget {
     final busy = controller.actingOnId == delivery.id;
 
     return Scaffold(
-      appBar: AppBar(title: Text('Delivery #${delivery.id}')),
+      appBar: AppBar(title: Text('Course #${delivery.id}')),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
           Row(
             children: [
-              Text('Status', style: Theme.of(context).textTheme.titleMedium),
+              Text('Statut', style: Theme.of(context).textTheme.titleMedium),
               const Spacer(),
               StatusChip(delivery.status),
             ],
@@ -44,7 +43,7 @@ class DeliveryDetailScreen extends StatelessWidget {
           if (order != null) ...[
             _Section(
               icon: Icons.storefront_outlined,
-              title: 'Pick up from',
+              title: 'Récupérer chez',
               child: Text(
                 order.restaurantName,
                 style: Theme.of(context).textTheme.bodyLarge,
@@ -52,7 +51,7 @@ class DeliveryDetailScreen extends StatelessWidget {
             ),
             _Section(
               icon: Icons.place_outlined,
-              title: 'Deliver to',
+              title: 'Livrer à',
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -63,7 +62,7 @@ class DeliveryDetailScreen extends StatelessWidget {
                   if (order.note != null && order.note!.trim().isNotEmpty) ...[
                     const SizedBox(height: 6),
                     Text(
-                      'Note: ${order.note}',
+                      'Note : ${order.note}',
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
                   ],
@@ -72,7 +71,7 @@ class DeliveryDetailScreen extends StatelessWidget {
             ),
             _Section(
               icon: Icons.person_outline,
-              title: 'Customer',
+              title: 'Client',
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -93,7 +92,7 @@ class DeliveryDetailScreen extends StatelessWidget {
             ),
             _Section(
               icon: Icons.receipt_long_outlined,
-              title: 'Order',
+              title: 'Commande',
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -103,13 +102,13 @@ class DeliveryDetailScreen extends StatelessWidget {
                       child: Text('${item.quantity}× ${item.productName}'),
                     ),
                   const Divider(height: 20),
-                  _MoneyRow('Delivery fee', order.deliveryFee),
+                  _MoneyRow('Frais de livraison', order.deliveryFee),
                   _MoneyRow('Total', order.totalAmount, bold: true),
                 ],
               ),
             ),
           ] else
-            const Text('Order details are unavailable.'),
+            const Text('Les détails de la commande sont indisponibles.'),
           const SizedBox(height: 8),
           _ActionBar(delivery: delivery, busy: busy),
         ],
@@ -120,9 +119,9 @@ class DeliveryDetailScreen extends StatelessWidget {
   Future<void> _call(BuildContext context, String phone) async {
     final uri = Uri(scheme: 'tel', path: phone);
     if (!await launchUrl(uri) && context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not start a call to $phone')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Impossible d\'appeler $phone')));
     }
   }
 }
@@ -134,22 +133,27 @@ class _ActionBar extends StatelessWidget {
   final bool busy;
 
   Future<void> _run(BuildContext context, DeliveryAction action) async {
-    if (action == DeliveryAction.fail) {
+    if (action.isDestructive) {
+      final isDecline = action == DeliveryAction.decline;
       final confirmed = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
-          title: const Text('Report a problem?'),
-          content: const Text(
-            'This marks the delivery as failed and cannot be undone.',
+          title: Text(
+            isDecline ? 'Refuser cette course ?' : 'Signaler un échec ?',
+          ),
+          content: Text(
+            isDecline
+                ? 'Elle sera proposée à un autre livreur.'
+                : 'Cette action marque la livraison comme échouée et ne peut pas être annulée.',
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancel'),
+              child: const Text('Annuler'),
             ),
             FilledButton(
               onPressed: () => Navigator.pop(context, true),
-              child: const Text('Report failure'),
+              child: Text(isDecline ? 'Refuser' : 'Signaler'),
             ),
           ],
         ),
@@ -158,13 +162,29 @@ class _ActionBar extends StatelessWidget {
     }
 
     if (!context.mounted) return;
+    final controller = context.read<DeliveriesController>();
     final messenger = ScaffoldMessenger.of(context);
-    final error = await context.read<DeliveriesController>().perform(
-      delivery,
-      action,
-    );
+    final navigator = Navigator.of(context);
+
+    final error = await controller.perform(delivery, action);
+
     if (error != null) {
       messenger.showSnackBar(SnackBar(content: Text(error)));
+      return;
+    }
+
+    if (action == DeliveryAction.decline) {
+      navigator.pop();
+      return;
+    }
+
+    if (action == DeliveryAction.delivered) {
+      final updated = controller.byId(delivery.id) ?? delivery;
+      navigator.pushReplacement(
+        MaterialPageRoute(
+          builder: (_) => DeliveryConfirmedScreen(delivery: updated),
+        ),
+      );
     }
   }
 
@@ -177,8 +197,8 @@ class _ActionBar extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 16),
         child: Text(
           delivery.status.isTerminal
-              ? 'This delivery is closed.'
-              : 'Nothing to do right now.',
+              ? 'Cette course est terminée.'
+              : 'Rien à faire pour le moment.',
           textAlign: TextAlign.center,
           style: Theme.of(context).textTheme.bodyMedium,
         ),
@@ -190,12 +210,14 @@ class _ActionBar extends StatelessWidget {
         for (final action in actions)
           Padding(
             padding: const EdgeInsets.only(top: 8),
-            child: action == DeliveryAction.fail
+            child: action.isDestructive
                 ? OutlinedButton(
                     onPressed: busy ? null : () => _run(context, action),
                     style: OutlinedButton.styleFrom(
-                      minimumSize: const Size.fromHeight(52),
                       foregroundColor: Theme.of(context).colorScheme.error,
+                      side: BorderSide(
+                        color: Theme.of(context).colorScheme.error,
+                      ),
                     ),
                     child: Text(action.label),
                   )

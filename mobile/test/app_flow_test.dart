@@ -100,7 +100,7 @@ void main() {
 
       final error = await auth.signIn('22000001', 'client1234');
 
-      expect(error, contains('not a courier'));
+      expect(error, contains('livreur'));
       expect(auth.status, isNot(AuthStatus.signedIn));
       expect(await storage.read(), isNull);
     });
@@ -121,7 +121,7 @@ void main() {
       );
 
       final error = await auth.signIn('21000001', 'wrong');
-      expect(error, 'Wrong phone number or password.');
+      expect(error, 'Numéro ou mot de passe incorrect.');
     });
   });
 
@@ -203,6 +203,48 @@ void main() {
 
       expect(error, isNull);
       expect(controller.byId(5)!.status, DeliveryStatus.accepted);
+    });
+
+    test('a declined delivery is dropped from the list', () async {
+      final mock = MockClient((request) async {
+        if (request.method == 'GET') {
+          return _json([
+            {
+              'id': 6,
+              'status': 'ASSIGNED',
+              'courierId': 3,
+              'order': {'id': 21, 'status': 'CONFIRMED', 'items': []},
+            },
+          ]);
+        }
+        expect(request.url.path, '/api/deliveries/6/decline');
+        return _json({
+          'id': 6,
+          'status': 'PENDING',
+          'courierId': null,
+          'order': {'id': 21, 'status': 'PENDING', 'items': []},
+        });
+      });
+
+      final controller = DeliveriesController(
+        DeliveryRepository(
+          ApiClient(
+            tokenProvider: () => 'jwt',
+            onUnauthorized: () {},
+            httpClient: mock,
+          ),
+        ),
+      );
+
+      await controller.refresh();
+      final error = await controller.perform(
+        controller.deliveries.first,
+        DeliveryAction.decline,
+      );
+
+      expect(error, isNull);
+      expect(controller.byId(6), isNull);
+      expect(controller.deliveries, isEmpty);
     });
   });
 }

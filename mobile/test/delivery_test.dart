@@ -19,8 +19,11 @@ void main() {
   });
 
   group('actionsFor', () {
-    test('assigned only offers accept', () {
-      expect(actionsFor(DeliveryStatus.assigned), [DeliveryAction.accept]);
+    test('assigned offers accept and decline', () {
+      expect(actionsFor(DeliveryStatus.assigned), [
+        DeliveryAction.accept,
+        DeliveryAction.decline,
+      ]);
     });
 
     test('mid-lifecycle offers a step plus fail', () {

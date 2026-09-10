@@ -59,6 +59,25 @@ final class DeliveryService
         });
     }
 
+    public function declineDelivery(
+        Delivery $delivery,
+        User $courier,
+    ): Delivery {
+        return $this->transitionWithLock($delivery, function (Delivery $delivery) use ($courier) {
+            if (DeliveryStatus::ASSIGNED !== $delivery->getStatus()) {
+                throw new InvalidOperationException('Only assigned deliveries can be declined.');
+            }
+
+            $this->assertAssignedCourier($delivery, $courier);
+
+            $delivery->setCourier(null);
+            $delivery->setStatus(DeliveryStatus::PENDING);
+            $delivery->setAssignedAt(null);
+
+            $this->syncOrderStatus($delivery);
+        });
+    }
+
     public function markPickedUp(
         Delivery $delivery,
         User $courier,

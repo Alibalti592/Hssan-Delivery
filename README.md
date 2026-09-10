@@ -185,6 +185,7 @@ GET  /api/deliveries/mine
 
 POST /api/deliveries/{id}/assign/{courierId}
 POST /api/deliveries/{id}/accept
+POST /api/deliveries/{id}/decline
 POST /api/deliveries/{id}/pickup
 POST /api/deliveries/{id}/on-the-way
 POST /api/deliveries/{id}/delivered
@@ -361,6 +362,7 @@ default-address invariant (setting one clears the others)
 delivery assignment
 delivery lifecycle transitions
 invalid delivery transitions
+courier decline (reverts an assigned delivery to pending)
 wrong-courier protection
 non-courier protection
 order/delivery status synchronization
@@ -378,8 +380,8 @@ php bin/phpunit
 
 Current baseline:
 
-90 tests
-546 assertions
+136 tests
+827 assertions
 
 Tests share a single Postgres database rather than running each in its own
 transaction, so re-running `php bin/phpunit` without resetting the database
@@ -447,9 +449,12 @@ The Flutter application (`mobile/`) currently implements the **courier app** —
 see `mobile/README.md`:
 
 courier authentication (ROLE_LIVREUR only)
+a dashboard (availability toggle, today's stats, current delivery shortcut)
+an available-deliveries screen to accept/decline a proposed delivery
 delivery queue (GET /api/deliveries/mine, active vs. history)
 delivery details (pickup, drop-off, customer, items, pricing)
-accept / pickup / on-the-way / delivered / fail actions
+accept / decline / pickup / on-the-way / delivered / fail actions
+a delivery-confirmed screen showing the amount collected
 tap-to-call the customer
 
 Not yet in the app:

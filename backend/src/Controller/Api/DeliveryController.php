@@ -99,6 +99,20 @@ final class DeliveryController extends AbstractController
     }
 
     #[Route(
+        '/{id}/decline',
+        name: 'api_delivery_decline',
+        methods: ['POST']
+    )]
+    #[IsGranted('ROLE_LIVREUR')]
+    public function decline(int $id): JsonResponse
+    {
+        return $this->executeCourierTransition(
+            $id,
+            fn (Delivery $delivery, User $courier) => $this->deliveryService->declineDelivery($delivery, $courier)
+        );
+    }
+
+    #[Route(
         '/{id}/pickup',
         name: 'api_delivery_pickup',
         methods: ['POST']

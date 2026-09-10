@@ -27,15 +27,15 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Sign out?'),
+        title: const Text('Se déconnecter ?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            child: const Text('Annuler'),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Sign out'),
+            child: const Text('Se déconnecter'),
           ),
         ],
       ),
@@ -52,10 +52,10 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('My deliveries'),
+        title: const Text('Toutes mes courses'),
         actions: [
           IconButton(
-            tooltip: 'Sign out',
+            tooltip: 'Se déconnecter',
             icon: const Icon(Icons.logout),
             onPressed: _confirmSignOut,
           ),
@@ -69,7 +69,7 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> {
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
                     child: Text(
-                      'Signed in as ${courier.name}',
+                      'Connecté en tant que ${courier.name}',
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
                   ),
@@ -91,7 +91,7 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> {
     if (!controller.loadedOnce && controller.error != null) {
       return _Message(
         icon: Icons.wifi_off,
-        title: 'Couldn\'t load your deliveries',
+        title: 'Impossible de charger vos courses',
         detail: controller.error,
         onRetry: controller.refresh,
       );
@@ -103,8 +103,8 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> {
     if (active.isEmpty && history.isEmpty) {
       return _Message(
         icon: Icons.inbox_outlined,
-        title: 'No deliveries yet',
-        detail: 'Assigned deliveries will show up here.',
+        title: 'Aucune course pour le moment',
+        detail: 'Les courses qui vous sont assignées apparaîtront ici.',
         onRetry: controller.refresh,
       );
     }
@@ -121,12 +121,12 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> {
             ),
           ),
         if (active.isNotEmpty) ...[
-          _SectionLabel('Active (${active.length})'),
+          _SectionLabel('En cours (${active.length})'),
           for (final d in active) _DeliveryCard(delivery: d),
         ],
         if (history.isNotEmpty) ...[
           const SizedBox(height: 8),
-          _SectionLabel('History'),
+          _SectionLabel('Historique'),
           for (final d in history) _DeliveryCard(delivery: d),
         ],
       ],
@@ -204,7 +204,7 @@ class _DeliveryCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  '${order.items.length} item(s) · ${order.totalAmount} DT',
+                  '${order.items.length} article(s) · ${order.totalAmount} DT',
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
               ],
@@ -257,7 +257,7 @@ class _Message extends StatelessWidget {
           Center(
             child: OutlinedButton(
               onPressed: onRetry,
-              child: const Text('Try again'),
+              child: const Text('Réessayer'),
             ),
           ),
         ],
