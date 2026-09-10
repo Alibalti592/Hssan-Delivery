@@ -12,6 +12,7 @@ ThemeData buildTheme(Brightness brightness) {
   return ThemeData(
     colorScheme: scheme,
     useMaterial3: true,
+    fontFamily: 'Roboto',
     scaffoldBackgroundColor: brightness == Brightness.light
         ? const Color(0xFFF2F4F7)
         : scheme.surface,

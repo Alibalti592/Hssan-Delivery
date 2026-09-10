@@ -25,3 +25,19 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+
+  # Bundled so the app renders text without a network fetch to Google Fonts —
+  # on web, Flutter's CanvasKit renderer otherwise fetches Roboto from
+  # fonts.gstatic.com at startup and silently renders blank text if that
+  # fails (no connectivity, corporate proxy, offline courier in the field).
+  fonts:
+    - family: Roboto
+      fonts:
+        - asset: assets/fonts/Roboto-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/Roboto-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Roboto-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/Roboto-ExtraBold.ttf
+          weight: 800
