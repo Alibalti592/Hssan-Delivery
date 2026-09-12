@@ -1,0 +1,9 @@
+# see https://docs.sentry.io/platforms/php/guides/symfony/
+#
+# No-ops when SENTRY_DSN is empty (the default — see .env.example), so this
+# is inert until a real DSN is supplied via .env.local or the deployment
+# environment. Create a free project at https://sentry.io to get one.
+sentry:
+    dsn: '%env(SENTRY_DSN)%'
+    options:
+        environment: '%env(APP_ENV)%'

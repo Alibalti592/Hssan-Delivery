@@ -4,6 +4,7 @@ namespace App\Tests\Integration;
 
 use App\Entity\Category;
 use App\Entity\Delivery;
+use App\Entity\DeliveryZone;
 use App\Entity\Order;
 use App\Entity\OrderItem;
 use App\Entity\Product;
@@ -118,6 +119,52 @@ final class DeliveryApiTest extends WebTestCase
         );
     }
 
+    /**
+     * DeliveryStatusChangedEvent → DeliveryNotificationListener →
+     * PushNotificationService fires on every assign, but with no
+     * FIREBASE_CREDENTIALS configured in the test env it must stay a no-op
+     * rather than blocking or failing the assignment itself — this is the
+     * concrete proof of that contract, not just an absence of a crash.
+     */
+    public function testAssigningADeliveryStillSucceedsWhenCourierHasARegisteredDeviceToken(): void
+    {
+        $client = static::createClient();
+
+        $this->entityManager = self::getContainer()
+            ->get(EntityManagerInterface::class);
+
+        $admin = $this->createTestUser('ROLE_ADMIN', 'Test Admin');
+        $courier = $this->createTestUser('ROLE_LIVREUR', 'Notified Courier');
+        $delivery = $this->createTestDelivery();
+
+        $courierToken = $this->authenticateClient($client, $courier);
+
+        $client->request(
+            'POST',
+            '/api/notifications/device-token',
+            server: [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_AUTHORIZATION' => 'Bearer '.$courierToken,
+            ],
+            content: json_encode(['token' => 'fcm-token-'.bin2hex(random_bytes(16))])
+        );
+
+        self::assertResponseStatusCodeSame(Response::HTTP_NO_CONTENT);
+
+        $adminToken = $this->authenticateClient($client, $admin);
+
+        $client->request(
+            'POST',
+            sprintf('/api/deliveries/%d/assign/%d', $delivery->getId(), $courier->getId()),
+            server: [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_AUTHORIZATION' => 'Bearer '.$adminToken,
+            ]
+        );
+
+        self::assertResponseStatusCodeSame(Response::HTTP_OK);
+    }
+
     public function testNonAdminCannotAssignDelivery(): void
     {
         $client = static::createClient();
@@ -208,6 +255,62 @@ final class DeliveryApiTest extends WebTestCase
 
         self::assertSame(
             'The selected user is not a courier.',
+            $response['message']
+        );
+    }
+
+    public function testAdminCannotAssignDeliveryToDeactivatedCourier(): void
+    {
+        $client = static::createClient();
+
+        $this->entityManager = self::getContainer()
+            ->get(EntityManagerInterface::class);
+
+        $admin = $this->createTestUser(
+            'ROLE_ADMIN',
+            'Test Admin'
+        );
+
+        $courier = $this->createTestUser(
+            'ROLE_LIVREUR',
+            'Deactivated Courier'
+        );
+
+        $courier->setActive(false);
+
+        $this->entityManager->flush();
+
+        $delivery = $this->createTestDelivery();
+
+        $token = $this->authenticateClient(
+            $client,
+            $admin
+        );
+
+        $client->request(
+            'POST',
+            sprintf(
+                '/api/deliveries/%d/assign/%d',
+                $delivery->getId(),
+                $courier->getId()
+            ),
+            server: [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_AUTHORIZATION' => 'Bearer ' . $token,
+            ]
+        );
+
+        self::assertResponseStatusCodeSame(
+            Response::HTTP_BAD_REQUEST
+        );
+
+        $response = json_decode(
+            $client->getResponse()->getContent(),
+            true
+        );
+
+        self::assertSame(
+            'This courier has been deactivated.',
             $response['message']
         );
     }
@@ -635,17 +738,30 @@ final class DeliveryApiTest extends WebTestCase
         );
 
         self::assertIsArray($response);
-        self::assertCount(1, $response);
+        self::assertCount(1, $response['items']);
 
         self::assertSame(
             $delivery->getId(),
-            $response[0]['id']
+            $response['items'][0]['id']
         );
 
         self::assertSame(
             $courier->getId(),
-            $response[0]['courierId']
+            $response['items'][0]['courierId']
         );
+
+        // The courier needs the pickup/drop-off details, not just an order id.
+        $order = $response['items'][0]['order'];
+
+        self::assertIsArray($order);
+        self::assertSame($delivery->getOrder()->getId(), $order['id']);
+        self::assertSame('Tunis, Tunisia', $order['deliveryAddress']);
+        self::assertSame('Delivery Test Client', $order['customerName']);
+        self::assertNotEmpty($order['customerPhone']);
+        self::assertNotEmpty($order['restaurantName']);
+        self::assertCount(1, $order['items']);
+        self::assertSame(1, $order['items'][0]['quantity']);
+        self::assertSame('12.500', $order['items'][0]['unitPrice']);
     }
 
     public function testClientCannotAccessCourierDeliveries(): void
@@ -728,6 +844,168 @@ final class DeliveryApiTest extends WebTestCase
         $this->assertOrderStatus(
             $orderId,
             OrderStatus::CANCELLED
+        );
+    }
+
+    public function testCourierCanDeclineAssignedDelivery(): void
+    {
+        $client = static::createClient();
+
+        $this->entityManager = self::getContainer()
+            ->get(EntityManagerInterface::class);
+
+        $admin = $this->createTestUser(
+            'ROLE_ADMIN',
+            'Test Admin'
+        );
+
+        $courier = $this->createTestUser(
+            'ROLE_LIVREUR',
+            'Test Courier'
+        );
+
+        $delivery = $this->createTestDelivery();
+
+        $orderId = $delivery->getOrder()->getId();
+
+        $adminToken = $this->authenticateClient(
+            $client,
+            $admin
+        );
+
+        $client->request(
+            'POST',
+            sprintf(
+                '/api/deliveries/%d/assign/%d',
+                $delivery->getId(),
+                $courier->getId()
+            ),
+            server: [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_AUTHORIZATION' => 'Bearer ' . $adminToken,
+            ]
+        );
+
+        self::assertResponseStatusCodeSame(
+            Response::HTTP_OK
+        );
+
+        $courierToken = $this->authenticateClient(
+            $client,
+            $courier
+        );
+
+        $client->request(
+            'POST',
+            sprintf(
+                '/api/deliveries/%d/decline',
+                $delivery->getId()
+            ),
+            server: [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_AUTHORIZATION' => 'Bearer ' . $courierToken,
+            ]
+        );
+
+        self::assertResponseStatusCodeSame(
+            Response::HTTP_OK
+        );
+
+        $response = json_decode(
+            $client->getResponse()->getContent(),
+            true
+        );
+
+        self::assertSame(
+            DeliveryStatus::PENDING->value,
+            $response['status']
+        );
+
+        self::assertNull(
+            $response['courierId']
+        );
+
+        $this->assertOrderStatus(
+            $orderId,
+            OrderStatus::PENDING
+        );
+    }
+
+    public function testCourierCannotDeclineDeliveryAssignedToSomeoneElse(): void
+    {
+        $client = static::createClient();
+
+        $this->entityManager = self::getContainer()
+            ->get(EntityManagerInterface::class);
+
+        $admin = $this->createTestUser(
+            'ROLE_ADMIN',
+            'Test Admin'
+        );
+
+        $courier = $this->createTestUser(
+            'ROLE_LIVREUR',
+            'Assigned Courier'
+        );
+
+        $otherCourier = $this->createTestUser(
+            'ROLE_LIVREUR',
+            'Other Courier'
+        );
+
+        $delivery = $this->createTestDelivery();
+
+        $adminToken = $this->authenticateClient(
+            $client,
+            $admin
+        );
+
+        $client->request(
+            'POST',
+            sprintf(
+                '/api/deliveries/%d/assign/%d',
+                $delivery->getId(),
+                $courier->getId()
+            ),
+            server: [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_AUTHORIZATION' => 'Bearer ' . $adminToken,
+            ]
+        );
+
+        self::assertResponseStatusCodeSame(
+            Response::HTTP_OK
+        );
+
+        $otherCourierToken = $this->authenticateClient(
+            $client,
+            $otherCourier
+        );
+
+        $client->request(
+            'POST',
+            sprintf(
+                '/api/deliveries/%d/decline',
+                $delivery->getId()
+            ),
+            server: [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_AUTHORIZATION' => 'Bearer ' . $otherCourierToken,
+            ]
+        );
+
+        self::assertResponseStatusCodeSame(
+            Response::HTTP_BAD_REQUEST
+        );
+
+        $response = json_decode(
+            $client->getResponse()->getContent(),
+            true
+        );
+
+        self::assertSame(
+            'You are not assigned to this delivery.',
+            $response['message']
         );
     }
 
@@ -869,13 +1147,20 @@ final class DeliveryApiTest extends WebTestCase
             'Delivery Test Client'
         );
 
+        $deliveryZone = new DeliveryZone();
+
+        $deliveryZone->setName('Test Zone '.random_int(1000, 9999));
+        $deliveryZone->setFee('4.000');
+
         $order = new Order();
 
         $order->setUser($clientUser);
         $order->setRestaurant($restaurant);
         $order->setNote('Delivery integration test');
         $order->setDeliveryAddress('Tunis, Tunisia');
-        $order->setTotalAmount('12.500');
+        $order->setDeliveryZone($deliveryZone);
+        $order->setDeliveryFee('4.000');
+        $order->setTotalAmount('16.500');
         $order->setStatus(OrderStatus::PENDING);
 
         $orderItem = new OrderItem();
@@ -896,6 +1181,7 @@ final class DeliveryApiTest extends WebTestCase
         $this->entityManager->persist($restaurant);
         $this->entityManager->persist($category);
         $this->entityManager->persist($product);
+        $this->entityManager->persist($deliveryZone);
         $this->entityManager->persist($order);
         $this->entityManager->persist($delivery);
 

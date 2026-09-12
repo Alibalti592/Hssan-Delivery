@@ -2,20 +2,23 @@
 
 Hssan Delivery is a delivery platform currently under development.
 
-The project is structured around a Symfony REST API backend, a Flutter mobile application, and a planned React/Vite administration dashboard.
+The project is structured around a Symfony REST API backend, a React/Vite administration dashboard, and a Flutter mobile application.
 
 ## Current project structure
 
 ```text
 Hssan-Delivery/
 ├── backend/    # Symfony REST API
+├── admin/      # React + Vite admin dashboard
 ├── mobile/     # Flutter mobile application
-├── admin/      # Planned React + Vite dashboard
 └── .github/
     └── workflows/
         └── backend.yml
 
-Current status: The Symfony backend is the most advanced component. The Flutter application and React admin dashboard are not yet implemented as production-ready applications.
+Current status: The Symfony backend is the most advanced component, followed by
+the admin dashboard (covers restaurant/category/product/delivery-zone/courier
+management and order/delivery visibility — see `admin/README.md`). The Flutter
+application is not yet implemented as a production-ready application.
 
 Technology stack
 Backend
@@ -49,6 +52,7 @@ A client can:
 create an account
 authenticate with phone and password
 browse the available catalogue
+save multiple labeled delivery addresses
 create orders
 receive a linked delivery
 Livreur
@@ -56,6 +60,10 @@ Livreur
 A courier account is created by an administrator.
 
 The courier receives credentials from the administrator and uses them to authenticate through the mobile application.
+
+An admin can deactivate a courier account (e.g. one who has left) without deleting
+it. A deactivated account can no longer log in, and can no longer be assigned new
+deliveries — attempting either returns an explicit error rather than failing silently.
 
 A courier can:
 
@@ -71,6 +79,9 @@ The administrator can currently:
 
 authenticate
 create courier accounts
+list and view courier accounts
+deactivate/reactivate a courier account
+view all orders and deliveries
 assign deliveries to couriers
 cancel eligible deliveries
 
@@ -136,22 +147,215 @@ Authentication
 POST /api/auth/register
 POST /api/auth/login
 GET  /api/auth/me
+POST /api/auth/change-password
 Admin courier management
-POST /api/admin/couriers
+POST  /api/admin/couriers
+GET   /api/admin/couriers
+GET   /api/admin/couriers/{id}
+PATCH /api/admin/couriers/{id}/active
+PATCH /api/admin/couriers/{id}/password
+Admin restaurant management
+POST   /api/admin/restaurants
+GET    /api/admin/restaurants
+GET    /api/admin/restaurants/{id}
+PUT    /api/admin/restaurants/{id}
+DELETE /api/admin/restaurants/{id}
+PATCH  /api/admin/restaurants/{id}/availability
+POST   /api/admin/restaurants/{id}/photo
+DELETE /api/admin/restaurants/{id}/photo
+Admin category management
+POST /api/admin/restaurants/{restaurantId}/categories
+GET  /api/admin/restaurants/{restaurantId}/categories
+GET  /api/admin/categories/{id}
+PUT  /api/admin/categories/{id}
+Admin product management
+POST   /api/admin/restaurants/{restaurantId}/products
+GET    /api/admin/restaurants/{restaurantId}/products
+GET    /api/admin/products/{id}
+PUT    /api/admin/products/{id}
+DELETE /api/admin/products/{id}
+PATCH  /api/admin/products/{id}/availability
+POST   /api/admin/products/{id}/photo
+DELETE /api/admin/products/{id}/photo
+
+Deleting a restaurant or product that has existing orders is refused (409) —
+deactivate it instead. Deleting a restaurant with no orders cascades to its
+categories and products.
+Admin delivery zone management
+POST /api/admin/delivery-zones
+GET  /api/admin/delivery-zones
+GET  /api/admin/delivery-zones/{id}
+PUT  /api/admin/delivery-zones/{id}
+Admin order management
+GET  /api/admin/orders
+GET  /api/admin/orders/{id}
+Admin delivery oversight
+GET  /api/admin/deliveries
+GET  /api/admin/deliveries/{id}
+Admin dashboard stats
+GET  /api/admin/stats
+Push notification device tokens
+POST   /api/notifications/device-token
+DELETE /api/notifications/device-token
 Delivery management
 GET  /api/deliveries/mine
 
 POST /api/deliveries/{id}/assign/{courierId}
 POST /api/deliveries/{id}/accept
+POST /api/deliveries/{id}/decline
 POST /api/deliveries/{id}/pickup
 POST /api/deliveries/{id}/on-the-way
 POST /api/deliveries/{id}/delivered
 POST /api/deliveries/{id}/cancel
 POST /api/deliveries/{id}/fail
+
+Every delivery response embeds an `order` summary (restaurant name, delivery
+address, customer name + phone, items, fee, total) so a courier has everything
+needed to carry out the job in one call.
 Orders
 POST /api/orders
+GET  /api/orders
+GET  /api/orders/{id}
+Catalogue (what a signed-in client browses before ordering)
+GET /api/restaurants
+GET /api/restaurants/{id}
+GET /api/restaurants/{id}/categories
+GET /api/restaurants/{id}/products
 
-The API is protected with JWT authentication and role-based authorization where required.
+Requires any authenticated account (ROLE_USER, same as /api/orders — no
+separate role check), but not ROLE_ADMIN. Closed restaurants and
+unavailable products are left out entirely, matching what OrderService
+will actually accept.
+Delivery zones
+GET  /api/delivery-zones
+Addresses
+POST   /api/addresses
+GET    /api/addresses
+GET    /api/addresses/{id}
+PUT    /api/addresses/{id}
+DELETE /api/addresses/{id}
+
+The API is protected with JWT authentication and role-based authorization where required. GET /api/orders, GET /api/deliveries/mine and GET /api/addresses(/{id}) scope results to the authenticated user; admins get unscoped visibility via GET /api/admin/orders and GET /api/admin/deliveries, which also return deliveryId/courierId so an admin can find the ID to act on with the assign/cancel endpoints above.
+
+Saved addresses
+
+A user can save multiple labeled delivery addresses (e.g. "Domicile", "Bureau"),
+each with a free-text address line and optional courier instructions. Exactly one
+address can be marked as the default per user — setting isDefault on one
+automatically clears it on every other address that user owns. There is no
+geocoding or map integration yet: addressLine is plain text, not lat/lng, and
+saved addresses are not yet wired into order creation (POST /api/orders still
+takes its own deliveryAddress field directly). This is the "address" half of
+Phase 1's "Address / geolocation model" item; geolocation itself is still open.
+
+Delivery pricing
+
+Delivery fees are zone-based rather than distance/GPS-based: each named neighborhood is
+pre-assigned a fixed fee (currently seeded for the Bizerte area). The flow is:
+
+Customer selects their delivery zone from the list returned by GET /api/delivery-zones
+   ↓
+Customer confirms the order, sending deliveryZoneId alongside the item list
+   ↓
+POST /api/orders looks up that zone's fee and adds it to the item total
+   ↓
+The order response returns deliveryZoneId, deliveryZoneName, deliveryFee, and totalAmount
+(totalAmount = item total + deliveryFee)
+
+There is no geocoding or distance calculation involved — the customer picks their zone
+directly. Zones are seeded via migration and managed through the admin delivery zone
+endpoints above (name and fee are updatable; there is no delete endpoint, consistent
+with restaurants/categories/products — zones already referenced by past orders are
+never removed).
+
+Account recovery
+
+There is no email or SMS channel anywhere in this app (accounts are phone
+number + password only), so a "forgot password" flow with a reset link/code
+isn't possible without adding that infrastructure first. Password recovery
+is instead split by how each role's account is provisioned:
+
+A signed-in user (client or courier) can change their own password via
+POST /api/auth/change-password (requires the current password).
+A courier locked out of their account has an admin reset it via
+PATCH /api/admin/couriers/{id}/password — the same out-of-band relay
+already used to hand a courier their initial password at creation.
+
+There is no equivalent recovery path for a client who both forgot their
+password and isn't signed in anywhere else; that requires a real email/SMS
+channel and is out of scope until one exists.
+
+Rate limiting
+
+POST /api/auth/login is throttled via Symfony's built-in login_throttling
+(5 failed attempts per username+IP per minute, plus an automatic 25/minute
+per-IP floor across all usernames), returning 429 once exceeded.
+POST /api/auth/register is limited to 5 attempts per IP per 10 minutes
+(config/packages/rate_limiter.yaml) as a basic guard against spam signups.
+
+Error tracking
+
+Uncaught exceptions can be reported to Sentry (sentry/sentry-symfony on the
+backend, sentry_flutter on mobile). Both are no-ops until a real DSN is
+supplied — SENTRY_DSN in the backend's .env.local, or
+--dart-define=SENTRY_DSN=... when running/building the mobile app — so
+this is inert by default and doesn't require a Sentry account to develop.
+
+Pagination
+
+The list endpoints most likely to grow unbounded over real usage —
+admin couriers/restaurants/products/orders/deliveries, the public
+restaurant/product catalogue, a client's own order history, and a
+courier's own delivery queue — accept `?page=` and `?limit=` (default
+page 1, limit 20, capped at 100) and return
+`{"items": [...], "meta": {"page", "limit", "total", "pages"}}` instead of
+a bare array. Small, admin-bounded lists (categories, delivery zones,
+saved addresses) aren't paginated — there's no realistic scenario where
+those grow past one page. The admin dashboard's list pages show Prev/Next
+controls backed by this; the mobile app fetches a large single page for
+the catalogue (administratively bounded) and a "load more" button for
+order history and delivery history (the two lists that genuinely grow
+per-user over time). GET /api/admin/stats backs the admin dashboard's
+overview counts with dedicated COUNT queries rather than paging through
+every list just to count it.
+
+Push notifications
+
+Delivery status changes can push a notification via Firebase Cloud
+Messaging: a courier is notified when a delivery is assigned to them, and
+a client is notified once their order is on its way and once it's
+delivered. The mobile app registers/unregisters its FCM token against the
+signed-in account via POST/DELETE /api/notifications/device-token
+(a device can belong to at most one account at a time — registering a
+token already owned by someone else reassigns it, since that means the
+same device switched accounts). Both the backend (kreait/firebase-php)
+and the mobile app are inert without a real Firebase project — see
+FIREBASE_CREDENTIALS in backend/.env.example and the FIREBASE_* dart-defines
+documented in mobile/lib/config.dart — so this doesn't require a Firebase
+account to develop, and a failed or skipped push never blocks the
+delivery/order action that triggered it.
+
+Docker / CD pipeline
+
+The backend (backend/Dockerfile, php-apache) and admin dashboard
+(admin/Dockerfile, a static Vite build served by nginx) each build into a
+standalone image. .github/workflows/cd.yml builds and pushes both to
+GHCR (ghcr.io/<owner>/hssan-delivery-backend and -admin, tagged :latest
+and :<commit-sha>) on every push to main — this is the "CD" half; the
+existing backend/admin/mobile CI workflows already gate every merge with
+lint + tests. Backend image details: JWT keys are generated on first boot
+from JWT_PASSPHRASE (never baked into the image, matching config/jwt/*.pem
+being gitignored), and pending Doctrine migrations run automatically on
+every boot.
+
+The workflow's final step in each job SSHes into a staging host and runs
+`docker compose pull && up -d` — inert until three repo secrets exist
+(STAGING_SSH_HOST, STAGING_SSH_USER, STAGING_SSH_KEY), so the pipeline
+runs end-to-end (build + push) without requiring a staging server to
+exist yet. docker-compose.staging.yml documents the layout such a server
+needs (backend + admin + postgres, referencing the GHCR images) — it's a
+template to fill in and place on the staging host, not something CI runs
+itself.
 
 Backend setup
 Requirements
@@ -177,6 +381,13 @@ DATABASE_URL
 JWT_SECRET_KEY
 JWT_PUBLIC_KEY
 JWT_PASSPHRASE
+CORS_ALLOW_ORIGIN
+
+CORS_ALLOW_ORIGIN is a regex of browser origins allowed to call /api/* (via
+nelmio/cors-bundle). Needed for any browser-based client — the admin
+dashboard in particular. The example default covers any localhost/127.0.0.1
+port for local development; tighten it to the real deployed origin(s) in
+production.
 
 The local .env file must never be committed.
 
@@ -214,6 +425,28 @@ php bin/console doctrine:migrations:migrate
 Clear the Symfony cache:
 
 php bin/console cache:clear
+Seed data (dev / test)
+
+Load a reproducible set of demo data — one account per role, a small
+catalogue, and a few orders/deliveries in different states:
+
+composer fixtures
+
+Or rebuild the whole local database from scratch (drop, create, migrate,
+seed) in one step:
+
+composer db-reset
+
+The fixture is idempotent: if its admin account already exists it does
+nothing, so `composer fixtures` is safe to re-run. It never touches the
+migration-seeded delivery zones. Seeded credentials (phone / password):
+
+admin     20000000 / admin1234
+courier   21000001 / courier1234   (active)
+courier   21000002 / courier1234   (deactivated)
+client    22000001 / client1234
+client    22000002 / client1234
+
 Run the backend
 
 Using the Symfony CLI:
@@ -235,55 +468,65 @@ invalid registration data
 admin courier creation
 courier authentication
 courier authorization
+self-service password change, including the wrong-current-password case
+admin-initiated courier password reset (account recovery)
+login throttling after repeated failed attempts
+registration rate limiting
+admin restaurant, category, product and delivery zone management
+restaurant/product photo upload, replace and remove
+restaurant/product delete, including the has-existing-orders conflict guard
+public catalogue (available restaurants/categories/products only, any signed-in role)
+admin order and delivery visibility
+admin courier listing and deactivation
+deactivated accounts cannot log in
+deactivated couriers cannot be assigned deliveries
+saved address CRUD and per-user ownership scoping
+default-address invariant (setting one clears the others)
 delivery assignment
 delivery lifecycle transitions
 invalid delivery transitions
+courier decline (reverts an assigned delivery to pending)
 wrong-courier protection
 non-courier protection
 order/delivery status synchronization
+pagination (page/limit, envelope shape, boundary behavior) on couriers, restaurants, products, orders, and deliveries
+admin dashboard stats (COUNT-based, correct regardless of list size)
+device-token registration/unregistration, including reassignment when a device switches accounts
+a delivery notification firing without blocking the underlying status change even when a device token is registered
 
-Run the complete test suite:
+It also contains unit tests for the pure logic that backs those workflows: the
+decimal/millimes money conversion and the delivery-to-order status mapping.
+
+Run the complete test suite (this resets the test database first):
+
+composer test
+
+Or, against an already-migrated test database:
 
 php bin/phpunit
 
 Current baseline:
 
-29 tests
-239 assertions
+179 tests
+1086 assertions
+
+Tests share a single Postgres database rather than running each in its own
+transaction, so re-running `php bin/phpunit` without resetting the database
+first (`composer test`, or the `test-db-reset` composer script) can fail on
+leftover data from the previous run.
 Continuous Integration
 
-GitHub Actions runs the backend CI workflow on pushes and pull requests targeting:
+GitHub Actions runs three workflows on pushes and pull requests targeting
+`dev` and `main`, one per component:
 
-dev
-main
+.github/workflows/backend.yml   PHP 8.2 · PostgreSQL 16 · composer validate ·
+                                temporary JWT keys · migrate · schema:validate ·
+                                PHPUnit
+.github/workflows/admin.yml     Node 20 · npm ci · oxlint · tsc + vite build
+.github/workflows/mobile.yml    Flutter stable · pub get · dart format check ·
+                                flutter analyze · flutter test
 
-Workflow file:
-
-.github/workflows/backend.yml
-
-The CI pipeline performs:
-
-Checkout
-   ↓
-PHP 8.2
-   ↓
-PostgreSQL 16
-   ↓
-Composer validation
-   ↓
-Composer install
-   ↓
-Generate temporary JWT test keys
-   ↓
-Create test database
-   ↓
-Run migrations
-   ↓
-Validate Doctrine schema
-   ↓
-Run PHPUnit
-
-The CI environment uses temporary JWT credentials and an isolated PostgreSQL database.
+The backend job uses temporary JWT credentials and an isolated PostgreSQL database.
 
 Security
 
@@ -313,62 +556,83 @@ JWT authentication
 client registration
 login
 authenticated profile endpoint
-restaurant/product foundations
+restaurant/product management, including photos, for admins
+public catalogue for browsing/ordering (any signed-in account)
+saved delivery addresses
 order creation
+zone-based delivery pricing
 automatic delivery creation
 delivery assignment
 courier delivery lifecycle
 admin courier creation
+admin courier listing and deactivation
+admin order and delivery visibility
 role-based authorization
 order/delivery status synchronization
+self-service password change
+admin-initiated courier password reset (account recovery)
+login throttling and registration rate limiting
+error tracking (Sentry, inert until a DSN is configured)
+pagination on every list endpoint likely to grow unbounded
+admin dashboard stats via dedicated COUNT queries
+push notifications on delivery status changes (FCM, inert until a Firebase project is configured)
 integration tests
 GitHub Actions CI
 Mobile
 
-The Flutter application is still under development.
+The Flutter application (`mobile/`) now serves **both personas** — courier
+and client — from a single app, branching on the signed-in account's role
+right after login (`ROLE_LIVREUR` → courier dashboard, `ROLE_CLIENT` →
+client home). See `mobile/README.md`.
 
-Planned client features:
+Courier:
 
-authentication
-restaurant browsing
-categories
-product browsing
-cart
-checkout
-order history
-order tracking
-notifications
-profile
-address management
+courier authentication (ROLE_LIVREUR only)
+a dashboard (availability toggle, today's stats, current delivery shortcut)
+an available-deliveries screen to accept/decline a proposed delivery
+delivery queue (GET /api/deliveries/mine, active vs. history, "load more" for older history)
+delivery details (pickup, drop-off, customer, items, pricing)
+accept / decline / pickup / on-the-way / delivered / fail actions
+a delivery-confirmed screen showing the amount collected
+tap-to-call the customer
+change password (dashboard menu)
+push notification registration (FCM, inert without a Firebase project — see "Push notifications" above)
 
-Planned courier features:
+Client:
 
-courier authentication
-delivery queue
-delivery details
-accept delivery
-pickup
-on-the-way
-delivered
-failed delivery
-notifications
-map/navigation integration
+client registration and authentication (ROLE_CLIENT)
+restaurant browsing (GET /api/restaurants)
+menu browsing by category with add-to-cart (GET .../categories, .../products)
+a cart (single-restaurant, quantity steppers, restaurant-switch confirmation)
+checkout (delivery address, delivery zone, optional note, live total)
+order placement (POST /api/orders) and a confirmation screen
+order history and order detail (GET /api/orders, GET /api/orders/{id}, "load more" for older orders)
+a profile screen (account info, change password, sign out)
+push notification registration (FCM, inert without a Firebase project — see "Push notifications" above)
+
+Not yet in the app:
+
+map / navigation integration
+saved-address picker in checkout (the backend has `/api/addresses`; checkout
+currently takes a free-text address)
 Admin dashboard
 
-The React/Vite admin dashboard is planned but is not yet implemented.
-
-Planned features:
+The React/Vite admin dashboard (`admin/`) is implemented and covers:
 
 admin authentication
-dashboard
-order management
-delivery monitoring
-courier management
-courier assignment
-restaurant management
+dashboard (counts overview, backed by GET /api/admin/stats)
+order visibility (list + detail, paginated with Prev/Next)
+delivery monitoring (list + detail, paginated with Prev/Next)
+delivery assignment / cancellation
+courier management (list, create, activate/deactivate, password reset, paginated with Prev/Next)
+restaurant management (including delete and photo upload/replace/remove, paginated with Prev/Next)
 category management
-product/menu management
-operational statistics
+product/menu management (including delete and photo upload/replace/remove, paginated with Prev/Next)
+delivery zone management
+
+Not yet implemented in the dashboard:
+
+operational statistics beyond simple counts
 Future services
 
 The platform is intended to expand beyond restaurant delivery.
@@ -400,27 +664,27 @@ Phase 1 — Backend domain completeness
  Restaurant management
  Category management
  Product management
- Admin order management
- Courier management improvements
- Delivery pricing
- Address / geolocation model
+ Admin order management (done — see "Admin order management" and "Admin delivery oversight" above)
+ Courier management improvements (done — list/show/deactivate, see "Admin courier management" above)
+ Delivery pricing (done — zone-based, see "Delivery pricing" above, including admin CRUD for zones)
+ Address / geolocation model (address half done — see "Saved addresses" above; geolocation/lat-lng still open)
 Phase 2 — Restaurant operations
  Order confirmation
  Order preparation workflow
  Ready-for-pickup workflow
  Restaurant operational endpoints
-Phase 3 — Flutter application
- Client application shell
- Client authentication
- Restaurant browsing
- Catalogue
- Cart
- Checkout
- Order tracking
- Courier application
- Courier delivery queue
- Delivery status actions
-Phase 4 — React admin dashboard
+Phase 3 — Flutter application (done — see "Mobile" above)
+ Client application shell (done)
+ Client authentication (done)
+ Restaurant browsing (done)
+ Catalogue (done)
+ Cart (done)
+ Checkout (done)
+ Order tracking (done — history + detail, load more, push notifications on status changes)
+ Courier application (done)
+ Courier delivery queue (done)
+ Delivery status actions (done)
+Phase 4 — React admin dashboard (done — see admin/README.md)
  Admin authentication
  Dashboard
  Order management
@@ -430,28 +694,46 @@ Phase 4 — React admin dashboard
  Restaurant management
  Category/product management
 Phase 5 — Real-time features
- Push notifications
+ Push notifications (done — delivery assigned/on-the-way/delivered via FCM, inert until a Firebase project is configured; see "Push notifications" above)
  Live delivery status
  Courier location updates
  Live delivery tracking
  Maps/navigation
 Phase 6 — Additional services
+
+The current schema is hard-coupled to restaurant delivery: `Order` requires a
+`Restaurant` and `Delivery` is always tied 1:1 to an `Order`. None of the
+services below can be added on top of that as-is — `Order`/`Delivery` need
+to be generalized first (e.g. `Order` becoming polymorphic across a
+restaurant order, a parcel job, or a supermarket cart) before any service
+work starts. A `DeliveryType` enum (`RESTAURANT`, `SUPERMARKET`, `PARCEL`)
+already exists in `src/Enum/DeliveryType.php` as a placeholder but isn't
+wired into anything yet.
+
+Bill payment and money transfer aren't delivery workflows at all — they need
+a wallet/balance per user and a transaction ledger, not a courier. Money
+transfer in particular carries money-transmission licensing considerations
+that depend on jurisdiction and should be scoped before implementation
+starts.
+
+ Generalize Order/Delivery schema (prerequisite for every item below)
  Supermarket delivery
  Parcel delivery
- Bill payment
- Money transfer
+ Bill payment (biller integration, payment method, transaction ledger)
+ Money transfer (wallet/balance, transaction ledger, licensing review)
 Phase 7 — Production infrastructure
- Docker
- Staging environment
+ Docker (done — backend + admin images, see "Docker / CD pipeline" above)
+ CD pipeline (done — build/push to GHCR on merge to main; staging deploy inert until a host exists, see "Docker / CD pipeline" above)
+ Staging environment (host not provisioned yet — docker-compose.staging.yml is ready to place on one)
  Production environment
- Nginx / HTTPS
+ Nginx / HTTPS (nginx serves the admin image; HTTPS itself is a staging/production host concern, not yet set up)
  Database backups
  Monitoring
- Error tracking
+ Error tracking (done — Sentry, inert until a DSN is configured; see "Error tracking" above)
 Phase 8 — Production hardening
  Security review
- Rate limiting
- Authentication hardening
+ Rate limiting (done — login throttling + registration limiter, see "Rate limiting" above)
+ Authentication hardening (partial — password change/reset done, see "Account recovery" above; no 2FA)
  Performance testing
  Load testing
  Beta rollout

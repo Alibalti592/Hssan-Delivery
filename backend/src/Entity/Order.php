@@ -40,6 +40,16 @@ class Order
     #[ORM\Column(type: 'text')]
     private ?string $deliveryAddress = null;
 
+    #[ORM\ManyToOne]
+    #[ORM\JoinColumn(nullable: false)]
+    private ?DeliveryZone $deliveryZone = null;
+
+    #[ORM\Column(type: 'decimal', precision: 10, scale: 3)]
+    private ?string $deliveryFee = null;
+
+    /**
+     * Items total plus deliveryFee.
+     */
     #[ORM\Column(type: 'decimal', precision: 10, scale: 3)]
     private ?string $totalAmount = null;
 
@@ -152,6 +162,30 @@ class Order
     public function setDeliveryAddress(string $deliveryAddress): static
     {
         $this->deliveryAddress = $deliveryAddress;
+
+        return $this;
+    }
+
+    public function getDeliveryZone(): ?DeliveryZone
+    {
+        return $this->deliveryZone;
+    }
+
+    public function setDeliveryZone(?DeliveryZone $deliveryZone): static
+    {
+        $this->deliveryZone = $deliveryZone;
+
+        return $this;
+    }
+
+    public function getDeliveryFee(): ?string
+    {
+        return $this->deliveryFee;
+    }
+
+    public function setDeliveryFee(string $deliveryFee): static
+    {
+        $this->deliveryFee = $deliveryFee;
 
         return $this;
     }

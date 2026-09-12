@@ -5,6 +5,8 @@ namespace App\Service;
 use App\Dto\Admin\CreateCourierRequest;
 use App\Dto\Auth\RegisterUserRequest;
 use App\Entity\User;
+use App\Exception\ConflictException;
+use App\Exception\InvalidOperationException;
 use App\Repository\UserRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
@@ -25,7 +27,7 @@ final class AuthService
                 'phone' => $dto->phone,
             ]) !== null
         ) {
-            throw new \RuntimeException(
+            throw new ConflictException(
                 'An account with this phone number already exists.'
             );
         }
@@ -59,7 +61,7 @@ final class AuthService
                 'phone' => $dto->phone,
             ]) !== null
         ) {
-            throw new \RuntimeException(
+            throw new ConflictException(
                 'An account with this phone number already exists.'
             );
         }
@@ -83,5 +85,24 @@ final class AuthService
         $this->entityManager->flush();
 
         return $courier;
+    }
+
+    /**
+     * Self-service password change for any authenticated user. Requires the
+     * current password, so it's not a substitute for account recovery when
+     * the user is locked out — see AdminCourierController::resetPassword()
+     * for that case (couriers only; see its docblock for why).
+     */
+    public function changePassword(User $user, string $currentPassword, string $newPassword): void
+    {
+        if (!$this->passwordHasher->isPasswordValid($user, $currentPassword)) {
+            throw new InvalidOperationException('Mot de passe actuel incorrect.');
+        }
+
+        $user->setPassword(
+            $this->passwordHasher->hashPassword($user, $newPassword)
+        );
+
+        $this->entityManager->flush();
     }
 }

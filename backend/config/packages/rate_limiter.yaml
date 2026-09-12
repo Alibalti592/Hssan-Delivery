@@ -1,0 +1,14 @@
+# see https://symfony.com/doc/current/rate_limiter.html
+#
+# Login brute-force protection is configured separately, via the
+# api_login firewall's `login_throttling` option in security.yaml —
+# that's the built-in mechanism for authenticators like json_login,
+# which never reach a controller action for a manual limiter to guard.
+framework:
+    rate_limiter:
+        # Basic abuse/spam guard on self-registration, keyed by IP
+        # (see AuthController::register).
+        register:
+            policy: sliding_window
+            limit: 5
+            interval: '10 minutes'

@@ -26,6 +26,9 @@ class Product
     #[ORM\Column]
     private bool $isAvailable = true;
 
+    #[ORM\Column(length: 255, nullable: true)]
+    private ?string $photoFilename = null;
+
     #[ORM\ManyToOne(inversedBy: 'products')]
     #[ORM\JoinColumn(nullable: false)]
     private ?Restaurant $restaurant = null;
@@ -104,6 +107,18 @@ class Product
     public function setIsAvailable(bool $isAvailable): static
     {
         $this->isAvailable = $isAvailable;
+
+        return $this;
+    }
+
+    public function getPhotoFilename(): ?string
+    {
+        return $this->photoFilename;
+    }
+
+    public function setPhotoFilename(?string $photoFilename): static
+    {
+        $this->photoFilename = $photoFilename;
 
         return $this;
     }

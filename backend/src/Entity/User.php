@@ -17,8 +17,6 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\Column]
     private ?int $id = null;
 
-    
-
     /**
      * @var list<string> The user roles
      */
@@ -34,10 +32,8 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\Column(length: 255)]
     private ?string $name = null;
 
-    #[ORM\Column(length: 255, unique :true)]
+    #[ORM\Column(length: 255, unique : true)]
     private ?string $phone = null;
-
-   
 
     /**
      * Null until an admin approves the account. Clients are verified
@@ -46,6 +42,13 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
      */
     #[ORM\Column(nullable: true)]
     private ?\DateTimeImmutable $verifiedAt = null;
+
+    /**
+     * An admin can deactivate an account (e.g. a courier who left) without
+     * deleting it. A deactivated account can no longer authenticate.
+     */
+    #[ORM\Column(options: ['default' => true])]
+    private bool $isActive = true;
 
     #[ORM\Column]
     private ?\DateTimeImmutable $createdAt = null;
@@ -70,8 +73,6 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     {
         return $this->id;
     }
-
-    
 
     /**
      * A visual identifier that represents this user.
@@ -161,8 +162,6 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         return $this;
     }
 
-   
-
     public function getVerifiedAt(): ?\DateTimeImmutable
     {
         return $this->verifiedAt;
@@ -177,7 +176,19 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
 
     public function isVerified(): bool
     {
-        return $this->verifiedAt !== null;
+        return null !== $this->verifiedAt;
+    }
+
+    public function isActive(): bool
+    {
+        return $this->isActive;
+    }
+
+    public function setActive(bool $isActive): static
+    {
+        $this->isActive = $isActive;
+
+        return $this;
     }
 
     public function getCreatedAt(): ?\DateTimeImmutable

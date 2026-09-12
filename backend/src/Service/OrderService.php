@@ -2,16 +2,21 @@
 
 namespace App\Service;
 
-use App\Entity\Delivery;
-use App\Enum\DeliveryStatus;
 use App\Dto\Order\CreateOrderRequest;
+use App\Entity\Delivery;
 use App\Entity\Order;
 use App\Entity\OrderItem;
 use App\Entity\User;
+use App\Enum\DeliveryStatus;
 use App\Enum\OrderStatus;
+use App\Exception\InvalidOperationException;
+use App\Pagination\PaginatedResult;
+use App\Pagination\Paginator;
+use App\Repository\DeliveryZoneRepository;
 use App\Repository\OrderRepository;
 use App\Repository\ProductRepository;
 use App\Repository\RestaurantRepository;
+use App\Util\Money;
 use Doctrine\ORM\EntityManagerInterface;
 
 final class OrderService
@@ -21,21 +26,28 @@ final class OrderService
         private readonly OrderRepository $orderRepository,
         private readonly RestaurantRepository $restaurantRepository,
         private readonly ProductRepository $productRepository,
+        private readonly DeliveryZoneRepository $deliveryZoneRepository,
     ) {
     }
 
     public function createOrder(
         CreateOrderRequest $dto,
-        User $user
+        User $user,
     ): Order {
         $restaurant = $this->restaurantRepository->find($dto->restaurantId);
 
-        if ($restaurant === null) {
-            throw new \RuntimeException('Restaurant not found.');
+        if (null === $restaurant) {
+            throw new InvalidOperationException('Restaurant not found.');
         }
 
         if (!$restaurant->isAvailable()) {
-            throw new \RuntimeException('Restaurant is currently unavailable.');
+            throw new InvalidOperationException('Restaurant is currently unavailable.');
+        }
+
+        $deliveryZone = $this->deliveryZoneRepository->find($dto->deliveryZoneId);
+
+        if (null === $deliveryZone) {
+            throw new InvalidOperationException('Delivery zone not found.');
         }
 
         $order = new Order();
@@ -44,6 +56,7 @@ final class OrderService
         $order->setRestaurant($restaurant);
         $order->setNote($dto->note);
         $order->setDeliveryAddress($dto->deliveryAddress);
+        $order->setDeliveryZone($deliveryZone);
         $order->setStatus(OrderStatus::PENDING);
 
         $totalMillimes = 0;
@@ -51,33 +64,25 @@ final class OrderService
         foreach ($dto->items as $itemDto) {
             $product = $this->productRepository->find($itemDto->productId);
 
-            if ($product === null) {
-                throw new \RuntimeException(
-                    "Product {$itemDto->productId} not found."
-                );
+            if (null === $product) {
+                throw new InvalidOperationException("Product {$itemDto->productId} not found.");
             }
 
             if ($product->getRestaurant()?->getId() !== $restaurant->getId()) {
-                throw new \RuntimeException(
-                    "Product {$itemDto->productId} does not belong to this restaurant."
-                );
+                throw new InvalidOperationException("Product {$itemDto->productId} does not belong to this restaurant.");
             }
 
             if (!$product->isAvailable()) {
-                throw new \RuntimeException(
-                    "Product {$itemDto->productId} is currently unavailable."
-                );
+                throw new InvalidOperationException("Product {$itemDto->productId} is currently unavailable.");
             }
 
             $unitPrice = $product->getPrice();
 
-            if ($unitPrice === null) {
-                throw new \RuntimeException(
-                    "Product {$itemDto->productId} has no price."
-                );
+            if (null === $unitPrice) {
+                throw new InvalidOperationException("Product {$itemDto->productId} has no price.");
             }
 
-            $priceMillimes = $this->toMillimes($unitPrice);
+            $priceMillimes = Money::toMillimes($unitPrice);
 
             $itemTotalMillimes =
                 $priceMillimes * $itemDto->quantity;
@@ -94,61 +99,50 @@ final class OrderService
         }
 
         if ($totalMillimes <= 0) {
-            throw new \RuntimeException(
-                'Order total must be greater than zero.'
-            );
+            throw new InvalidOperationException('Order total must be greater than zero.');
         }
 
+        $deliveryFeeMillimes = Money::toMillimes($deliveryZone->getFee());
+
+        $order->setDeliveryFee(
+            Money::fromMillimes($deliveryFeeMillimes)
+        );
         $order->setTotalAmount(
-            $this->fromMillimes($totalMillimes)
+            Money::fromMillimes($totalMillimes + $deliveryFeeMillimes)
         );
         $delivery = new Delivery();
 
-$delivery->setOrder($order);
-$delivery->setStatus(DeliveryStatus::PENDING);
+        $delivery->setOrder($order);
+        $delivery->setStatus(DeliveryStatus::PENDING);
 
-$order->setDelivery($delivery);
+        $order->setDelivery($delivery);
 
-$this->entityManager->persist($delivery);
+        $this->entityManager->persist($delivery);
 
         $this->entityManager->persist($order);
         $this->entityManager->flush();
 
         return $order;
     }
-    public function getUserOrders(User $user): array
-{
-    return $this->orderRepository->findBy(
-        ['user' => $user],
-        ['createdAt' => 'DESC']
-    );
-}
-public function getUserOrder(int $orderId, User $user): ?Order
-{
-    return $this->orderRepository->findOneBy([
-        'id' => $orderId,
-        'user' => $user,
-    ]);
-}
-    private function toMillimes(string $amount): int
+
+    /**
+     * @return PaginatedResult<Order>
+     */
+    public function getUserOrders(User $user, int $page, int $limit): PaginatedResult
     {
-        [$whole, $decimal] = array_pad(
-            explode('.', $amount, 2),
-            2,
-            ''
-        );
+        $qb = $this->orderRepository->createQueryBuilder('o')
+            ->andWhere('o.user = :user')
+            ->setParameter('user', $user)
+            ->orderBy('o.createdAt', 'DESC');
 
-        $decimal = str_pad($decimal, 3, '0');
-
-        return ((int) $whole * 1000)
-            + (int) substr($decimal, 0, 3);
+        return Paginator::paginate($qb, $page, $limit);
     }
 
-    private function fromMillimes(int $millimes): string
+    public function getUserOrder(int $orderId, User $user): ?Order
     {
-        $whole = intdiv($millimes, 1000);
-        $decimal = $millimes % 1000;
-
-        return sprintf('%d.%03d', $whole, $decimal);
+        return $this->orderRepository->findOneBy([
+            'id' => $orderId,
+            'user' => $user,
+        ]);
     }
 }

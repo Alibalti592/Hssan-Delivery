@@ -1,0 +1,144 @@
+name: CD
+
+# Builds and publishes versioned Docker images for the backend and admin
+# dashboard on every push to main (production). This is CI/CD's "CD" half:
+# CI (backend.yml / admin.yml / mobile.yml) already gates every merge with
+# lint + tests; this workflow assumes that gate passed and turns main's
+# head into deployable artifacts.
+#
+# Staging deploy (the last step of each job) is inert until three repo
+# secrets are configured — STAGING_SSH_HOST, STAGING_SSH_USER,
+# STAGING_SSH_KEY — matching the "inert until configured" pattern used
+# elsewhere in this project (Sentry, Firebase): the build/push always runs,
+# the deploy step only runs once a real staging host exists to receive it.
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    outputs:
+      image: ${{ steps.meta.outputs.image }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compute image name
+        id: meta
+        run: echo "image=ghcr.io/${OWNER,,}/hssan-delivery-backend" >> "$GITHUB_OUTPUT"
+        env:
+          OWNER: ${{ github.repository_owner }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: backend
+          push: true
+          tags: |
+            ${{ steps.meta.outputs.image }}:latest
+            ${{ steps.meta.outputs.image }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Check staging secrets
+        id: staging
+        run: |
+          if [ -n "$STAGING_SSH_HOST" ] && [ -n "$STAGING_SSH_USER" ] && [ -n "$STAGING_SSH_KEY" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+          fi
+        env:
+          STAGING_SSH_HOST: ${{ secrets.STAGING_SSH_HOST }}
+          STAGING_SSH_USER: ${{ secrets.STAGING_SSH_USER }}
+          STAGING_SSH_KEY: ${{ secrets.STAGING_SSH_KEY }}
+
+      - name: Deploy to staging
+        if: steps.staging.outputs.configured == 'true'
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.STAGING_SSH_HOST }}
+          username: ${{ secrets.STAGING_SSH_USER }}
+          key: ${{ secrets.STAGING_SSH_KEY }}
+          script: |
+            docker pull ${{ steps.meta.outputs.image }}:${{ github.sha }}
+            docker compose -f /opt/hssan-delivery/docker-compose.staging.yml pull backend
+            docker compose -f /opt/hssan-delivery/docker-compose.staging.yml up -d backend
+
+  admin:
+    runs-on: ubuntu-latest
+    outputs:
+      image: ${{ steps.meta.outputs.image }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compute image name
+        id: meta
+        run: echo "image=ghcr.io/${OWNER,,}/hssan-delivery-admin" >> "$GITHUB_OUTPUT"
+        env:
+          OWNER: ${{ github.repository_owner }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: admin
+          push: true
+          build-args: |
+            VITE_API_URL=${{ vars.STAGING_API_URL || 'http://127.0.0.1:8000' }}
+          tags: |
+            ${{ steps.meta.outputs.image }}:latest
+            ${{ steps.meta.outputs.image }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Check staging secrets
+        id: staging
+        run: |
+          if [ -n "$STAGING_SSH_HOST" ] && [ -n "$STAGING_SSH_USER" ] && [ -n "$STAGING_SSH_KEY" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+          fi
+        env:
+          STAGING_SSH_HOST: ${{ secrets.STAGING_SSH_HOST }}
+          STAGING_SSH_USER: ${{ secrets.STAGING_SSH_USER }}
+          STAGING_SSH_KEY: ${{ secrets.STAGING_SSH_KEY }}
+
+      - name: Deploy to staging
+        if: steps.staging.outputs.configured == 'true'
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.STAGING_SSH_HOST }}
+          username: ${{ secrets.STAGING_SSH_USER }}
+          key: ${{ secrets.STAGING_SSH_KEY }}
+          script: |
+            docker pull ${{ steps.meta.outputs.image }}:${{ github.sha }}
+            docker compose -f /opt/hssan-delivery/docker-compose.staging.yml pull admin
+            docker compose -f /opt/hssan-delivery/docker-compose.staging.yml up -d admin

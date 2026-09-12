@@ -2,9 +2,12 @@
 
 namespace App\Controller\Api;
 
+use App\Dto\Admin\CourierResponse;
 use App\Dto\Admin\CreateCourierRequest;
+use App\Dto\Admin\ResetCourierPasswordRequest;
+use App\Dto\Admin\UpdateCourierActiveRequest;
 use App\Service\AuthService;
-use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use App\Service\CourierService;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -15,64 +18,113 @@ use Symfony\Component\Validator\Validator\ValidatorInterface;
 
 #[Route('/api/admin/couriers')]
 #[IsGranted('ROLE_ADMIN')]
-final class AdminCourierController extends AbstractController
+final class AdminCourierController extends AbstractApiController
 {
+    use PaginationParamsTrait;
+
     public function __construct(
-        private readonly SerializerInterface $serializer,
-        private readonly ValidatorInterface $validator,
+        SerializerInterface $serializer,
+        ValidatorInterface $validator,
         private readonly AuthService $authService,
+        private readonly CourierService $courierService,
     ) {
+        parent::__construct($serializer, $validator);
     }
 
     #[Route('', name: 'api_admin_courier_create', methods: ['POST'])]
     public function create(Request $request): JsonResponse
     {
         /** @var CreateCourierRequest $dto */
-        $dto = $this->serializer->deserialize(
-            $request->getContent(),
-            CreateCourierRequest::class,
-            'json'
+        $dto = $this->deserializeAndValidate($request, CreateCourierRequest::class);
+
+        $courier = $this->authService->createCourier($dto);
+
+        return $this->json(
+            CourierResponse::fromEntity($courier),
+            Response::HTTP_CREATED
+        );
+    }
+
+    #[Route('', name: 'api_admin_courier_list', methods: ['GET'])]
+    public function list(Request $request): JsonResponse
+    {
+        $result = $this->courierService->list(
+            $this->paginationPage($request),
+            $this->paginationLimit($request)
         );
 
-        $violations = $this->validator->validate($dto);
+        return $this->paginatedJson($result, static fn ($courier) => CourierResponse::fromEntity($courier));
+    }
 
-        if (count($violations) > 0) {
-            $errors = [];
+    #[Route('/{id}', name: 'api_admin_courier_show', methods: ['GET'])]
+    public function show(int $id): JsonResponse
+    {
+        $courier = $this->courierService->get($id);
 
-            foreach ($violations as $violation) {
-                $errors[] = [
-                    'field' => $violation->getPropertyPath(),
-                    'message' => $violation->getMessage(),
-                ];
-            }
-
+        if (null === $courier) {
             return $this->json(
-                [
-                    'message' => 'Validation failed.',
-                    'errors' => $errors,
-                ],
-                Response::HTTP_UNPROCESSABLE_ENTITY
-            );
-        }
-
-        try {
-            $courier = $this->authService->createCourier($dto);
-        } catch (\RuntimeException $exception) {
-            return $this->json(
-                ['message' => $exception->getMessage()],
-                Response::HTTP_CONFLICT
+                ['message' => 'Courier not found.'],
+                Response::HTTP_NOT_FOUND
             );
         }
 
         return $this->json(
-            [
-                'id' => $courier->getId(),
-                'name' => $courier->getName(),
-                'phone' => $courier->getPhone(),
-                'roles' => $courier->getRoles(),
-                'verified' => $courier->isVerified(),
-            ],
-            Response::HTTP_CREATED
+            CourierResponse::fromEntity($courier)
+        );
+    }
+
+    #[Route('/{id}/active', name: 'api_admin_courier_active', methods: ['PATCH'])]
+    public function active(
+        int $id,
+        Request $request,
+    ): JsonResponse {
+        $courier = $this->courierService->get($id);
+
+        if (null === $courier) {
+            return $this->json(
+                ['message' => 'Courier not found.'],
+                Response::HTTP_NOT_FOUND
+            );
+        }
+
+        /** @var UpdateCourierActiveRequest $dto */
+        $dto = $this->deserializeAndValidate($request, UpdateCourierActiveRequest::class);
+
+        $courier = $this->courierService->setActive($courier, $dto->isActive);
+
+        return $this->json(
+            CourierResponse::fromEntity($courier)
+        );
+    }
+
+    /**
+     * Account recovery for a courier who lost access to their account.
+     * Couriers are admin-provisioned (see create() above) with no email or
+     * SMS channel in this app to verify identity through, so recovery works
+     * the same way provisioning does: the admin picks a new password here
+     * and relays it to the courier out-of-band.
+     */
+    #[Route('/{id}/password', name: 'api_admin_courier_reset_password', methods: ['PATCH'])]
+    public function resetPassword(
+        int $id,
+        Request $request,
+    ): JsonResponse {
+        $courier = $this->courierService->get($id);
+
+        if (null === $courier) {
+            return $this->json(
+                ['message' => 'Courier not found.'],
+                Response::HTTP_NOT_FOUND
+            );
+        }
+
+        /** @var ResetCourierPasswordRequest $dto */
+        $dto = $this->deserializeAndValidate($request, ResetCourierPasswordRequest::class);
+
+        $courier = $this->courierService->resetPassword($courier, $dto->password);
+
+        return $this->json(
+            CourierResponse::fromEntity($courier)
         );
     }
 }

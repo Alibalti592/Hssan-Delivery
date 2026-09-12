@@ -2,12 +2,15 @@
 
 namespace App\Controller\Api;
 
+use App\Dto\DeliveryResponse;
+use App\Entity\Delivery;
 use App\Entity\User;
 use App\Repository\DeliveryRepository;
 use App\Repository\UserRepository;
 use App\Service\DeliveryService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
@@ -15,6 +18,8 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 #[Route('/api/deliveries')]
 final class DeliveryController extends AbstractController
 {
+    use PaginationParamsTrait;
+
     public function __construct(
         private readonly DeliveryService $deliveryService,
         private readonly DeliveryRepository $deliveryRepository,
@@ -28,20 +33,18 @@ final class DeliveryController extends AbstractController
         methods: ['GET']
     )]
     #[IsGranted('ROLE_LIVREUR')]
-    public function mine(): JsonResponse
+    public function mine(Request $request): JsonResponse
     {
         /** @var User $courier */
         $courier = $this->getUser();
 
-        $deliveries = $this->deliveryRepository
-            ->findByCourier($courier);
-
-        return $this->json(
-            array_map(
-                fn ($delivery) => $this->deliveryResponse($delivery),
-                $deliveries
-            )
+        $result = $this->deliveryRepository->paginateByCourier(
+            $courier,
+            $this->paginationPage($request),
+            $this->paginationLimit($request)
         );
+
+        return $this->paginatedJson($result, fn ($delivery) => DeliveryResponse::fromEntity($delivery));
     }
 
     #[Route(
@@ -56,7 +59,7 @@ final class DeliveryController extends AbstractController
     ): JsonResponse {
         $delivery = $this->deliveryRepository->find($id);
 
-        if ($delivery === null) {
+        if (null === $delivery) {
             return $this->json(
                 ['message' => 'Delivery not found.'],
                 Response::HTTP_NOT_FOUND
@@ -65,28 +68,21 @@ final class DeliveryController extends AbstractController
 
         $courier = $this->userRepository->find($courierId);
 
-        if ($courier === null) {
+        if (null === $courier) {
             return $this->json(
                 ['message' => 'Courier not found.'],
                 Response::HTTP_NOT_FOUND
             );
         }
 
-        try {
-            $delivery = $this->deliveryService->assignCourier(
-                $delivery,
-                $courier
-            );
+        $delivery = $this->deliveryService->assignCourier(
+            $delivery,
+            $courier
+        );
 
-            return $this->json(
-                $this->deliveryResponse($delivery)
-            );
-        } catch (\RuntimeException $exception) {
-            return $this->json(
-                ['message' => $exception->getMessage()],
-                Response::HTTP_BAD_REQUEST
-            );
-        }
+        return $this->json(
+            DeliveryResponse::fromEntity($delivery)
+        );
     }
 
     #[Route(
@@ -99,7 +95,21 @@ final class DeliveryController extends AbstractController
     {
         return $this->executeCourierTransition(
             $id,
-            'acceptDelivery'
+            fn (Delivery $delivery, User $courier) => $this->deliveryService->acceptDelivery($delivery, $courier)
+        );
+    }
+
+    #[Route(
+        '/{id}/decline',
+        name: 'api_delivery_decline',
+        methods: ['POST']
+    )]
+    #[IsGranted('ROLE_LIVREUR')]
+    public function decline(int $id): JsonResponse
+    {
+        return $this->executeCourierTransition(
+            $id,
+            fn (Delivery $delivery, User $courier) => $this->deliveryService->declineDelivery($delivery, $courier)
         );
     }
 
@@ -113,7 +123,7 @@ final class DeliveryController extends AbstractController
     {
         return $this->executeCourierTransition(
             $id,
-            'markPickedUp'
+            fn (Delivery $delivery, User $courier) => $this->deliveryService->markPickedUp($delivery, $courier)
         );
     }
 
@@ -127,7 +137,7 @@ final class DeliveryController extends AbstractController
     {
         return $this->executeCourierTransition(
             $id,
-            'markOnTheWay'
+            fn (Delivery $delivery, User $courier) => $this->deliveryService->markOnTheWay($delivery, $courier)
         );
     }
 
@@ -141,7 +151,7 @@ final class DeliveryController extends AbstractController
     {
         return $this->executeCourierTransition(
             $id,
-            'markDelivered'
+            fn (Delivery $delivery, User $courier) => $this->deliveryService->markDelivered($delivery, $courier)
         );
     }
 
@@ -155,26 +165,19 @@ final class DeliveryController extends AbstractController
     {
         $delivery = $this->deliveryRepository->find($id);
 
-        if ($delivery === null) {
+        if (null === $delivery) {
             return $this->json(
                 ['message' => 'Delivery not found.'],
                 Response::HTTP_NOT_FOUND
             );
         }
 
-        try {
-            $delivery = $this->deliveryService
-                ->cancelDelivery($delivery);
+        $delivery = $this->deliveryService
+            ->cancelDelivery($delivery);
 
-            return $this->json(
-                $this->deliveryResponse($delivery)
-            );
-        } catch (\RuntimeException $exception) {
-            return $this->json(
-                ['message' => $exception->getMessage()],
-                Response::HTTP_BAD_REQUEST
-            );
-        }
+        return $this->json(
+            DeliveryResponse::fromEntity($delivery)
+        );
     }
 
     #[Route(
@@ -187,17 +190,20 @@ final class DeliveryController extends AbstractController
     {
         return $this->executeCourierTransition(
             $id,
-            'failDelivery'
+            fn (Delivery $delivery, User $courier) => $this->deliveryService->failDelivery($delivery, $courier)
         );
     }
 
+    /**
+     * @param callable(Delivery, User): Delivery $transition
+     */
     private function executeCourierTransition(
         int $id,
-        string $method
+        callable $transition,
     ): JsonResponse {
         $delivery = $this->deliveryRepository->find($id);
 
-        if ($delivery === null) {
+        if (null === $delivery) {
             return $this->json(
                 ['message' => 'Delivery not found.'],
                 Response::HTTP_NOT_FOUND
@@ -207,45 +213,10 @@ final class DeliveryController extends AbstractController
         /** @var User $courier */
         $courier = $this->getUser();
 
-        try {
-            $delivery = $this->deliveryService->$method(
-                $delivery,
-                $courier
-            );
+        $delivery = $transition($delivery, $courier);
 
-            return $this->json(
-                $this->deliveryResponse($delivery)
-            );
-        } catch (\RuntimeException $exception) {
-            return $this->json(
-                ['message' => $exception->getMessage()],
-                Response::HTTP_BAD_REQUEST
-            );
-        }
-    }
-
-    private function deliveryResponse($delivery): array
-    {
-        return [
-            'id' => $delivery->getId(),
-            'orderId' => $delivery->getOrder()?->getId(),
-            'status' => $delivery->getStatus()->value,
-            'courierId' => $delivery->getCourier()?->getId(),
-            'assignedAt' => $delivery->getAssignedAt()?->format(
-                \DateTimeInterface::ATOM
-            ),
-            'acceptedAt' => $delivery->getAcceptedAt()?->format(
-                \DateTimeInterface::ATOM
-            ),
-            'pickedUpAt' => $delivery->getPickedUpAt()?->format(
-                \DateTimeInterface::ATOM
-            ),
-            'deliveredAt' => $delivery->getDeliveredAt()?->format(
-                \DateTimeInterface::ATOM
-            ),
-            'createdAt' => $delivery->getCreatedAt()?->format(
-                \DateTimeInterface::ATOM
-            ),
-        ];
+        return $this->json(
+            DeliveryResponse::fromEntity($delivery)
+        );
     }
 }

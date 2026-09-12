@@ -266,7 +266,7 @@ final class AuthApiTest extends WebTestCase
 
         self::assertSame(
             'An account with this phone number already exists.',
-            $response['error']
+            $response['message']
         );
     }
 
@@ -313,6 +313,121 @@ final class AuthApiTest extends WebTestCase
         );
     }
 
+    public function testLoginIsThrottledAfterTooManyFailedAttempts(): void
+    {
+        $client = static::createClient();
+
+        $this->entityManager = self::getContainer()
+            ->get(EntityManagerInterface::class);
+
+        // Login throttling state is stored in the rate_limiter cache pool,
+        // which persists on disk across requests (and test runs) since it's
+        // keyed by client IP — start from a clean slate.
+        self::getContainer()->get('cache.rate_limiter')->clear();
+
+        $user = $this->createTestUser();
+
+        // The configured limit is 5 failed attempts per minute (see
+        // security.yaml's api_login.login_throttling).
+        for ($i = 0; $i < 5; ++$i) {
+            $client->request(
+                'POST',
+                '/api/auth/login',
+                server: ['CONTENT_TYPE' => 'application/json'],
+                content: json_encode([
+                    'phone' => $user->getPhone(),
+                    'password' => 'wrong-password',
+                ])
+            );
+
+            self::assertResponseStatusCodeSame(Response::HTTP_UNAUTHORIZED);
+        }
+
+        // The 6th attempt is blocked before credentials are even checked —
+        // even the *correct* password is rejected once throttled.
+        $client->request(
+            'POST',
+            '/api/auth/login',
+            server: ['CONTENT_TYPE' => 'application/json'],
+            content: json_encode([
+                'phone' => $user->getPhone(),
+                'password' => 'password123',
+            ])
+        );
+
+        self::assertResponseStatusCodeSame(Response::HTTP_TOO_MANY_REQUESTS);
+
+        $response = json_decode(
+            $client->getResponse()->getContent(),
+            true
+        );
+
+        self::assertIsArray($response);
+        self::assertArrayHasKey('message', $response);
+        self::assertStringContainsString(
+            'Too many failed login attempts',
+            $response['message']
+        );
+
+        // Don't leak an exhausted limiter into whichever test runs next.
+        self::getContainer()->get('cache.rate_limiter')->clear();
+    }
+
+    public function testRegisterIsRateLimitedAfterTooManyAttempts(): void
+    {
+        $client = static::createClient();
+
+        $this->entityManager = self::getContainer()
+            ->get(EntityManagerInterface::class);
+
+        self::getContainer()->get('cache.rate_limiter')->clear();
+
+        // The configured limit is 5 attempts per 10 minutes per IP (see
+        // config/packages/rate_limiter.yaml), regardless of whether each
+        // individual attempt would otherwise succeed.
+        for ($i = 0; $i < 5; ++$i) {
+            $client->request(
+                'POST',
+                '/api/auth/register',
+                server: ['CONTENT_TYPE' => 'application/json'],
+                content: json_encode([
+                    'name' => 'Spammer',
+                    'phone' => $this->uniquePhone(),
+                    'password' => 'password123',
+                ])
+            );
+
+            self::assertResponseStatusCodeSame(Response::HTTP_CREATED);
+        }
+
+        $client->request(
+            'POST',
+            '/api/auth/register',
+            server: ['CONTENT_TYPE' => 'application/json'],
+            content: json_encode([
+                'name' => 'Spammer',
+                'phone' => $this->uniquePhone(),
+                'password' => 'password123',
+            ])
+        );
+
+        self::assertResponseStatusCodeSame(Response::HTTP_TOO_MANY_REQUESTS);
+
+        $response = json_decode(
+            $client->getResponse()->getContent(),
+            true
+        );
+
+        self::assertIsArray($response);
+        self::assertSame(
+            'Trop de tentatives. Réessayez plus tard.',
+            $response['message']
+        );
+
+        // Don't leak an exhausted limiter into whichever test runs next.
+        self::getContainer()->get('cache.rate_limiter')->clear();
+    }
+
     public function testInvalidRegistrationDataIsRejected(): void
     {
         $client = static::createClient();
@@ -344,24 +459,187 @@ final class AuthApiTest extends WebTestCase
 
         self::assertIsArray($response);
 
-       self::assertArrayHasKey(
-    'error',
-    $response
-);
+        self::assertArrayHasKey(
+            'message',
+            $response
+        );
 
-self::assertSame(
-    'Validation failed',
-    $response['error']
-);
+        self::assertSame(
+            'Validation failed.',
+            $response['message']
+        );
 
-self::assertArrayHasKey(
-    'fields',
-    $response
-);
+        self::assertArrayHasKey(
+            'errors',
+            $response
+        );
 
-self::assertNotEmpty(
-    $response['fields']
-);
+        self::assertNotEmpty(
+            $response['errors']
+        );
+    }
+
+    public function testAuthenticatedUserCanChangePassword(): void
+    {
+        $client = static::createClient();
+
+        $this->entityManager = self::getContainer()
+            ->get(EntityManagerInterface::class);
+
+        $user = $this->createTestUser();
+
+        $token = $this->authenticateClient(
+            $client,
+            $user
+        );
+
+        $client->request(
+            'POST',
+            '/api/auth/change-password',
+            server: [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_AUTHORIZATION' => 'Bearer '.$token,
+            ],
+            content: json_encode([
+                'currentPassword' => 'password123',
+                'newPassword' => 'newPassword456',
+            ])
+        );
+
+        self::assertResponseStatusCodeSame(
+            Response::HTTP_NO_CONTENT
+        );
+
+        $client->request(
+            'POST',
+            '/api/auth/login',
+            server: [
+                'CONTENT_TYPE' => 'application/json',
+            ],
+            content: json_encode([
+                'phone' => $user->getPhone(),
+                'password' => 'newPassword456',
+            ])
+        );
+
+        self::assertResponseStatusCodeSame(
+            Response::HTTP_OK
+        );
+
+        $client->request(
+            'POST',
+            '/api/auth/login',
+            server: [
+                'CONTENT_TYPE' => 'application/json',
+            ],
+            content: json_encode([
+                'phone' => $user->getPhone(),
+                'password' => 'password123',
+            ])
+        );
+
+        self::assertResponseStatusCodeSame(
+            Response::HTTP_UNAUTHORIZED
+        );
+    }
+
+    public function testChangePasswordFailsWithWrongCurrentPassword(): void
+    {
+        $client = static::createClient();
+
+        $this->entityManager = self::getContainer()
+            ->get(EntityManagerInterface::class);
+
+        $user = $this->createTestUser();
+
+        $token = $this->authenticateClient(
+            $client,
+            $user
+        );
+
+        $client->request(
+            'POST',
+            '/api/auth/change-password',
+            server: [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_AUTHORIZATION' => 'Bearer '.$token,
+            ],
+            content: json_encode([
+                'currentPassword' => 'wrong-password',
+                'newPassword' => 'newPassword456',
+            ])
+        );
+
+        self::assertResponseStatusCodeSame(
+            Response::HTTP_BAD_REQUEST
+        );
+
+        $response = json_decode(
+            $client->getResponse()->getContent(),
+            true
+        );
+
+        self::assertIsArray($response);
+        self::assertSame(
+            'Mot de passe actuel incorrect.',
+            $response['message']
+        );
+    }
+
+    public function testChangePasswordRejectsShortNewPassword(): void
+    {
+        $client = static::createClient();
+
+        $this->entityManager = self::getContainer()
+            ->get(EntityManagerInterface::class);
+
+        $user = $this->createTestUser();
+
+        $token = $this->authenticateClient(
+            $client,
+            $user
+        );
+
+        $client->request(
+            'POST',
+            '/api/auth/change-password',
+            server: [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_AUTHORIZATION' => 'Bearer '.$token,
+            ],
+            content: json_encode([
+                'currentPassword' => 'password123',
+                'newPassword' => '123',
+            ])
+        );
+
+        self::assertResponseStatusCodeSame(
+            Response::HTTP_UNPROCESSABLE_ENTITY
+        );
+    }
+
+    public function testUnauthenticatedUserCannotChangePassword(): void
+    {
+        $client = static::createClient();
+
+        $this->entityManager = self::getContainer()
+            ->get(EntityManagerInterface::class);
+
+        $client->request(
+            'POST',
+            '/api/auth/change-password',
+            server: [
+                'CONTENT_TYPE' => 'application/json',
+            ],
+            content: json_encode([
+                'currentPassword' => 'password123',
+                'newPassword' => 'newPassword456',
+            ])
+        );
+
+        self::assertResponseStatusCodeSame(
+            Response::HTTP_UNAUTHORIZED
+        );
     }
 
     public function testUnauthenticatedUserCannotAccessMe(): void

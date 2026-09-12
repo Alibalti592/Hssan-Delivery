@@ -10,15 +10,21 @@
         "doctrine/doctrine-bundle": "^2.19",
         "doctrine/doctrine-migrations-bundle": "^3.7",
         "doctrine/orm": "^3.6",
+        "kreait/firebase-php": "^7.24.1",
         "lexik/jwt-authentication-bundle": "^3.2",
+        "nelmio/cors-bundle": "^2.6.1",
         "phpdocumentor/reflection-docblock": "^6.0",
         "phpstan/phpdoc-parser": "^2.3",
+        "sentry/sentry-symfony": "^5.13",
         "symfony/console": "7.4.*",
         "symfony/dotenv": "7.4.*",
         "symfony/flex": "^2",
         "symfony/framework-bundle": "7.4.*",
+        "symfony/lock": "7.4.*",
+        "symfony/mime": "7.4.*",
         "symfony/property-access": "7.4.*",
         "symfony/property-info": "7.4.*",
+        "symfony/rate-limiter": "7.4.*",
         "symfony/runtime": "7.4.*",
         "symfony/security-bundle": "7.4.*",
         "symfony/serializer": "7.4.*",
@@ -32,7 +38,10 @@
             "symfony/runtime": true
         },
         "bump-after-update": true,
-        "sort-packages": true
+        "sort-packages": true,
+        "platform": {
+            "php": "8.2.33"
+        }
     },
     "autoload": {
         "psr-4": {
@@ -73,6 +82,13 @@
         "test": [
             "@test-db-reset",
             "php bin/phpunit"
+        ],
+        "fixtures": "php bin/console doctrine:fixtures:load --append --no-interaction",
+        "db-reset": [
+            "php bin/console doctrine:database:drop --force --if-exists",
+            "php bin/console doctrine:database:create",
+            "php bin/console doctrine:migrations:migrate --no-interaction",
+            "@fixtures"
         ]
     },
     "conflict": {
@@ -85,6 +101,7 @@
         }
     },
     "require-dev": {
+        "doctrine/doctrine-fixtures-bundle": "^4.3",
         "friendsofphp/php-cs-fixer": "^3.95",
         "phpunit/phpunit": "^11.5",
         "symfony/browser-kit": "7.4.*",

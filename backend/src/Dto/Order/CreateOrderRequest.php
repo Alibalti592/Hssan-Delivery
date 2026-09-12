@@ -26,4 +26,8 @@ final class CreateOrderRequest
     #[Assert\NotBlank]
     #[Assert\Length(max: 1000)]
     public string $deliveryAddress = '';
+
+    #[Assert\NotNull]
+    #[Assert\Positive]
+    public ?int $deliveryZoneId = null;
 }

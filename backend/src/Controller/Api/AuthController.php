@@ -2,6 +2,7 @@
 
 namespace App\Controller\Api;
 
+use App\Dto\Auth\ChangePasswordRequest;
 use App\Dto\Auth\RegisterUserRequest;
 use App\Dto\Auth\UserResponse;
 use App\Entity\User;
@@ -10,6 +11,7 @@ use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\RateLimiter\RateLimiterFactory;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Serializer\SerializerInterface;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
@@ -18,43 +20,37 @@ use Symfony\Component\Validator\Validator\ValidatorInterface;
 class AuthController extends AbstractApiController
 {
     public function __construct(
-    private readonly SerializerInterface $serializer,
-    private readonly ValidatorInterface $validator,
-    private readonly AuthService $authService,
-    private readonly Security $security,
-) {
-}
+        SerializerInterface $serializer,
+        ValidatorInterface $validator,
+        private readonly AuthService $authService,
+        private readonly Security $security,
+        private readonly RateLimiterFactory $registerLimiter,
+    ) {
+        parent::__construct($serializer, $validator);
+    }
 
     #[Route('/register', name: 'api_auth_register', methods: ['POST'])]
-public function register(Request $request): JsonResponse
-{
-    /** @var RegisterUserRequest $dto */
-    $dto = $this->serializer->deserialize(
-        $request->getContent(),
-        RegisterUserRequest::class,
-        'json'
-    );
+    public function register(Request $request): JsonResponse
+    {
+        $limiter = $this->registerLimiter->create($request->getClientIp());
 
-    $violations = $this->validator->validate($dto);
+        if (!$limiter->consume()->isAccepted()) {
+            return new JsonResponse(
+                ['message' => 'Trop de tentatives. Réessayez plus tard.'],
+                Response::HTTP_TOO_MANY_REQUESTS
+            );
+        }
 
-    if (\count($violations) > 0) {
-        return $this->validationErrorResponse($violations);
-    }
+        /** @var RegisterUserRequest $dto */
+        $dto = $this->deserializeAndValidate($request, RegisterUserRequest::class);
 
-    try {
         $user = $this->authService->register($dto);
-    } catch (\RuntimeException $exception) {
+
         return new JsonResponse(
-            ['error' => $exception->getMessage()],
-            Response::HTTP_CONFLICT
+            UserResponse::fromEntity($user),
+            Response::HTTP_CREATED
         );
     }
-
-    return new JsonResponse(
-        UserResponse::fromEntity($user),
-        Response::HTTP_CREATED
-    );
-}
 
     /**
      * Never actually executed: the "api_login" firewall's json_login
@@ -75,5 +71,26 @@ public function register(Request $request): JsonResponse
         $user = $this->security->getUser();
 
         return new JsonResponse(UserResponse::fromEntity($user));
+    }
+
+    /**
+     * Self-service password change. Requires the current password, so this
+     * covers "I know my password but want to change it" — not account
+     * recovery for a locked-out user (there's no email/SMS channel in this
+     * app to verify identity through; see AdminCourierController::resetPassword()
+     * for how couriers recover access instead).
+     */
+    #[Route('/change-password', name: 'api_auth_change_password', methods: ['POST'])]
+    public function changePassword(Request $request): JsonResponse
+    {
+        /** @var User $user */
+        $user = $this->security->getUser();
+
+        /** @var ChangePasswordRequest $dto */
+        $dto = $this->deserializeAndValidate($request, ChangePasswordRequest::class);
+
+        $this->authService->changePassword($user, $dto->currentPassword, $dto->newPassword);
+
+        return new JsonResponse(null, Response::HTTP_NO_CONTENT);
     }
 }
