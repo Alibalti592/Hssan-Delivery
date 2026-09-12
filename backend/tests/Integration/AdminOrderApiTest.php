@@ -80,16 +80,16 @@ final class AdminOrderApiTest extends WebTestCase
 
         self::assertIsArray($response);
 
-        $ids = array_column($response, 'id');
+        $ids = array_column($response['items'], 'id');
 
         self::assertContains($order->getId(), $ids);
 
         $key = array_search($order->getId(), $ids, true);
 
-        self::assertSame('Test Client One', $response[$key]['userName']);
-        self::assertSame(OrderStatus::PENDING->value, $response[$key]['status']);
-        self::assertArrayHasKey('deliveryId', $response[$key]);
-        self::assertNotNull($response[$key]['deliveryId']);
+        self::assertSame('Test Client One', $response['items'][$key]['userName']);
+        self::assertSame(OrderStatus::PENDING->value, $response['items'][$key]['status']);
+        self::assertArrayHasKey('deliveryId', $response['items'][$key]);
+        self::assertNotNull($response['items'][$key]['deliveryId']);
     }
 
     public function testNonAdminCannotListOrders(): void

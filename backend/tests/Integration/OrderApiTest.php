@@ -528,6 +528,102 @@ final class OrderApiTest extends WebTestCase
         self::assertSame('4.000', $fees[$zone->getName()]);
     }
 
+    public function testClientCanListOwnOrdersPaginated(): void
+    {
+        $client = static::createClient();
+
+        $this->entityManager = self::getContainer()
+            ->get(EntityManagerInterface::class);
+
+        $user = $this->createTestUser();
+        $otherUser = $this->createTestUser();
+
+        $restaurant = $this->createTestRestaurant();
+        $category = $this->createTestCategory($restaurant);
+        $product = $this->createTestProduct($restaurant, $category);
+        $zone = $this->createTestDeliveryZone('4.000');
+
+        $token = $this->authenticateClient($client, $user);
+
+        // 3 orders of their own, plus one belonging to another user, which
+        // must never appear in this user's list.
+        for ($i = 0; $i < 3; ++$i) {
+            $this->placeOrder($client, $token, $restaurant, $product, $zone);
+        }
+        $otherToken = $this->authenticateClient($client, $otherUser);
+        $this->placeOrder($client, $otherToken, $restaurant, $product, $zone);
+
+        $client->request(
+            'GET',
+            '/api/orders?page=1&limit=2',
+            server: [
+                'HTTP_AUTHORIZATION' => 'Bearer ' . $token,
+            ]
+        );
+
+        self::assertResponseIsSuccessful();
+
+        $response = json_decode(
+            $client->getResponse()->getContent(),
+            true
+        );
+
+        self::assertIsArray($response);
+        self::assertCount(2, $response['items']);
+        self::assertSame([
+            'page' => 1,
+            'limit' => 2,
+            'total' => 3,
+            'pages' => 2,
+        ], $response['meta']);
+
+        $client->request(
+            'GET',
+            '/api/orders?page=2&limit=2',
+            server: [
+                'HTTP_AUTHORIZATION' => 'Bearer ' . $token,
+            ]
+        );
+
+        $response = json_decode(
+            $client->getResponse()->getContent(),
+            true
+        );
+
+        self::assertCount(1, $response['items']);
+        self::assertSame(2, $response['meta']['page']);
+    }
+
+    private function placeOrder(
+        KernelBrowser $client,
+        string $token,
+        Restaurant $restaurant,
+        Product $product,
+        DeliveryZone $zone,
+    ): void {
+        $client->request(
+            'POST',
+            '/api/orders',
+            server: [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_AUTHORIZATION' => 'Bearer ' . $token,
+            ],
+            content: json_encode([
+                'restaurantId' => $restaurant->getId(),
+                'items' => [
+                    [
+                        'productId' => $product->getId(),
+                        'quantity' => 1,
+                    ],
+                ],
+                'deliveryAddress' => 'Tunis, Tunisia',
+                'deliveryZoneId' => $zone->getId(),
+            ])
+        );
+
+        self::assertResponseStatusCodeSame(201);
+    }
+
     private function createTestUser(): User
     {
         $phone = '221' . random_int(100000, 999999);

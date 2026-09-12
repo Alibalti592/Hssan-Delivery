@@ -2,7 +2,15 @@ import { useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { couriersApi } from '../../api/resources';
-import { PageHeader, Loading, ErrorBanner, EmptyState, ActiveBadge, formatDate } from '../../components/ui';
+import {
+  PageHeader,
+  Loading,
+  ErrorBanner,
+  EmptyState,
+  ActiveBadge,
+  Pagination,
+  formatDate,
+} from '../../components/ui';
 
 export default function CouriersListPage() {
   const queryClient = useQueryClient();
@@ -10,8 +18,9 @@ export default function CouriersListPage() {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
+  const [page, setPage] = useState(1);
 
-  const couriers = useQuery({ queryKey: ['couriers'], queryFn: couriersApi.list });
+  const couriers = useQuery({ queryKey: ['couriers', page], queryFn: () => couriersApi.list({ page }) });
 
   const create = useMutation({
     mutationFn: () => couriersApi.create({ name, phone, password }),
@@ -39,7 +48,7 @@ export default function CouriersListPage() {
     <>
       <PageHeader
         title="Couriers"
-        subtitle={`${couriers.data?.length ?? 0} couriers`}
+        subtitle={`${couriers.data?.meta.total ?? 0} couriers`}
         actions={
           <button type="button" className="btn" onClick={() => setCreating((c) => !c)}>
             {creating ? 'Cancel' : '+ New courier'}
@@ -86,7 +95,7 @@ export default function CouriersListPage() {
 
         {couriers.isLoading ? (
           <Loading />
-        ) : !couriers.data || couriers.data.length === 0 ? (
+        ) : !couriers.data || couriers.data.items.length === 0 ? (
           <EmptyState>No couriers yet.</EmptyState>
         ) : (
           <div className="card">
@@ -101,7 +110,7 @@ export default function CouriersListPage() {
                 </tr>
               </thead>
               <tbody>
-                {couriers.data.map((c) => (
+                {couriers.data.items.map((c) => (
                   <tr key={c.id}>
                     <td className="rname">{c.name}</td>
                     <td>{c.phone}</td>
@@ -126,6 +135,12 @@ export default function CouriersListPage() {
                 ))}
               </tbody>
             </table>
+            <Pagination
+              page={couriers.data.meta.page}
+              pages={couriers.data.meta.pages}
+              total={couriers.data.meta.total}
+              onPageChange={setPage}
+            />
           </div>
         )}
       </div>

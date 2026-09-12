@@ -6,9 +6,26 @@ import type {
   Courier,
   CurrentUser,
   DeliveryZoneAdmin,
+  Paginated,
   Product,
   Restaurant,
 } from './types';
+
+export interface PageParams {
+  page?: number;
+  limit?: number;
+}
+
+function toQuery(params?: PageParams): string {
+  if (!params) return '';
+
+  const qs = new URLSearchParams();
+  if (params.page !== undefined) qs.set('page', String(params.page));
+  if (params.limit !== undefined) qs.set('limit', String(params.limit));
+
+  const s = qs.toString();
+  return s ? `?${s}` : '';
+}
 
 // Auth
 export const authApi = {
@@ -19,7 +36,8 @@ export const authApi = {
 
 // Restaurants
 export const restaurantsApi = {
-  list: () => api.get<Restaurant[]>('/api/admin/restaurants'),
+  list: (params?: PageParams) =>
+    api.get<Paginated<Restaurant>>(`/api/admin/restaurants${toQuery(params)}`),
   get: (id: number) => api.get<Restaurant>(`/api/admin/restaurants/${id}`),
   create: (data: { name: string; description: string | null; isAvailable: boolean }) =>
     api.post<Restaurant>('/api/admin/restaurants', data),
@@ -46,8 +64,8 @@ export const categoriesApi = {
 
 // Products
 export const productsApi = {
-  listForRestaurant: (restaurantId: number) =>
-    api.get<Product[]>(`/api/admin/restaurants/${restaurantId}/products`),
+  listForRestaurant: (restaurantId: number, params?: PageParams) =>
+    api.get<Paginated<Product>>(`/api/admin/restaurants/${restaurantId}/products${toQuery(params)}`),
   get: (id: number) => api.get<Product>(`/api/admin/products/${id}`),
   create: (
     restaurantId: number,
@@ -77,7 +95,7 @@ export const deliveryZonesApi = {
 
 // Couriers
 export const couriersApi = {
-  list: () => api.get<Courier[]>('/api/admin/couriers'),
+  list: (params?: PageParams) => api.get<Paginated<Courier>>(`/api/admin/couriers${toQuery(params)}`),
   get: (id: number) => api.get<Courier>(`/api/admin/couriers/${id}`),
   create: (data: { name: string; phone: string; password: string }) =>
     api.post<Courier>('/api/admin/couriers', data),
@@ -87,15 +105,28 @@ export const couriersApi = {
     api.patch<Courier>(`/api/admin/couriers/${id}/password`, { password }),
 };
 
+// Dashboard summary
+export interface AdminStats {
+  restaurants: number;
+  deliveryZones: number;
+  couriers: number;
+  totalOrders: number;
+  activeOrders: number;
+}
+
+export const statsApi = {
+  summary: () => api.get<AdminStats>('/api/admin/stats'),
+};
+
 // Orders (admin)
 export const ordersApi = {
-  list: () => api.get<AdminOrder[]>('/api/admin/orders'),
+  list: (params?: PageParams) => api.get<Paginated<AdminOrder>>(`/api/admin/orders${toQuery(params)}`),
   get: (id: number) => api.get<AdminOrder>(`/api/admin/orders/${id}`),
 };
 
 // Deliveries (admin visibility + actions)
 export const deliveriesApi = {
-  list: () => api.get<AdminDelivery[]>('/api/admin/deliveries'),
+  list: (params?: PageParams) => api.get<Paginated<AdminDelivery>>(`/api/admin/deliveries${toQuery(params)}`),
   get: (id: number) => api.get<AdminDelivery>(`/api/admin/deliveries/${id}`),
   assign: (deliveryId: number, courierId: number) =>
     api.post<AdminDelivery>(`/api/deliveries/${deliveryId}/assign/${courierId}`),

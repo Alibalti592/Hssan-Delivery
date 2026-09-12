@@ -10,6 +10,8 @@ use App\Entity\User;
 use App\Enum\DeliveryStatus;
 use App\Enum\OrderStatus;
 use App\Exception\InvalidOperationException;
+use App\Pagination\PaginatedResult;
+use App\Pagination\Paginator;
 use App\Repository\DeliveryZoneRepository;
 use App\Repository\OrderRepository;
 use App\Repository\ProductRepository;
@@ -123,12 +125,17 @@ final class OrderService
         return $order;
     }
 
-    public function getUserOrders(User $user): array
+    /**
+     * @return PaginatedResult<Order>
+     */
+    public function getUserOrders(User $user, int $page, int $limit): PaginatedResult
     {
-        return $this->orderRepository->findBy(
-            ['user' => $user],
-            ['createdAt' => 'DESC']
-        );
+        $qb = $this->orderRepository->createQueryBuilder('o')
+            ->andWhere('o.user = :user')
+            ->setParameter('user', $user)
+            ->orderBy('o.createdAt', 'DESC');
+
+        return Paginator::paginate($qb, $page, $limit);
     }
 
     public function getUserOrder(int $orderId, User $user): ?Order

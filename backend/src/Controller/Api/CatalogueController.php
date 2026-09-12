@@ -11,6 +11,7 @@ use App\Service\ProductService;
 use App\Service\RestaurantService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 
@@ -25,6 +26,8 @@ use Symfony\Component\Routing\Attribute\Route;
 #[Route('/api/restaurants')]
 final class CatalogueController extends AbstractController
 {
+    use PaginationParamsTrait;
+
     public function __construct(
         private readonly RestaurantService $restaurantService,
         private readonly CategoryService $categoryService,
@@ -33,16 +36,14 @@ final class CatalogueController extends AbstractController
     }
 
     #[Route('', name: 'api_catalogue_restaurant_list', methods: ['GET'])]
-    public function list(): JsonResponse
+    public function list(Request $request): JsonResponse
     {
-        $restaurants = $this->restaurantService->listAvailable();
-
-        return $this->json(
-            array_map(
-                static fn ($restaurant) => RestaurantResponse::fromEntity($restaurant),
-                $restaurants
-            )
+        $result = $this->restaurantService->listAvailable(
+            $this->paginationPage($request),
+            $this->paginationLimit($request)
         );
+
+        return $this->paginatedJson($result, static fn ($restaurant) => RestaurantResponse::fromEntity($restaurant));
     }
 
     #[Route('/{id}', name: 'api_catalogue_restaurant_show', methods: ['GET'])]
@@ -85,7 +86,7 @@ final class CatalogueController extends AbstractController
         name: 'api_catalogue_product_list',
         methods: ['GET']
     )]
-    public function products(int $id): JsonResponse
+    public function products(int $id, Request $request): JsonResponse
     {
         $restaurant = $this->getAvailableRestaurant($id);
 
@@ -93,14 +94,13 @@ final class CatalogueController extends AbstractController
             return $this->restaurantNotFound();
         }
 
-        $products = $this->productService->listAvailableForRestaurant($restaurant);
-
-        return $this->json(
-            array_map(
-                static fn ($product) => ProductResponse::fromEntity($product),
-                $products
-            )
+        $result = $this->productService->listAvailableForRestaurant(
+            $restaurant,
+            $this->paginationPage($request),
+            $this->paginationLimit($request)
         );
+
+        return $this->paginatedJson($result, static fn ($product) => ProductResponse::fromEntity($product));
     }
 
     private function getAvailableRestaurant(int $id): ?Restaurant

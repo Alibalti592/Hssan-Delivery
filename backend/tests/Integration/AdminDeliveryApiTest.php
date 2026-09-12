@@ -80,7 +80,7 @@ final class AdminDeliveryApiTest extends WebTestCase
 
         self::assertIsArray($response);
 
-        $ids = array_column($response, 'id');
+        $ids = array_column($response['items'], 'id');
 
         self::assertContains($delivery->getId(), $ids);
     }

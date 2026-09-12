@@ -12,14 +12,23 @@ class DeliveriesController extends ChangeNotifier {
   List<Delivery> _deliveries = const [];
   bool _loading = false;
   bool _loadedOnce = false;
+  bool _loadingMoreHistory = false;
   String? _error;
   int? _actingOnId;
+  int _page = 1;
+  int _pages = 1;
 
   List<Delivery> get deliveries => _deliveries;
   bool get loading => _loading;
   bool get loadedOnce => _loadedOnce;
+  bool get loadingMoreHistory => _loadingMoreHistory;
   String? get error => _error;
   int? get actingOnId => _actingOnId;
+
+  /// Whether older history beyond the current page exists. Active
+  /// deliveries are always fully loaded (see DeliveryRepository.listMine),
+  /// so this only ever leaves history truncated, never an active delivery.
+  bool get hasMoreHistory => _page < _pages;
 
   List<Delivery> get active =>
       _deliveries.where((d) => !d.status.isTerminal).toList(growable: false);
@@ -31,7 +40,10 @@ class DeliveriesController extends ChangeNotifier {
     _error = null;
     notifyListeners();
     try {
-      _deliveries = _sorted(await _repository.listMine());
+      final result = await _repository.listMine();
+      _deliveries = _sorted(result.items);
+      _page = result.page;
+      _pages = result.pages;
       _loadedOnce = true;
     } on ApiException catch (e) {
       _error = e.message;
@@ -39,6 +51,29 @@ class DeliveriesController extends ChangeNotifier {
       _error = e.message;
     } finally {
       _loading = false;
+      notifyListeners();
+    }
+  }
+
+  /// Returns an error message on failure, or null on success (including
+  /// when there's nothing more to load).
+  Future<String?> loadMoreHistory() async {
+    if (!hasMoreHistory || _loadingMoreHistory) return null;
+
+    _loadingMoreHistory = true;
+    notifyListeners();
+    try {
+      final result = await _repository.listMine(page: _page + 1);
+      _deliveries = _sorted([..._deliveries, ...result.items]);
+      _page = result.page;
+      _pages = result.pages;
+      return null;
+    } on ApiException catch (e) {
+      return e.message;
+    } on NetworkException catch (e) {
+      return e.message;
+    } finally {
+      _loadingMoreHistory = false;
       notifyListeners();
     }
   }

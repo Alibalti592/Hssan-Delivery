@@ -3,6 +3,7 @@
 namespace App\Service;
 
 use App\Entity\User;
+use App\Pagination\PaginatedResult;
 use App\Repository\UserRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
@@ -17,11 +18,11 @@ final class CourierService
     }
 
     /**
-     * @return User[]
+     * @return PaginatedResult<User>
      */
-    public function list(): array
+    public function list(int $page, int $limit): PaginatedResult
     {
-        return $this->userRepository->findAllCouriers();
+        return $this->userRepository->paginateCouriers($page, $limit);
     }
 
     public function get(int $id): ?User

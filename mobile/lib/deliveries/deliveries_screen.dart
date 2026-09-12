@@ -129,8 +129,34 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> {
           _SectionLabel('Historique'),
           for (final d in history) _DeliveryCard(delivery: d),
         ],
+        if (controller.hasMoreHistory) ...[
+          const SizedBox(height: 8),
+          Center(
+            child: controller.loadingMoreHistory
+                ? const Padding(
+                    padding: EdgeInsets.all(12),
+                    child: SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  )
+                : OutlinedButton(
+                    onPressed: () => _loadMoreHistory(context),
+                    child: const Text('Charger plus d\'historique'),
+                  ),
+          ),
+        ],
       ],
     );
+  }
+
+  Future<void> _loadMoreHistory(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final error = await context.read<DeliveriesController>().loadMoreHistory();
+    if (error != null) {
+      messenger.showSnackBar(SnackBar(content: Text(error)));
+    }
   }
 }
 

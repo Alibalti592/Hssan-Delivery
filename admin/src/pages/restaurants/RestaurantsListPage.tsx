@@ -1,15 +1,25 @@
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { API_URL } from '../../api/client';
 import { restaurantsApi } from '../../api/resources';
-import { PageHeader, Loading, ErrorBanner, EmptyState, AvailabilityBadge, formatDate } from '../../components/ui';
+import {
+  PageHeader,
+  Loading,
+  ErrorBanner,
+  EmptyState,
+  AvailabilityBadge,
+  Pagination,
+  formatDate,
+} from '../../components/ui';
 
 export default function RestaurantsListPage() {
   const queryClient = useQueryClient();
+  const [page, setPage] = useState(1);
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ['restaurants'],
-    queryFn: restaurantsApi.list,
+    queryKey: ['restaurants', page],
+    queryFn: () => restaurantsApi.list({ page }),
   });
 
   const toggleAvailability = useMutation({
@@ -22,7 +32,7 @@ export default function RestaurantsListPage() {
     <>
       <PageHeader
         title="Restaurants"
-        subtitle={`${data?.length ?? 0} restaurants`}
+        subtitle={`${data?.meta.total ?? 0} restaurants`}
         actions={
           <Link to="/restaurants/new" className="btn">
             + New restaurant
@@ -33,7 +43,7 @@ export default function RestaurantsListPage() {
         <ErrorBanner error={error} />
         {isLoading ? (
           <Loading />
-        ) : !data || data.length === 0 ? (
+        ) : !data || data.items.length === 0 ? (
           <EmptyState>No restaurants yet.</EmptyState>
         ) : (
           <div className="card">
@@ -49,7 +59,7 @@ export default function RestaurantsListPage() {
                 </tr>
               </thead>
               <tbody>
-                {data.map((r) => (
+                {data.items.map((r) => (
                   <tr key={r.id}>
                     <td>
                       <div className="photo-box" style={{ width: 36, height: 36 }}>
@@ -87,6 +97,12 @@ export default function RestaurantsListPage() {
                 ))}
               </tbody>
             </table>
+            <Pagination
+              page={data.meta.page}
+              pages={data.meta.pages}
+              total={data.meta.total}
+              onPageChange={setPage}
+            />
           </div>
         )}
       </div>

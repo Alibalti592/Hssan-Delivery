@@ -49,13 +49,13 @@ final class CatalogueApiTest extends WebTestCase
 
         self::assertIsArray($response);
 
-        $names = array_column($response, 'name');
+        $names = array_column($response['items'], 'name');
 
         self::assertContains('Open Diner', $names);
         self::assertNotContains('Closed Diner', $names);
 
         $listed = current(array_filter(
-            $response,
+            $response['items'],
             static fn ($r) => $r['id'] === $open->getId()
         ));
 
@@ -278,7 +278,7 @@ final class CatalogueApiTest extends WebTestCase
             true
         );
 
-        $names = array_column($response, 'name');
+        $names = array_column($response['items'], 'name');
 
         self::assertContains('Available Burger', $names);
         self::assertNotContains('Sold Out Burger', $names);

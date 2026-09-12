@@ -119,6 +119,52 @@ final class DeliveryApiTest extends WebTestCase
         );
     }
 
+    /**
+     * DeliveryStatusChangedEvent → DeliveryNotificationListener →
+     * PushNotificationService fires on every assign, but with no
+     * FIREBASE_CREDENTIALS configured in the test env it must stay a no-op
+     * rather than blocking or failing the assignment itself — this is the
+     * concrete proof of that contract, not just an absence of a crash.
+     */
+    public function testAssigningADeliveryStillSucceedsWhenCourierHasARegisteredDeviceToken(): void
+    {
+        $client = static::createClient();
+
+        $this->entityManager = self::getContainer()
+            ->get(EntityManagerInterface::class);
+
+        $admin = $this->createTestUser('ROLE_ADMIN', 'Test Admin');
+        $courier = $this->createTestUser('ROLE_LIVREUR', 'Notified Courier');
+        $delivery = $this->createTestDelivery();
+
+        $courierToken = $this->authenticateClient($client, $courier);
+
+        $client->request(
+            'POST',
+            '/api/notifications/device-token',
+            server: [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_AUTHORIZATION' => 'Bearer '.$courierToken,
+            ],
+            content: json_encode(['token' => 'fcm-token-'.bin2hex(random_bytes(16))])
+        );
+
+        self::assertResponseStatusCodeSame(Response::HTTP_NO_CONTENT);
+
+        $adminToken = $this->authenticateClient($client, $admin);
+
+        $client->request(
+            'POST',
+            sprintf('/api/deliveries/%d/assign/%d', $delivery->getId(), $courier->getId()),
+            server: [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_AUTHORIZATION' => 'Bearer '.$adminToken,
+            ]
+        );
+
+        self::assertResponseStatusCodeSame(Response::HTTP_OK);
+    }
+
     public function testNonAdminCannotAssignDelivery(): void
     {
         $client = static::createClient();
@@ -692,20 +738,20 @@ final class DeliveryApiTest extends WebTestCase
         );
 
         self::assertIsArray($response);
-        self::assertCount(1, $response);
+        self::assertCount(1, $response['items']);
 
         self::assertSame(
             $delivery->getId(),
-            $response[0]['id']
+            $response['items'][0]['id']
         );
 
         self::assertSame(
             $courier->getId(),
-            $response[0]['courierId']
+            $response['items'][0]['courierId']
         );
 
         // The courier needs the pickup/drop-off details, not just an order id.
-        $order = $response[0]['order'];
+        $order = $response['items'][0]['order'];
 
         self::assertIsArray($order);
         self::assertSame($delivery->getOrder()->getId(), $order['id']);

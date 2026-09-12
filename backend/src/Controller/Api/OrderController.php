@@ -15,6 +15,8 @@ use Symfony\Component\Validator\Validator\ValidatorInterface;
 #[Route('/api/orders')]
 final class OrderController extends AbstractApiController
 {
+    use PaginationParamsTrait;
+
     public function __construct(
         private readonly OrderService $orderService,
         SerializerInterface $serializer,
@@ -24,7 +26,7 @@ final class OrderController extends AbstractApiController
     }
 
     #[Route('', name: 'api_orders_list', methods: ['GET'])]
-    public function list(): JsonResponse
+    public function list(Request $request): JsonResponse
     {
         $user = $this->getUser();
 
@@ -35,14 +37,13 @@ final class OrderController extends AbstractApiController
             );
         }
 
-        $orders = $this->orderService->getUserOrders($user);
-
-        return $this->json(
-            array_map(
-                static fn (\App\Entity\Order $order) => OrderResponse::fromEntity($order),
-                $orders
-            )
+        $result = $this->orderService->getUserOrders(
+            $user,
+            $this->paginationPage($request),
+            $this->paginationLimit($request)
         );
+
+        return $this->paginatedJson($result, static fn (\App\Entity\Order $order) => OrderResponse::fromEntity($order));
     }
 
     #[Route('/{id}', name: 'api_orders_show', methods: ['GET'])]

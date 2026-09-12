@@ -10,6 +10,9 @@ import 'package:mobile/core/token_storage.dart';
 import 'package:mobile/deliveries/deliveries_controller.dart';
 import 'package:mobile/deliveries/delivery.dart';
 import 'package:mobile/deliveries/delivery_repository.dart';
+import 'package:mobile/notifications/notifications_repository.dart';
+import 'package:mobile/notifications/push_notification_service.dart';
+import 'package:mobile/orders/orders_repository.dart';
 
 class _MemoryTokenStorage extends TokenStorage {
   String? _token;
@@ -29,6 +32,13 @@ http.Response _json(Object body, [int status = 200]) => http.Response(
   status,
   headers: {'content-type': 'application/json'},
 );
+
+/// Wraps a list in the backend's `{"items": [...], "meta": {...}}`
+/// pagination envelope, matching what PagedResult.fromJson expects.
+Map<String, dynamic> _pagedBody(List<dynamic> items) => {
+  'items': items,
+  'meta': {'page': 1, 'limit': 20, 'total': items.length, 'pages': 1},
+};
 
 void main() {
   group('AuthController', () {
@@ -277,22 +287,24 @@ void main() {
   group('DeliveriesController', () {
     test('lists deliveries with active ones first', () async {
       final mock = MockClient((request) async {
-        return _json([
-          {
-            'id': 1,
-            'status': 'DELIVERED',
-            'courierId': 3,
-            'assignedAt': '2026-09-10T08:00:00+00:00',
-            'order': {'id': 10, 'status': 'COMPLETED', 'items': []},
-          },
-          {
-            'id': 2,
-            'status': 'ON_THE_WAY',
-            'courierId': 3,
-            'assignedAt': '2026-09-10T09:00:00+00:00',
-            'order': {'id': 11, 'status': 'READY_FOR_PICKUP', 'items': []},
-          },
-        ]);
+        return _json(
+          _pagedBody([
+            {
+              'id': 1,
+              'status': 'DELIVERED',
+              'courierId': 3,
+              'assignedAt': '2026-09-10T08:00:00+00:00',
+              'order': {'id': 10, 'status': 'COMPLETED', 'items': []},
+            },
+            {
+              'id': 2,
+              'status': 'ON_THE_WAY',
+              'courierId': 3,
+              'assignedAt': '2026-09-10T09:00:00+00:00',
+              'order': {'id': 11, 'status': 'READY_FOR_PICKUP', 'items': []},
+            },
+          ]),
+        );
       });
 
       final controller = DeliveriesController(
@@ -316,14 +328,16 @@ void main() {
     test('perform swaps in the updated delivery', () async {
       final mock = MockClient((request) async {
         if (request.method == 'GET') {
-          return _json([
-            {
-              'id': 5,
-              'status': 'ASSIGNED',
-              'courierId': 3,
-              'order': {'id': 20, 'status': 'CONFIRMED', 'items': []},
-            },
-          ]);
+          return _json(
+            _pagedBody([
+              {
+                'id': 5,
+                'status': 'ASSIGNED',
+                'courierId': 3,
+                'order': {'id': 20, 'status': 'CONFIRMED', 'items': []},
+              },
+            ]),
+          );
         }
         expect(request.url.path, '/api/deliveries/5/accept');
         return _json({
@@ -357,14 +371,16 @@ void main() {
     test('a declined delivery is dropped from the list', () async {
       final mock = MockClient((request) async {
         if (request.method == 'GET') {
-          return _json([
-            {
-              'id': 6,
-              'status': 'ASSIGNED',
-              'courierId': 3,
-              'order': {'id': 21, 'status': 'CONFIRMED', 'items': []},
-            },
-          ]);
+          return _json(
+            _pagedBody([
+              {
+                'id': 6,
+                'status': 'ASSIGNED',
+                'courierId': 3,
+                'order': {'id': 21, 'status': 'CONFIRMED', 'items': []},
+              },
+            ]),
+          );
         }
         expect(request.url.path, '/api/deliveries/6/decline');
         return _json({
@@ -395,5 +411,212 @@ void main() {
       expect(controller.byId(6), isNull);
       expect(controller.deliveries, isEmpty);
     });
+
+    test('loadMoreHistory appends the next page', () async {
+      final mock = MockClient((request) async {
+        final page = request.url.queryParameters['page'];
+        if (page == '2') {
+          return _json({
+            'items': [
+              {
+                'id': 1,
+                'status': 'DELIVERED',
+                'courierId': 3,
+                'order': {'id': 9, 'status': 'COMPLETED', 'items': []},
+              },
+            ],
+            'meta': {'page': 2, 'limit': 1, 'total': 2, 'pages': 2},
+          });
+        }
+        return _json({
+          'items': [
+            {
+              'id': 2,
+              'status': 'ASSIGNED',
+              'courierId': 3,
+              'order': {'id': 10, 'status': 'CONFIRMED', 'items': []},
+            },
+          ],
+          'meta': {'page': 1, 'limit': 1, 'total': 2, 'pages': 2},
+        });
+      });
+
+      final controller = DeliveriesController(
+        DeliveryRepository(
+          ApiClient(
+            tokenProvider: () => 'jwt',
+            onUnauthorized: () {},
+            httpClient: mock,
+          ),
+        ),
+      );
+
+      await controller.refresh();
+      expect(controller.hasMoreHistory, isTrue);
+      expect(controller.history, isEmpty);
+      expect(controller.active.map((d) => d.id), [2]);
+
+      final error = await controller.loadMoreHistory();
+
+      expect(error, isNull);
+      expect(controller.hasMoreHistory, isFalse);
+      expect(controller.history.map((d) => d.id), [1]);
+      // The active delivery from page 1 must still be there.
+      expect(controller.active.map((d) => d.id), [2]);
+    });
+  });
+
+  group('OrdersRepository', () {
+    test('listOrders unwraps the paginated envelope', () async {
+      final mock = MockClient((request) async {
+        expect(request.url.path, '/api/orders');
+        expect(request.url.queryParameters['page'], '2');
+        return _json({
+          'items': [
+            {
+              'id': 42,
+              'restaurantId': 1,
+              'items': [],
+              'deliveryAddress': 'Tunis',
+              'deliveryZoneId': 1,
+              'deliveryZoneName': 'Centre',
+              'deliveryFee': '4.000',
+              'totalAmount': '20.000',
+              'status': 'PENDING',
+            },
+          ],
+          'meta': {'page': 2, 'limit': 1, 'total': 2, 'pages': 2},
+        });
+      });
+
+      final repository = OrdersRepository(
+        ApiClient(
+          tokenProvider: () => 'jwt',
+          onUnauthorized: () {},
+          httpClient: mock,
+        ),
+      );
+
+      final result = await repository.listOrders(page: 2);
+
+      expect(result.items.map((o) => o.id), [42]);
+      expect(result.page, 2);
+      expect(result.pages, 2);
+      expect(result.hasMore, isFalse);
+    });
+  });
+
+  group('NotificationsRepository', () {
+    test('registerDeviceToken posts the token and platform', () async {
+      final mock = MockClient((request) async {
+        expect(request.method, 'POST');
+        expect(request.url.path, '/api/notifications/device-token');
+        final body = jsonDecode(request.body) as Map<String, dynamic>;
+        expect(body['token'], 'abc123');
+        expect(body['platform'], 'android');
+        return http.Response('', 204);
+      });
+
+      final repository = NotificationsRepository(
+        ApiClient(
+          tokenProvider: () => 'jwt',
+          onUnauthorized: () {},
+          httpClient: mock,
+        ),
+      );
+
+      await repository.registerDeviceToken('abc123', platform: 'android');
+    });
+
+    test('unregisterDeviceToken sends a DELETE with the token', () async {
+      final mock = MockClient((request) async {
+        expect(request.method, 'DELETE');
+        expect(request.url.path, '/api/notifications/device-token');
+        final body = jsonDecode(request.body) as Map<String, dynamic>;
+        expect(body['token'], 'abc123');
+        return http.Response('', 204);
+      });
+
+      final repository = NotificationsRepository(
+        ApiClient(
+          tokenProvider: () => 'jwt',
+          onUnauthorized: () {},
+          httpClient: mock,
+        ),
+      );
+
+      await repository.unregisterDeviceToken('abc123');
+    });
+  });
+
+  group('PushNotificationService', () {
+    // No FIREBASE_* --dart-define is set in test runs, so
+    // AppConfig.firebaseConfigured is false and every method below must
+    // stay a safe no-op without ever touching the Firebase plugin — which
+    // has no platform channel to answer it in a plain `flutter test` run.
+    test('is inert without a Firebase config', () async {
+      var repositoryCalled = false;
+      final mock = MockClient((request) async {
+        repositoryCalled = true;
+        return http.Response('', 204);
+      });
+
+      final service = PushNotificationService(
+        NotificationsRepository(
+          ApiClient(
+            tokenProvider: () => 'jwt',
+            onUnauthorized: () {},
+            httpClient: mock,
+          ),
+        ),
+      );
+
+      await service.initialize();
+      await service.registerForCurrentUser();
+      await service.unregister();
+
+      expect(repositoryCalled, isFalse);
+    });
+
+    test(
+      'AuthController sign-in/sign-out work with an unconfigured push service',
+      () async {
+        final mock = MockClient((request) async {
+          if (request.url.path == '/api/auth/login') {
+            return _json({'token': 'jwt-push'});
+          }
+          return _json({
+            'id': 1,
+            'name': 'Push Test',
+            'phone': '21000009',
+            'roles': ['ROLE_CLIENT', 'ROLE_USER'],
+            'isVerified': true,
+          });
+        });
+
+        late final AuthController auth;
+        final api = ApiClient(
+          tokenProvider: () => auth.token,
+          onUnauthorized: () {},
+          httpClient: mock,
+        );
+        final pushNotifications = PushNotificationService(
+          NotificationsRepository(api),
+        );
+        auth = AuthController(
+          repository: AuthRepository(api),
+          storage: _MemoryTokenStorage(),
+          pushNotifications: pushNotifications,
+        );
+
+        await pushNotifications.initialize();
+        final error = await auth.signIn('21000009', 'password123');
+        expect(error, isNull);
+        expect(auth.status, AuthStatus.signedIn);
+
+        await auth.signOut();
+        expect(auth.status, AuthStatus.signedOut);
+      },
+    );
   });
 }

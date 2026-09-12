@@ -20,6 +20,8 @@ use Symfony\Component\Validator\Validator\ValidatorInterface;
 #[IsGranted('ROLE_ADMIN')]
 final class AdminCourierController extends AbstractApiController
 {
+    use PaginationParamsTrait;
+
     public function __construct(
         SerializerInterface $serializer,
         ValidatorInterface $validator,
@@ -44,16 +46,14 @@ final class AdminCourierController extends AbstractApiController
     }
 
     #[Route('', name: 'api_admin_courier_list', methods: ['GET'])]
-    public function list(): JsonResponse
+    public function list(Request $request): JsonResponse
     {
-        $couriers = $this->courierService->list();
-
-        return $this->json(
-            array_map(
-                static fn ($courier) => CourierResponse::fromEntity($courier),
-                $couriers
-            )
+        $result = $this->courierService->list(
+            $this->paginationPage($request),
+            $this->paginationLimit($request)
         );
+
+        return $this->paginatedJson($result, static fn ($courier) => CourierResponse::fromEntity($courier));
     }
 
     #[Route('/{id}', name: 'api_admin_courier_show', methods: ['GET'])]

@@ -17,8 +17,12 @@ export default function DeliveryDetailPage() {
     queryFn: () => deliveriesApi.get(deliveryId),
   });
 
-  const couriers = useQuery({ queryKey: ['couriers'], queryFn: couriersApi.list });
-  const activeCouriers = couriers.data?.filter((c) => c.isActive) ?? [];
+  // The assignment dropdown and name lookup below need the whole roster,
+  // not just one page — fetched at the max page size since the
+  // admin-managed courier roster is realistically bounded, unlike
+  // deliveries/orders which grow unbounded.
+  const couriers = useQuery({ queryKey: ['couriers', 'all'], queryFn: () => couriersApi.list({ limit: 100 }) });
+  const activeCouriers = couriers.data?.items.filter((c) => c.isActive) ?? [];
 
   const assign = useMutation({
     mutationFn: () => deliveriesApi.assign(deliveryId, Number(courierId)),
@@ -37,7 +41,7 @@ export default function DeliveryDetailPage() {
   });
 
   const courierName = (id: number | null) =>
-    id ? couriers.data?.find((c) => c.id === id)?.name ?? `#${id}` : '—';
+    id ? couriers.data?.items.find((c) => c.id === id)?.name ?? `#${id}` : '—';
 
   return (
     <>

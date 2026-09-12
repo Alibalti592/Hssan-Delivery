@@ -6,6 +6,8 @@ use App\Dto\Admin\CreateRestaurantRequest;
 use App\Dto\Admin\UpdateRestaurantRequest;
 use App\Entity\Restaurant;
 use App\Exception\ConflictException;
+use App\Pagination\PaginatedResult;
+use App\Pagination\Paginator;
 use App\Repository\OrderRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
@@ -37,25 +39,33 @@ final class RestaurantService
     }
 
     /**
-     * @return Restaurant[]
+     * @return PaginatedResult<Restaurant>
      */
-    public function list(): array
+    public function list(int $page, int $limit): PaginatedResult
     {
-        return $this->entityManager
+        $qb = $this->entityManager
             ->getRepository(Restaurant::class)
-            ->findBy([], ['createdAt' => 'DESC']);
+            ->createQueryBuilder('r')
+            ->orderBy('r.createdAt', 'DESC');
+
+        return Paginator::paginate($qb, $page, $limit);
     }
 
     /**
      * The public catalogue: open restaurants only, alphabetical for browsing.
      *
-     * @return Restaurant[]
+     * @return PaginatedResult<Restaurant>
      */
-    public function listAvailable(): array
+    public function listAvailable(int $page, int $limit): PaginatedResult
     {
-        return $this->entityManager
+        $qb = $this->entityManager
             ->getRepository(Restaurant::class)
-            ->findBy(['isAvailable' => true], ['name' => 'ASC']);
+            ->createQueryBuilder('r')
+            ->andWhere('r.isAvailable = :available')
+            ->setParameter('available', true)
+            ->orderBy('r.name', 'ASC');
+
+        return Paginator::paginate($qb, $page, $limit);
     }
 
     public function get(int $id): ?Restaurant

@@ -1,5 +1,6 @@
 import '../cart/cart.dart';
 import '../core/api_client.dart';
+import '../core/paged_result.dart';
 import 'order_models.dart';
 
 class OrdersRepository {
@@ -33,11 +34,12 @@ class OrdersRepository {
     return ClientOrder.fromJson(body as Map<String, dynamic>);
   }
 
-  Future<List<ClientOrder>> listOrders() async {
-    final body = await _api.get('/api/orders');
-    return (body as List<dynamic>)
-        .map((e) => ClientOrder.fromJson(e as Map<String, dynamic>))
-        .toList(growable: false);
+  Future<PagedResult<ClientOrder>> listOrders({int page = 1}) async {
+    final body = await _api.get('/api/orders?page=$page');
+    return PagedResult.fromJson(
+      body as Map<String, dynamic>,
+      (json) => ClientOrder.fromJson(json),
+    );
   }
 
   Future<ClientOrder> getOrder(int id) async {

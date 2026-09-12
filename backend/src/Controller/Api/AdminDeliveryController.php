@@ -6,6 +6,7 @@ use App\Dto\DeliveryResponse;
 use App\Repository\DeliveryRepository;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
@@ -14,22 +15,22 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 #[IsGranted('ROLE_ADMIN')]
 final class AdminDeliveryController extends AbstractController
 {
+    use PaginationParamsTrait;
+
     public function __construct(
         private readonly DeliveryRepository $deliveryRepository,
     ) {
     }
 
     #[Route('', name: 'api_admin_delivery_list', methods: ['GET'])]
-    public function list(): JsonResponse
+    public function list(Request $request): JsonResponse
     {
-        $deliveries = $this->deliveryRepository->findAllOrderedByCreatedAtDesc();
-
-        return $this->json(
-            array_map(
-                static fn ($delivery) => DeliveryResponse::fromEntity($delivery),
-                $deliveries
-            )
+        $result = $this->deliveryRepository->paginateAllOrderedByCreatedAtDesc(
+            $this->paginationPage($request),
+            $this->paginationLimit($request)
         );
+
+        return $this->paginatedJson($result, static fn ($delivery) => DeliveryResponse::fromEntity($delivery));
     }
 
     #[Route('/{id}', name: 'api_admin_delivery_show', methods: ['GET'])]

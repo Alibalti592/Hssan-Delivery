@@ -477,27 +477,27 @@ final class AdminProductApiTest extends WebTestCase
 
         self::assertCount(
             2,
-            $response
+            $response['items']
         );
 
         self::assertSame(
             'Burger',
-            $response[0]['name']
+            $response['items'][0]['name']
         );
 
         self::assertSame(
             'Cheeseburger',
-            $response[1]['name']
+            $response['items'][1]['name']
         );
 
         self::assertSame(
             '15.000',
-            $response[0]['price']
+            $response['items'][0]['price']
         );
 
         self::assertSame(
             '18.500',
-            $response[1]['price']
+            $response['items'][1]['price']
         );
     }
 
@@ -541,8 +541,9 @@ final class AdminProductApiTest extends WebTestCase
 
         self::assertSame(
             [],
-            $response
+            $response['items']
         );
+        self::assertSame(0, $response['meta']['total']);
     }
 
     public function testAdminGets404ForUnknownProductRestaurant(): void

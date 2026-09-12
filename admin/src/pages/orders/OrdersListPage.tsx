@@ -1,19 +1,33 @@
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { ordersApi } from '../../api/resources';
-import { PageHeader, Loading, ErrorBanner, EmptyState, StatusBadge, money, formatDate } from '../../components/ui';
+import {
+  PageHeader,
+  Loading,
+  ErrorBanner,
+  EmptyState,
+  StatusBadge,
+  Pagination,
+  money,
+  formatDate,
+} from '../../components/ui';
 
 export default function OrdersListPage() {
-  const { data, isLoading, error } = useQuery({ queryKey: ['orders'], queryFn: ordersApi.list });
+  const [page, setPage] = useState(1);
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['orders', page],
+    queryFn: () => ordersApi.list({ page }),
+  });
 
   return (
     <>
-      <PageHeader title="Orders" subtitle={`${data?.length ?? 0} orders`} />
+      <PageHeader title="Orders" subtitle={`${data?.meta.total ?? 0} orders`} />
       <div className="content">
         <ErrorBanner error={error} />
         {isLoading ? (
           <Loading />
-        ) : !data || data.length === 0 ? (
+        ) : !data || data.items.length === 0 ? (
           <EmptyState>No orders yet.</EmptyState>
         ) : (
           <div className="card">
@@ -30,7 +44,7 @@ export default function OrdersListPage() {
                 </tr>
               </thead>
               <tbody>
-                {data.map((o) => (
+                {data.items.map((o) => (
                   <tr key={o.id}>
                     <td className="rname">#{o.id}</td>
                     <td>
@@ -52,6 +66,12 @@ export default function OrdersListPage() {
                 ))}
               </tbody>
             </table>
+            <Pagination
+              page={data.meta.page}
+              pages={data.meta.pages}
+              total={data.meta.total}
+              onPageChange={setPage}
+            />
           </div>
         )}
       </div>

@@ -141,6 +141,12 @@ tr.row-link:hover td { background: #fafbfc; }
 .breadcrumb { font-size: 11px; color: #9aa0a6; margin-bottom: 6px; }
 .breadcrumb a:hover { color: #1b2437; text-decoration: underline; }
 
+.pagination {
+  display: flex; align-items: center; justify-content: center; gap: 14px;
+  margin-top: 16px;
+}
+.pagination-info { font-size: 11.5px; color: #6b7787; }
+
 /* ---- photo uploader ---- */
 .photo-row { display: flex; align-items: center; gap: 16px; margin-bottom: 18px; }
 .photo-box {

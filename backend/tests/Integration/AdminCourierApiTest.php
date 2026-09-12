@@ -397,10 +397,91 @@ final class AdminCourierApiTest extends WebTestCase
 
         self::assertIsArray($response);
 
-        $ids = array_column($response, 'id');
+        $ids = array_column($response['items'], 'id');
 
         self::assertContains($courier->getId(), $ids);
         self::assertNotContains($client_->getId(), $ids);
+        self::assertSame(1, $response['meta']['page']);
+    }
+
+    public function testAdminCanPaginateCouriers(): void
+    {
+        $client = static::createClient();
+
+        $this->entityManager = self::getContainer()
+            ->get(EntityManagerInterface::class);
+
+        $admin = $this->createTestUser('ROLE_ADMIN', 'Test Admin');
+
+        // Not a courier — must never be counted or returned, regardless of
+        // page/limit, since the courier filter runs as a separate raw-SQL
+        // pass before pagination.
+        $this->createTestUser('ROLE_USER', 'Plain Client');
+
+        $adminToken = $this->authenticateClient($client, $admin);
+
+        // The suite shares one Postgres database across tests (no per-test
+        // transaction/rollback — see AuthApiTest for the same caveat with
+        // the rate limiter), so other tests' couriers may already exist.
+        // Take a baseline count instead of assuming a clean slate.
+        $client->request(
+            'GET',
+            '/api/admin/couriers?page=1&limit=1',
+            server: ['HTTP_AUTHORIZATION' => 'Bearer '.$adminToken]
+        );
+
+        self::assertResponseStatusCodeSame(Response::HTTP_OK);
+
+        $baselineTotal = json_decode($client->getResponse()->getContent(), true)['meta']['total'];
+
+        $couriers = [];
+        for ($i = 0; $i < 3; ++$i) {
+            $couriers[] = $this->createTestUser('ROLE_LIVREUR', "Paginate Courier $i");
+        }
+
+        $expectedTotal = $baselineTotal + 3;
+        $lastPage = (int) ceil($expectedTotal / 2);
+
+        $client->request(
+            'GET',
+            '/api/admin/couriers?page=1&limit=2',
+            server: ['HTTP_AUTHORIZATION' => 'Bearer '.$adminToken]
+        );
+
+        $response = json_decode($client->getResponse()->getContent(), true);
+
+        self::assertCount(2, $response['items']);
+        self::assertSame([
+            'page' => 1,
+            'limit' => 2,
+            'total' => $expectedTotal,
+            'pages' => $lastPage,
+        ], $response['meta']);
+
+        // Walk every page and confirm each of the 3 new couriers appears
+        // exactly once across the whole listing, with no duplicates.
+        $seenIds = [];
+        for ($page = 1; $page <= $lastPage; ++$page) {
+            $client->request(
+                'GET',
+                "/api/admin/couriers?page=$page&limit=2",
+                server: ['HTTP_AUTHORIZATION' => 'Bearer '.$adminToken]
+            );
+            $pageData = json_decode($client->getResponse()->getContent(), true);
+            foreach ($pageData['items'] as $item) {
+                $seenIds[] = $item['id'];
+            }
+        }
+
+        self::assertSame(
+            count($seenIds),
+            count(array_unique($seenIds)),
+            'No courier should appear on more than one page.'
+        );
+
+        foreach ($couriers as $courier) {
+            self::assertContains($courier->getId(), $seenIds);
+        }
     }
 
     public function testNonAdminCannotListCouriers(): void

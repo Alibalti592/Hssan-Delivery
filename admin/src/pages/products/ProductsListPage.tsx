@@ -1,13 +1,24 @@
+import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useParams } from 'react-router-dom';
 import { API_URL } from '../../api/client';
 import { categoriesApi, productsApi, restaurantsApi } from '../../api/resources';
-import { PageHeader, Loading, ErrorBanner, EmptyState, AvailabilityBadge, Breadcrumb, money } from '../../components/ui';
+import {
+  PageHeader,
+  Loading,
+  ErrorBanner,
+  EmptyState,
+  AvailabilityBadge,
+  Breadcrumb,
+  Pagination,
+  money,
+} from '../../components/ui';
 
 export default function ProductsListPage() {
   const { id } = useParams();
   const restaurantId = Number(id);
   const queryClient = useQueryClient();
+  const [page, setPage] = useState(1);
 
   const restaurant = useQuery({
     queryKey: ['restaurants', restaurantId],
@@ -15,8 +26,8 @@ export default function ProductsListPage() {
   });
 
   const products = useQuery({
-    queryKey: ['products', restaurantId],
-    queryFn: () => productsApi.listForRestaurant(restaurantId),
+    queryKey: ['products', restaurantId, page],
+    queryFn: () => productsApi.listForRestaurant(restaurantId, { page }),
   });
 
   const categories = useQuery({
@@ -57,7 +68,7 @@ export default function ProductsListPage() {
 
         {products.isLoading || categories.isLoading ? (
           <Loading />
-        ) : !products.data || products.data.length === 0 ? (
+        ) : !products.data || products.data.items.length === 0 ? (
           <EmptyState>
             No products yet. You'll need at least one category before adding a product.
           </EmptyState>
@@ -75,7 +86,7 @@ export default function ProductsListPage() {
                 </tr>
               </thead>
               <tbody>
-                {products.data.map((p) => (
+                {products.data.items.map((p) => (
                   <tr key={p.id}>
                     <td>
                       <div className="photo-box" style={{ width: 36, height: 36 }}>
@@ -116,6 +127,12 @@ export default function ProductsListPage() {
                 ))}
               </tbody>
             </table>
+            <Pagination
+              page={products.data.meta.page}
+              pages={products.data.meta.pages}
+              total={products.data.meta.total}
+              onPageChange={setPage}
+            />
           </div>
         )}
       </div>

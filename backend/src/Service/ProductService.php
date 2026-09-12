@@ -9,6 +9,8 @@ use App\Entity\Product;
 use App\Entity\Restaurant;
 use App\Exception\ConflictException;
 use App\Exception\InvalidOperationException;
+use App\Pagination\PaginatedResult;
+use App\Pagination\Paginator;
 use App\Repository\CategoryRepository;
 use App\Repository\OrderItemRepository;
 use App\Repository\ProductRepository;
@@ -58,29 +60,39 @@ final class ProductService
     }
 
     /**
-     * @return Product[]
+     * @return PaginatedResult<Product>
      */
     public function listForRestaurant(
-        Restaurant $restaurant
-    ): array {
-        return $this->productRepository->findBy(
-            ['restaurant' => $restaurant],
-            ['createdAt' => 'ASC']
-        );
+        Restaurant $restaurant,
+        int $page,
+        int $limit,
+    ): PaginatedResult {
+        $qb = $this->productRepository->createQueryBuilder('p')
+            ->andWhere('p.restaurant = :restaurant')
+            ->setParameter('restaurant', $restaurant)
+            ->orderBy('p.createdAt', 'ASC');
+
+        return Paginator::paginate($qb, $page, $limit);
     }
 
     /**
      * The public catalogue: only what a client could actually order.
      *
-     * @return Product[]
+     * @return PaginatedResult<Product>
      */
     public function listAvailableForRestaurant(
-        Restaurant $restaurant
-    ): array {
-        return $this->productRepository->findBy(
-            ['restaurant' => $restaurant, 'isAvailable' => true],
-            ['createdAt' => 'ASC']
-        );
+        Restaurant $restaurant,
+        int $page,
+        int $limit,
+    ): PaginatedResult {
+        $qb = $this->productRepository->createQueryBuilder('p')
+            ->andWhere('p.restaurant = :restaurant')
+            ->andWhere('p.isAvailable = :available')
+            ->setParameter('restaurant', $restaurant)
+            ->setParameter('available', true)
+            ->orderBy('p.createdAt', 'ASC');
+
+        return Paginator::paginate($qb, $page, $limit);
     }
 
     public function get(int $id): ?Product

@@ -26,8 +26,10 @@ separate builds or flavors.
   in-progress delivery if there is one.
 - **Available deliveries** (`Courses disponibles`) — deliveries `ASSIGNED` to
   the courier, awaiting a decision: `Accepter` or `Refuser`.
-- **My deliveries** (`Toutes mes courses`) — the full queue from
+- **My deliveries** (`Toutes mes courses`) — the queue from
   `GET /api/deliveries/mine`, split into active and history, pull to refresh.
+  Active deliveries always load in full; a "Charger plus d'historique"
+  button pages in older history beyond the first page.
 - **Delivery detail** — pickup restaurant, drop-off address and note, customer
   name with a tap-to-call button, the item list and pricing.
 - **Lifecycle actions** — accept / decline / confirm pickup / start delivery /
@@ -39,6 +41,8 @@ separate builds or flavors.
   (`POST /api/auth/change-password`, requires the current password). A
   courier who can't sign in at all has an admin reset their password
   instead — see the root README's "Account recovery" section.
+- **Push notifications** — notified when a delivery is assigned. Inert
+  without a Firebase project configured (see Configuration below).
 
 ## Client (`ROLE_CLIENT`)
 
@@ -58,11 +62,15 @@ separate builds or flavors.
 - **Order confirmation** — shown right after a successful order.
 - **Orders** (`Mes commandes`) — order history (`GET /api/orders`) and detail
   (`GET /api/orders/{id}`) with a status timeline (pending → confirmed →
-  preparing → ready for pickup → completed, or cancelled).
+  preparing → ready for pickup → completed, or cancelled). A "Charger plus"
+  button pages in older orders beyond the first page.
 - **Saved addresses** (`Mes adresses`, from the profile menu) — list and add
   (`GET`/`POST /api/addresses`); also usable as a picker from checkout.
 - **Profile** — account name/phone, saved addresses, change password, and
   sign out.
+- **Push notifications** — notified when an order is on its way and when
+  it's delivered. Inert without a Firebase project configured (see
+  Configuration below).
 
 ## Requirements
 
@@ -86,6 +94,25 @@ just never sends anything without a DSN:
 ```
 flutter run --dart-define=SENTRY_DSN=https://...@sentry.io/...
 ```
+
+Push notifications (Firebase Cloud Messaging) are off by default — the app
+works the same either way, it just never registers for or receives pushes
+without all four of these (from a Firebase project's app config: Project
+settings -> General -> Your apps):
+
+```
+flutter run \
+  --dart-define=FIREBASE_API_KEY=... \
+  --dart-define=FIREBASE_APP_ID=... \
+  --dart-define=FIREBASE_MESSAGING_SENDER_ID=... \
+  --dart-define=FIREBASE_PROJECT_ID=...
+```
+
+This covers sending/receiving pushes only. A real release build still
+needs `flutterfire configure` (or the equivalent manual setup) for native
+Android/iOS integration (`google-services.json`, `GoogleService-Info.plist`)
+— without it, background/terminated-state notifications on Android in
+particular may not display correctly even with the dart-defines above set.
 
 ## Run
 
@@ -114,7 +141,8 @@ drives the auth and delivery controllers against a mocked HTTP client.
 lib/
   config.dart              API base URL (--dart-define)
   theme.dart               Material 3 theme (navy brand) + status colours
-  core/                    HTTP client, typed errors, secure token/onboarding storage
+  core/                    HTTP client, typed errors, secure token/onboarding storage,
+                           paginated-list result type
   onboarding/              splash screen, first-launch onboarding carousel
   auth/                    login/register/change-password: repository, ChangeNotifier
                            controller, screens
@@ -125,6 +153,8 @@ lib/
   cart/                    single-restaurant cart (ChangeNotifier)
   orders/                  client order models + repository
   addresses/               saved-address models + repository
+  notifications/           FCM wiring: repository + PushNotificationService
+                           (inert without a Firebase project — see Configuration)
   client/                  client home shell, restaurant/menu/product detail,
                            cart/checkout, order history/detail, addresses,
                            profile

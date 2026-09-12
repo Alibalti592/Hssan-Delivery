@@ -113,6 +113,44 @@ export function Breadcrumb({ items }: { items: { label: string; to?: string }[] 
   );
 }
 
+export function Pagination({
+  page,
+  pages,
+  total,
+  onPageChange,
+}: {
+  page: number;
+  pages: number;
+  total: number;
+  onPageChange: (page: number) => void;
+}) {
+  if (pages <= 1) return null;
+
+  return (
+    <div className="pagination">
+      <button
+        type="button"
+        className="btn ghost sm"
+        disabled={page <= 1}
+        onClick={() => onPageChange(page - 1)}
+      >
+        ← Prev
+      </button>
+      <span className="pagination-info">
+        Page {page} of {pages} ({total} total)
+      </span>
+      <button
+        type="button"
+        className="btn ghost sm"
+        disabled={page >= pages}
+        onClick={() => onPageChange(page + 1)}
+      >
+        Next →
+      </button>
+    </div>
+  );
+}
+
 export function money(amount: string): string {
   return `${amount} DT`;
 }

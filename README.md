@@ -192,6 +192,11 @@ GET  /api/admin/orders/{id}
 Admin delivery oversight
 GET  /api/admin/deliveries
 GET  /api/admin/deliveries/{id}
+Admin dashboard stats
+GET  /api/admin/stats
+Push notification device tokens
+POST   /api/notifications/device-token
+DELETE /api/notifications/device-token
 Delivery management
 GET  /api/deliveries/mine
 
@@ -295,6 +300,40 @@ backend, sentry_flutter on mobile). Both are no-ops until a real DSN is
 supplied — SENTRY_DSN in the backend's .env.local, or
 --dart-define=SENTRY_DSN=... when running/building the mobile app — so
 this is inert by default and doesn't require a Sentry account to develop.
+
+Pagination
+
+The list endpoints most likely to grow unbounded over real usage —
+admin couriers/restaurants/products/orders/deliveries, the public
+restaurant/product catalogue, a client's own order history, and a
+courier's own delivery queue — accept `?page=` and `?limit=` (default
+page 1, limit 20, capped at 100) and return
+`{"items": [...], "meta": {"page", "limit", "total", "pages"}}` instead of
+a bare array. Small, admin-bounded lists (categories, delivery zones,
+saved addresses) aren't paginated — there's no realistic scenario where
+those grow past one page. The admin dashboard's list pages show Prev/Next
+controls backed by this; the mobile app fetches a large single page for
+the catalogue (administratively bounded) and a "load more" button for
+order history and delivery history (the two lists that genuinely grow
+per-user over time). GET /api/admin/stats backs the admin dashboard's
+overview counts with dedicated COUNT queries rather than paging through
+every list just to count it.
+
+Push notifications
+
+Delivery status changes can push a notification via Firebase Cloud
+Messaging: a courier is notified when a delivery is assigned to them, and
+a client is notified once their order is on its way and once it's
+delivered. The mobile app registers/unregisters its FCM token against the
+signed-in account via POST/DELETE /api/notifications/device-token
+(a device can belong to at most one account at a time — registering a
+token already owned by someone else reassigns it, since that means the
+same device switched accounts). Both the backend (kreait/firebase-php)
+and the mobile app are inert without a real Firebase project — see
+FIREBASE_CREDENTIALS in backend/.env.example and the FIREBASE_* dart-defines
+documented in mobile/lib/config.dart — so this doesn't require a Firebase
+account to develop, and a failed or skipped push never blocks the
+delivery/order action that triggered it.
 
 Backend setup
 Requirements
@@ -428,6 +467,10 @@ courier decline (reverts an assigned delivery to pending)
 wrong-courier protection
 non-courier protection
 order/delivery status synchronization
+pagination (page/limit, envelope shape, boundary behavior) on couriers, restaurants, products, orders, and deliveries
+admin dashboard stats (COUNT-based, correct regardless of list size)
+device-token registration/unregistration, including reassignment when a device switches accounts
+a delivery notification firing without blocking the underlying status change even when a device token is registered
 
 It also contains unit tests for the pure logic that backs those workflows: the
 decimal/millimes money conversion and the delivery-to-order status mapping.
@@ -442,8 +485,8 @@ php bin/phpunit
 
 Current baseline:
 
-168 tests
-1008 assertions
+179 tests
+1086 assertions
 
 Tests share a single Postgres database rather than running each in its own
 transaction, so re-running `php bin/phpunit` without resetting the database
@@ -508,6 +551,9 @@ self-service password change
 admin-initiated courier password reset (account recovery)
 login throttling and registration rate limiting
 error tracking (Sentry, inert until a DSN is configured)
+pagination on every list endpoint likely to grow unbounded
+admin dashboard stats via dedicated COUNT queries
+push notifications on delivery status changes (FCM, inert until a Firebase project is configured)
 integration tests
 GitHub Actions CI
 Mobile
@@ -522,12 +568,13 @@ Courier:
 courier authentication (ROLE_LIVREUR only)
 a dashboard (availability toggle, today's stats, current delivery shortcut)
 an available-deliveries screen to accept/decline a proposed delivery
-delivery queue (GET /api/deliveries/mine, active vs. history)
+delivery queue (GET /api/deliveries/mine, active vs. history, "load more" for older history)
 delivery details (pickup, drop-off, customer, items, pricing)
 accept / decline / pickup / on-the-way / delivered / fail actions
 a delivery-confirmed screen showing the amount collected
 tap-to-call the customer
 change password (dashboard menu)
+push notification registration (FCM, inert without a Firebase project — see "Push notifications" above)
 
 Client:
 
@@ -537,12 +584,12 @@ menu browsing by category with add-to-cart (GET .../categories, .../products)
 a cart (single-restaurant, quantity steppers, restaurant-switch confirmation)
 checkout (delivery address, delivery zone, optional note, live total)
 order placement (POST /api/orders) and a confirmation screen
-order history and order detail (GET /api/orders, GET /api/orders/{id})
+order history and order detail (GET /api/orders, GET /api/orders/{id}, "load more" for older orders)
 a profile screen (account info, change password, sign out)
+push notification registration (FCM, inert without a Firebase project — see "Push notifications" above)
 
 Not yet in the app:
 
-push notifications
 map / navigation integration
 saved-address picker in checkout (the backend has `/api/addresses`; checkout
 currently takes a free-text address)
@@ -551,20 +598,19 @@ Admin dashboard
 The React/Vite admin dashboard (`admin/`) is implemented and covers:
 
 admin authentication
-dashboard (counts overview)
-order visibility (list + detail)
-delivery monitoring (list + detail)
+dashboard (counts overview, backed by GET /api/admin/stats)
+order visibility (list + detail, paginated with Prev/Next)
+delivery monitoring (list + detail, paginated with Prev/Next)
 delivery assignment / cancellation
-courier management (list, create, activate/deactivate)
-restaurant management (including delete and photo upload/replace/remove)
+courier management (list, create, activate/deactivate, password reset, paginated with Prev/Next)
+restaurant management (including delete and photo upload/replace/remove, paginated with Prev/Next)
 category management
-product/menu management (including delete and photo upload/replace/remove)
+product/menu management (including delete and photo upload/replace/remove, paginated with Prev/Next)
 delivery zone management
 
 Not yet implemented in the dashboard:
 
 operational statistics beyond simple counts
-pagination on any list (matches the backend, which doesn't paginate yet either)
 Future services
 
 The platform is intended to expand beyond restaurant delivery.
@@ -612,7 +658,7 @@ Phase 3 — Flutter application (done — see "Mobile" above)
  Catalogue (done)
  Cart (done)
  Checkout (done)
- Order tracking (done — history + detail; no push notifications yet)
+ Order tracking (done — history + detail, load more, push notifications on status changes)
  Courier application (done)
  Courier delivery queue (done)
  Delivery status actions (done)
@@ -626,7 +672,7 @@ Phase 4 — React admin dashboard (done — see admin/README.md)
  Restaurant management
  Category/product management
 Phase 5 — Real-time features
- Push notifications
+ Push notifications (done — delivery assigned/on-the-way/delivered via FCM, inert until a Firebase project is configured; see "Push notifications" above)
  Live delivery status
  Courier location updates
  Live delivery tracking

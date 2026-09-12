@@ -759,10 +759,11 @@ final class AdminRestaurantApiTest extends WebTestCase
 
         self::assertIsArray($response);
 
-        $names = array_column($response, 'name');
+        $names = array_column($response['items'], 'name');
 
         self::assertContains('Restaurant One', $names);
         self::assertContains('Restaurant Two', $names);
+        self::assertGreaterThanOrEqual(2, $response['meta']['total']);
     }
 
     public function testNonAdminCannotListRestaurants(): void
@@ -855,7 +856,8 @@ final class AdminRestaurantApiTest extends WebTestCase
             true
         );
 
-        self::assertSame([], $response);
+        self::assertSame([], $response['items']);
+        self::assertSame(0, $response['meta']['total']);
     }
     public function testAdminCanShowRestaurant(): void
 {

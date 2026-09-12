@@ -6,6 +6,7 @@ use App\Dto\Admin\OrderResponse;
 use App\Repository\OrderRepository;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
@@ -14,22 +15,22 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 #[IsGranted('ROLE_ADMIN')]
 final class AdminOrderController extends AbstractController
 {
+    use PaginationParamsTrait;
+
     public function __construct(
         private readonly OrderRepository $orderRepository,
     ) {
     }
 
     #[Route('', name: 'api_admin_order_list', methods: ['GET'])]
-    public function list(): JsonResponse
+    public function list(Request $request): JsonResponse
     {
-        $orders = $this->orderRepository->findAllOrderedByCreatedAtDesc();
-
-        return $this->json(
-            array_map(
-                static fn ($order) => OrderResponse::fromEntity($order),
-                $orders
-            )
+        $result = $this->orderRepository->paginateAllOrderedByCreatedAtDesc(
+            $this->paginationPage($request),
+            $this->paginationLimit($request)
         );
+
+        return $this->paginatedJson($result, static fn ($order) => OrderResponse::fromEntity($order));
     }
 
     #[Route('/{id}', name: 'api_admin_order_show', methods: ['GET'])]

@@ -20,6 +20,8 @@ use Symfony\Component\Validator\Validator\ValidatorInterface;
 #[IsGranted('ROLE_ADMIN')]
 final class AdminProductController extends AbstractApiController
 {
+    use PaginationParamsTrait;
+
     public function __construct(
         SerializerInterface $serializer,
         ValidatorInterface $validator,
@@ -65,7 +67,7 @@ final class AdminProductController extends AbstractApiController
         name: 'api_admin_product_list',
         methods: ['GET']
     )]
-    public function list(int $restaurantId): JsonResponse
+    public function list(int $restaurantId, Request $request): JsonResponse
     {
         $restaurant = $this->productService->getRestaurant($restaurantId);
 
@@ -76,16 +78,13 @@ final class AdminProductController extends AbstractApiController
             );
         }
 
-        $products = $this->productService->listForRestaurant(
-            $restaurant
+        $result = $this->productService->listForRestaurant(
+            $restaurant,
+            $this->paginationPage($request),
+            $this->paginationLimit($request)
         );
 
-        return $this->json(
-            array_map(
-                static fn ($product) => ProductResponse::fromEntity($product),
-                $products
-            )
-        );
+        return $this->paginatedJson($result, static fn ($product) => ProductResponse::fromEntity($product));
     }
 
     #[Route(

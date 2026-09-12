@@ -4,6 +4,8 @@ namespace App\Repository;
 
 use App\Entity\Delivery;
 use App\Entity\User;
+use App\Pagination\PaginatedResult;
+use App\Pagination\Paginator;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
@@ -15,23 +17,26 @@ class DeliveryRepository extends ServiceEntityRepository
     }
 
     /**
-     * @return Delivery[]
+     * @return PaginatedResult<Delivery>
      */
-    public function findByCourier(User $courier): array
+    public function paginateByCourier(User $courier, int $page, int $limit): PaginatedResult
     {
-        return $this->createQueryBuilder('d')
+        $qb = $this->createQueryBuilder('d')
             ->andWhere('d.courier = :courier')
             ->setParameter('courier', $courier)
-            ->orderBy('d.createdAt', 'DESC')
-            ->getQuery()
-            ->getResult();
+            ->orderBy('d.createdAt', 'DESC');
+
+        return Paginator::paginate($qb, $page, $limit);
     }
 
     /**
-     * @return Delivery[]
+     * @return PaginatedResult<Delivery>
      */
-    public function findAllOrderedByCreatedAtDesc(): array
+    public function paginateAllOrderedByCreatedAtDesc(int $page, int $limit): PaginatedResult
     {
-        return $this->findBy([], ['createdAt' => 'DESC']);
+        $qb = $this->createQueryBuilder('d')
+            ->orderBy('d.createdAt', 'DESC');
+
+        return Paginator::paginate($qb, $page, $limit);
     }
 }

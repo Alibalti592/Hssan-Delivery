@@ -10,6 +10,7 @@ use App\Repository\UserRepository;
 use App\Service\DeliveryService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
@@ -17,6 +18,8 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 #[Route('/api/deliveries')]
 final class DeliveryController extends AbstractController
 {
+    use PaginationParamsTrait;
+
     public function __construct(
         private readonly DeliveryService $deliveryService,
         private readonly DeliveryRepository $deliveryRepository,
@@ -30,20 +33,18 @@ final class DeliveryController extends AbstractController
         methods: ['GET']
     )]
     #[IsGranted('ROLE_LIVREUR')]
-    public function mine(): JsonResponse
+    public function mine(Request $request): JsonResponse
     {
         /** @var User $courier */
         $courier = $this->getUser();
 
-        $deliveries = $this->deliveryRepository
-            ->findByCourier($courier);
-
-        return $this->json(
-            array_map(
-                fn ($delivery) => DeliveryResponse::fromEntity($delivery),
-                $deliveries
-            )
+        $result = $this->deliveryRepository->paginateByCourier(
+            $courier,
+            $this->paginationPage($request),
+            $this->paginationLimit($request)
         );
+
+        return $this->paginatedJson($result, fn ($delivery) => DeliveryResponse::fromEntity($delivery));
     }
 
     #[Route(
