@@ -54,3 +54,18 @@ npm run build
 ```
 
 Type-checks (`tsc -b`) then builds to `dist/`.
+
+## Test
+
+```
+npx playwright install --with-deps chromium   # first run only
+npm run test:e2e
+```
+
+End-to-end tests (`e2e/`) drive the real app against a real Vite dev
+server, but never a real backend — every test mocks the exact
+`**/api/**` calls it needs with `page.route()` (see `e2e/mockApi.ts`)
+before navigating, so the suite needs no backend or database, locally
+or in CI. Covers: the login gate (redirect when signed out, admin
+sign-in, non-admin rejection), the dashboard stats summary, and
+Prev/Next pagination on the couriers list.
