@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 
 import 'addresses/address_repository.dart';
 import 'auth/auth_controller.dart';
@@ -8,6 +9,7 @@ import 'auth/login_screen.dart';
 import 'cart/cart.dart';
 import 'catalogue/catalogue_repository.dart';
 import 'client/client_home_screen.dart';
+import 'config.dart';
 import 'core/api_client.dart';
 import 'core/onboarding_storage.dart';
 import 'core/token_storage.dart';
@@ -19,8 +21,13 @@ import 'onboarding/splash_screen.dart';
 import 'orders/orders_repository.dart';
 import 'theme.dart';
 
-void main() {
-  runApp(const HssanDeliveryApp());
+Future<void> main() async {
+  // Empty DSN (the default — see config.dart) makes the SDK a no-op: it
+  // still runs the app via appRunner, just never sends anything anywhere.
+  await SentryFlutter.init(
+    (options) => options.dsn = AppConfig.sentryDsn,
+    appRunner: () => runApp(const HssanDeliveryApp()),
+  );
 }
 
 class HssanDeliveryApp extends StatefulWidget {

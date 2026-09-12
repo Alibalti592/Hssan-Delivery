@@ -12,4 +12,9 @@ class AppConfig {
     'API_BASE_URL',
     defaultValue: 'http://10.0.2.2:8000',
   );
+
+  /// Error tracking (Sentry). Empty by default — the SDK no-ops without a
+  /// DSN, so this is inert until one is supplied:
+  ///   flutter run --dart-define=SENTRY_DSN=https://...@sentry.io/...
+  static const String sentryDsn = String.fromEnvironment('SENTRY_DSN');
 }

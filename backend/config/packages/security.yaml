@@ -30,6 +30,14 @@ security:
                 password_path: password
                 success_handler: lexik_jwt_authentication.handler.authentication_success
                 failure_handler: lexik_jwt_authentication.handler.authentication_failure
+            # Throttles by username+IP (5/min) plus Symfony's automatic
+            # global per-firewall limit (5x that, so 25/min) as a floor
+            # against spraying many phone numbers from one IP. Both return
+            # 429 Too Many Requests. Requires symfony/rate-limiter +
+            # symfony/lock (see composer.json).
+            login_throttling:
+                max_attempts: 5
+                interval: '1 minute'
 
         # All other /api/* requests authenticate via a Bearer JWT, no session.
         api:
