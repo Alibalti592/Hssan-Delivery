@@ -151,6 +151,12 @@ flutter test
 
 `test/delivery_test.dart` covers the status/action model; `test/app_flow_test.dart`
 drives the auth and delivery controllers against a mocked HTTP client.
+`test/widget/` goes one layer up — it pumps real screens (login, the
+courier dashboard, the courier delivery queue, the client order list)
+with `pumpWidget`/`tester.tap`/`tester.enterText` against the same
+mocked-HTTP pattern, so a layout regression that breaks what the user
+actually sees or taps (not just the underlying controller logic) fails
+CI too.
 
 ## Structure
 
