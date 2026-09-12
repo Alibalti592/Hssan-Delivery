@@ -13,6 +13,10 @@ services:
     _defaults:
         autowire: true      # Automatically injects dependencies in your services.
         autoconfigure: true # Automatically registers your services as commands, event subscribers, etc.
+        bind:
+            # PushNotificationService::__construct — see its docblock for
+            # why this is a plain string rather than a packages/*.yaml entry.
+            string $firebaseCredentials: '%env(FIREBASE_CREDENTIALS)%'
 
     # makes classes in src/ available to be used as services
     # this creates a service per class whose id is the fully-qualified class name

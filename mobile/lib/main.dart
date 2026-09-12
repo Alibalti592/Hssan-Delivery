@@ -16,6 +16,8 @@ import 'core/token_storage.dart';
 import 'dashboard/dashboard_screen.dart';
 import 'deliveries/deliveries_controller.dart';
 import 'deliveries/delivery_repository.dart';
+import 'notifications/notifications_repository.dart';
+import 'notifications/push_notification_service.dart';
 import 'onboarding/onboarding_screen.dart';
 import 'onboarding/splash_screen.dart';
 import 'orders/orders_repository.dart';
@@ -40,6 +42,7 @@ class HssanDeliveryApp extends StatefulWidget {
 class _HssanDeliveryAppState extends State<HssanDeliveryApp> {
   late final AuthController _auth;
   late final ApiClient _api;
+  late final PushNotificationService _pushNotifications;
   late final DeliveriesController _deliveries;
   late final CatalogueRepository _catalogue;
   late final OrdersRepository _orders;
@@ -56,9 +59,11 @@ class _HssanDeliveryAppState extends State<HssanDeliveryApp> {
       tokenProvider: () => _auth.token,
       onUnauthorized: () => _auth.onUnauthorized(),
     );
+    _pushNotifications = PushNotificationService(NotificationsRepository(_api));
     _auth = AuthController(
       repository: AuthRepository(_api),
       storage: TokenStorage(),
+      pushNotifications: _pushNotifications,
     );
     _deliveries = DeliveriesController(DeliveryRepository(_api));
     _catalogue = CatalogueRepository(_api);
@@ -66,6 +71,7 @@ class _HssanDeliveryAppState extends State<HssanDeliveryApp> {
     _addresses = AddressRepository(_api);
     _cart = CartController();
 
+    _pushNotifications.initialize();
     _auth.bootstrap();
   }
 
@@ -92,6 +98,7 @@ class _HssanDeliveryAppState extends State<HssanDeliveryApp> {
       child: MaterialApp(
         title: 'Delivery Hassen',
         debugShowCheckedModeBanner: false,
+        scaffoldMessengerKey: _pushNotifications.messengerKey,
         theme: buildTheme(Brightness.light),
         darkTheme: buildTheme(Brightness.dark),
         home: const _Root(),

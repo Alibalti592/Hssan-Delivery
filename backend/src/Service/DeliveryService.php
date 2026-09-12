@@ -5,14 +5,17 @@ namespace App\Service;
 use App\Entity\Delivery;
 use App\Entity\User;
 use App\Enum\DeliveryStatus;
+use App\Event\DeliveryStatusChangedEvent;
 use App\Exception\InvalidOperationException;
 use Doctrine\DBAL\LockMode;
 use Doctrine\ORM\EntityManagerInterface;
+use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
 
 final class DeliveryService
 {
     public function __construct(
         private readonly EntityManagerInterface $entityManager,
+        private readonly EventDispatcherInterface $eventDispatcher,
     ) {
     }
 
@@ -180,13 +183,17 @@ final class DeliveryService
      * Runs a status transition inside a locked transaction so two concurrent
      * requests acting on the same delivery (e.g. two admins assigning it, or
      * a courier double-tapping an action) can't both pass the status check
-     * before either one commits.
+     * before either one commits. Dispatches DeliveryStatusChangedEvent once
+     * the transaction has actually committed — never for one that throws or
+     * rolls back — so PushNotificationService only fires on a real change.
      *
      * @param callable(Delivery): void $transition
      */
     private function transitionWithLock(Delivery $delivery, callable $transition): Delivery
     {
-        return $this->entityManager->wrapInTransaction(function () use ($delivery, $transition) {
+        $previousStatus = $delivery->getStatus();
+
+        $delivery = $this->entityManager->wrapInTransaction(function () use ($delivery, $transition) {
             $this->entityManager->lock($delivery, LockMode::PESSIMISTIC_WRITE);
             $this->entityManager->refresh($delivery);
 
@@ -196,6 +203,12 @@ final class DeliveryService
 
             return $delivery;
         });
+
+        if ($delivery->getStatus() !== $previousStatus) {
+            $this->eventDispatcher->dispatch(new DeliveryStatusChangedEvent($delivery, $previousStatus));
+        }
+
+        return $delivery;
     }
 
     private function assertAssignedCourier(

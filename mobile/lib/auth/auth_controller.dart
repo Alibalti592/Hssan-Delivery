@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import '../core/api_exception.dart';
 import '../core/token_storage.dart';
+import '../notifications/push_notification_service.dart';
 import 'account.dart';
 import 'auth_repository.dart';
 
@@ -11,11 +14,14 @@ class AuthController extends ChangeNotifier {
   AuthController({
     required AuthRepository repository,
     required TokenStorage storage,
+    PushNotificationService? pushNotifications,
   }) : _repository = repository,
-       _storage = storage;
+       _storage = storage,
+       _pushNotifications = pushNotifications;
 
   final AuthRepository _repository;
   final TokenStorage _storage;
+  final PushNotificationService? _pushNotifications;
 
   AuthStatus _status = AuthStatus.unknown;
   Account? _account;
@@ -44,6 +50,7 @@ class AuthController extends ChangeNotifier {
       }
       _account = account;
       _set(AuthStatus.signedIn);
+      unawaited(_pushNotifications?.registerForCurrentUser());
     } on ApiException {
       await _discard();
     } on NetworkException {
@@ -69,6 +76,7 @@ class AuthController extends ChangeNotifier {
       await _storage.write(token);
       _account = account;
       _set(AuthStatus.signedIn);
+      unawaited(_pushNotifications?.registerForCurrentUser());
       return null;
     } on ApiException catch (e) {
       _token = null;
@@ -141,6 +149,10 @@ class AuthController extends ChangeNotifier {
   }
 
   Future<void> _discard() async {
+    // Unregister while the (possibly already-invalid, e.g. after a 401)
+    // token is still set — the call is a best-effort no-op on failure
+    // either way, see PushNotificationService.unregister.
+    await _pushNotifications?.unregister();
     await _storage.clear();
     _token = null;
     _account = null;
