@@ -1,0 +1,52 @@
+# Reference compose file for a staging host. Not used by CI — CD (see
+# .github/workflows/cd.yml) only builds and pushes images to GHCR; a real
+# staging deploy also needs this file placed at /opt/hssan-delivery/ on the
+# staging host itself, plus the three STAGING_SSH_* secrets in the repo
+# so the CD workflow's deploy step (currently inert) can SSH in and run
+# `docker compose pull && up -d` against it.
+#
+# Fill in the placeholders below before using this for a real deploy —
+# it is not meant to be run as-is.
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: hssan_delivery
+      POSTGRES_USER: hssan
+      POSTGRES_PASSWORD: __CHANGE_ME__
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  backend:
+    image: ghcr.io/__OWNER__/hssan-delivery-backend:latest
+    restart: unless-stopped
+    depends_on:
+      - postgres
+    environment:
+      APP_ENV: prod
+      APP_SECRET: __CHANGE_ME__
+      DATABASE_URL: postgresql://hssan:__CHANGE_ME__@postgres:5432/hssan_delivery?serverVersion=16&charset=utf8
+      JWT_PASSPHRASE: __CHANGE_ME__
+      LOCK_DSN: flock
+      CORS_ALLOW_ORIGIN: '^https://admin\.hssan\.example$'
+      SENTRY_DSN: ""
+      FIREBASE_CREDENTIALS: ""
+    volumes:
+      - backend_uploads:/var/www/html/public/uploads
+      - backend_jwt:/var/www/html/config/jwt
+    ports:
+      - "8000:80"
+
+  admin:
+    image: ghcr.io/__OWNER__/hssan-delivery-admin:latest
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "8080:80"
+
+volumes:
+  postgres_data:
+  backend_uploads:
+  backend_jwt:

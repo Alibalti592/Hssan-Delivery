@@ -335,6 +335,28 @@ documented in mobile/lib/config.dart — so this doesn't require a Firebase
 account to develop, and a failed or skipped push never blocks the
 delivery/order action that triggered it.
 
+Docker / CD pipeline
+
+The backend (backend/Dockerfile, php-apache) and admin dashboard
+(admin/Dockerfile, a static Vite build served by nginx) each build into a
+standalone image. .github/workflows/cd.yml builds and pushes both to
+GHCR (ghcr.io/<owner>/hssan-delivery-backend and -admin, tagged :latest
+and :<commit-sha>) on every push to main — this is the "CD" half; the
+existing backend/admin/mobile CI workflows already gate every merge with
+lint + tests. Backend image details: JWT keys are generated on first boot
+from JWT_PASSPHRASE (never baked into the image, matching config/jwt/*.pem
+being gitignored), and pending Doctrine migrations run automatically on
+every boot.
+
+The workflow's final step in each job SSHes into a staging host and runs
+`docker compose pull && up -d` — inert until three repo secrets exist
+(STAGING_SSH_HOST, STAGING_SSH_USER, STAGING_SSH_KEY), so the pipeline
+runs end-to-end (build + push) without requiring a staging server to
+exist yet. docker-compose.staging.yml documents the layout such a server
+needs (backend + admin + postgres, referencing the GHCR images) — it's a
+template to fill in and place on the staging host, not something CI runs
+itself.
+
 Backend setup
 Requirements
 PHP 8.2+
@@ -700,10 +722,11 @@ starts.
  Bill payment (biller integration, payment method, transaction ledger)
  Money transfer (wallet/balance, transaction ledger, licensing review)
 Phase 7 — Production infrastructure
- Docker
- Staging environment
+ Docker (done — backend + admin images, see "Docker / CD pipeline" above)
+ CD pipeline (done — build/push to GHCR on merge to main; staging deploy inert until a host exists, see "Docker / CD pipeline" above)
+ Staging environment (host not provisioned yet — docker-compose.staging.yml is ready to place on one)
  Production environment
- Nginx / HTTPS
+ Nginx / HTTPS (nginx serves the admin image; HTTPS itself is a staging/production host concern, not yet set up)
  Database backups
  Monitoring
  Error tracking (done — Sentry, inert until a DSN is configured; see "Error tracking" above)
