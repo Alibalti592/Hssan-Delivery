@@ -23,9 +23,15 @@ export default defineConfig({
       : {},
   },
   webServer: {
-    command: 'npm run dev -- --port 5173 --strictPort',
+    // --host 127.0.0.1 matters, not just cosmetics: Vite's default host
+    // ("localhost") can resolve to the IPv6 loopback on some CI runners,
+    // while Playwright's readiness probe below hits 127.0.0.1 (IPv4) —
+    // a mismatch that manifests as "Timed out waiting ... from
+    // config.webServer" even though the dev server did start.
+    command: 'npm run dev -- --host 127.0.0.1 --port 5173 --strictPort',
     url: 'http://127.0.0.1:5173',
     reuseExistingServer: !process.env.CI,
+    timeout: 120_000,
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
 });
