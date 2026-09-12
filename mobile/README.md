@@ -114,6 +114,23 @@ Android/iOS integration (`google-services.json`, `GoogleService-Info.plist`)
 — without it, background/terminated-state notifications on Android in
 particular may not display correctly even with the dart-defines above set.
 
+## Native icon and splash screen
+
+The app ships a real launcher icon and splash screen (navy brand background,
+white "H" mark) instead of Flutter's default icon, generated with
+`flutter_launcher_icons` and `flutter_native_splash` from the source art in
+`assets/icon/`. Regenerate both after changing the source art or the brand
+colour:
+
+```
+dart run flutter_launcher_icons
+dart run flutter_native_splash:create
+```
+
+Both tools are configured in `pubspec.yaml` (`flutter_launcher_icons:` /
+`flutter_native_splash:` keys) and write directly into the native
+`android/` and `ios/` projects — there's nothing to run at app startup.
+
 ## Run
 
 ```

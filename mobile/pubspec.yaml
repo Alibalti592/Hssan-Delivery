@@ -25,6 +25,8 @@ dev_dependencies:
     sdk: flutter
 
   flutter_lints: ^5.0.0
+  flutter_launcher_icons: ^0.14.4
+  flutter_native_splash: ^2.4.6
 
 flutter:
   uses-material-design: true
@@ -44,3 +46,32 @@ flutter:
           weight: 700
         - asset: assets/fonts/Roboto-ExtraBold.ttf
           weight: 800
+
+# Native launcher icon, regenerated with `dart run flutter_launcher_icons`.
+# Android gets an adaptive icon (navy background + white "H" foreground);
+# everything else gets the flat navy/white square. Source art:
+# assets/icon/app_icon.png (1024x1024, no transparency) and
+# assets/icon/app_icon_foreground.png (transparent, glyph inside the safe zone).
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/icon/app_icon.png"
+  adaptive_icon_background: "#1B2437"
+  adaptive_icon_foreground: "assets/icon/app_icon_foreground.png"
+  min_sdk_android: 21
+  remove_alpha_ios: true
+
+# Native splash screen, regenerated with `dart run flutter_native_splash:create`.
+# Same navy brand background in both themes with the white "H" mark centered —
+# there's no separate dark-mode splash asset because the brand background is
+# already dark navy.
+flutter_native_splash:
+  color: "#1B2437"
+  image: assets/icon/splash_logo.png
+  color_dark: "#1B2437"
+  image_dark: assets/icon/splash_logo.png
+  android_12:
+    image: assets/icon/splash_logo.png
+    icon_background_color: "#1B2437"
+    image_dark: assets/icon/splash_logo.png
+    icon_background_color_dark: "#1B2437"
