@@ -218,6 +218,60 @@ void main() {
       final error = await auth.signIn('21000001', 'wrong');
       expect(error, 'Numéro ou mot de passe incorrect.');
     });
+
+    test('changePassword succeeds and keeps the session', () async {
+      final mock = MockClient((request) async {
+        expect(request.url.path, '/api/auth/change-password');
+        expect(request.headers['Authorization'], 'Bearer jwt-1');
+        final body = jsonDecode(request.body) as Map<String, dynamic>;
+        expect(body['currentPassword'], 'oldPass123');
+        expect(body['newPassword'], 'newPass456');
+        return http.Response('', 204);
+      });
+
+      final auth = AuthController(
+        repository: AuthRepository(
+          ApiClient(
+            tokenProvider: () => 'jwt-1',
+            onUnauthorized: () {},
+            httpClient: mock,
+          ),
+        ),
+        storage: _MemoryTokenStorage(),
+      );
+
+      final error = await auth.changePassword(
+        currentPassword: 'oldPass123',
+        newPassword: 'newPass456',
+      );
+
+      expect(error, isNull);
+    });
+
+    test('changePassword surfaces the backend error message', () async {
+      final mock = MockClient(
+        (request) async =>
+            _json({'message': 'Mot de passe actuel incorrect.'}, 400),
+      );
+
+      final auth = AuthController(
+        repository: AuthRepository(
+          ApiClient(
+            tokenProvider: () => 'jwt-1',
+            onUnauthorized: () {},
+            httpClient: mock,
+          ),
+        ),
+        storage: _MemoryTokenStorage(),
+      );
+
+      final error = await auth.changePassword(
+        currentPassword: 'wrong',
+        newPassword: 'newPass456',
+      );
+
+      expect(error, 'Mot de passe actuel incorrect.');
+    });
   });
 
   group('DeliveriesController', () {

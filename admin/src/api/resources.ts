@@ -83,6 +83,8 @@ export const couriersApi = {
     api.post<Courier>('/api/admin/couriers', data),
   setActive: (id: number, isActive: boolean) =>
     api.patch<Courier>(`/api/admin/couriers/${id}/active`, { isActive }),
+  resetPassword: (id: number, password: string) =>
+    api.patch<Courier>(`/api/admin/couriers/${id}/password`, { password }),
 };
 
 // Orders (admin)

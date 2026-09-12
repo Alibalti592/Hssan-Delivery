@@ -38,4 +38,15 @@ class AuthRepository {
     final body = await _api.get('/api/auth/me');
     return Account.fromJson(body as Map<String, dynamic>);
   }
+
+  /// Self-service password change. Requires the caller's current password.
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    await _api.post('/api/auth/change-password', {
+      'currentPassword': currentPassword,
+      'newPassword': newPassword,
+    });
+  }
 }

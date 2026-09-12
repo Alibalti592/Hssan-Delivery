@@ -35,6 +35,10 @@ separate builds or flavors.
   `POST /api/deliveries/{id}/…` endpoint. The buttons shown depend on the
   current status. Marking a delivery delivered opens a confirmation screen
   (`Livraison confirmée`) showing the amount collected.
+- **Change password** — from the dashboard's overflow menu
+  (`POST /api/auth/change-password`, requires the current password). A
+  courier who can't sign in at all has an admin reset their password
+  instead — see the root README's "Account recovery" section.
 
 ## Client (`ROLE_CLIENT`)
 
@@ -57,7 +61,8 @@ separate builds or flavors.
   preparing → ready for pickup → completed, or cancelled).
 - **Saved addresses** (`Mes adresses`, from the profile menu) — list and add
   (`GET`/`POST /api/addresses`); also usable as a picker from checkout.
-- **Profile** — account name/phone, saved addresses, and sign out.
+- **Profile** — account name/phone, saved addresses, change password, and
+  sign out.
 
 ## Requirements
 
@@ -73,6 +78,13 @@ emulator. Override it for other targets:
 ```
 flutter run --dart-define=API_BASE_URL=http://localhost:8000        # iOS sim / desktop
 flutter run --dart-define=API_BASE_URL=https://api.hssan.example    # deployed
+```
+
+Error tracking (Sentry) is off by default — the SDK still runs the app, it
+just never sends anything without a DSN:
+
+```
+flutter run --dart-define=SENTRY_DSN=https://...@sentry.io/...
 ```
 
 ## Run
@@ -104,7 +116,8 @@ lib/
   theme.dart               Material 3 theme (navy brand) + status colours
   core/                    HTTP client, typed errors, secure token/onboarding storage
   onboarding/              splash screen, first-launch onboarding carousel
-  auth/                    login/register: repository, ChangeNotifier controller, screens
+  auth/                    login/register/change-password: repository, ChangeNotifier
+                           controller, screens
   dashboard/               courier landing screen after login
   deliveries/              courier queue, available-deliveries, detail, confirmation:
                            models, repository, controller, screens

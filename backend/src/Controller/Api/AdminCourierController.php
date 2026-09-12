@@ -4,6 +4,7 @@ namespace App\Controller\Api;
 
 use App\Dto\Admin\CourierResponse;
 use App\Dto\Admin\CreateCourierRequest;
+use App\Dto\Admin\ResetCourierPasswordRequest;
 use App\Dto\Admin\UpdateCourierActiveRequest;
 use App\Service\AuthService;
 use App\Service\CourierService;
@@ -90,6 +91,37 @@ final class AdminCourierController extends AbstractApiController
         $dto = $this->deserializeAndValidate($request, UpdateCourierActiveRequest::class);
 
         $courier = $this->courierService->setActive($courier, $dto->isActive);
+
+        return $this->json(
+            CourierResponse::fromEntity($courier)
+        );
+    }
+
+    /**
+     * Account recovery for a courier who lost access to their account.
+     * Couriers are admin-provisioned (see create() above) with no email or
+     * SMS channel in this app to verify identity through, so recovery works
+     * the same way provisioning does: the admin picks a new password here
+     * and relays it to the courier out-of-band.
+     */
+    #[Route('/{id}/password', name: 'api_admin_courier_reset_password', methods: ['PATCH'])]
+    public function resetPassword(
+        int $id,
+        Request $request,
+    ): JsonResponse {
+        $courier = $this->courierService->get($id);
+
+        if (null === $courier) {
+            return $this->json(
+                ['message' => 'Courier not found.'],
+                Response::HTTP_NOT_FOUND
+            );
+        }
+
+        /** @var ResetCourierPasswordRequest $dto */
+        $dto = $this->deserializeAndValidate($request, ResetCourierPasswordRequest::class);
+
+        $courier = $this->courierService->resetPassword($courier, $dto->password);
 
         return $this->json(
             CourierResponse::fromEntity($courier)

@@ -147,11 +147,13 @@ Authentication
 POST /api/auth/register
 POST /api/auth/login
 GET  /api/auth/me
+POST /api/auth/change-password
 Admin courier management
 POST  /api/admin/couriers
 GET   /api/admin/couriers
 GET   /api/admin/couriers/{id}
 PATCH /api/admin/couriers/{id}/active
+PATCH /api/admin/couriers/{id}/password
 Admin restaurant management
 POST   /api/admin/restaurants
 GET    /api/admin/restaurants
@@ -260,6 +262,39 @@ directly. Zones are seeded via migration and managed through the admin delivery 
 endpoints above (name and fee are updatable; there is no delete endpoint, consistent
 with restaurants/categories/products — zones already referenced by past orders are
 never removed).
+
+Account recovery
+
+There is no email or SMS channel anywhere in this app (accounts are phone
+number + password only), so a "forgot password" flow with a reset link/code
+isn't possible without adding that infrastructure first. Password recovery
+is instead split by how each role's account is provisioned:
+
+A signed-in user (client or courier) can change their own password via
+POST /api/auth/change-password (requires the current password).
+A courier locked out of their account has an admin reset it via
+PATCH /api/admin/couriers/{id}/password — the same out-of-band relay
+already used to hand a courier their initial password at creation.
+
+There is no equivalent recovery path for a client who both forgot their
+password and isn't signed in anywhere else; that requires a real email/SMS
+channel and is out of scope until one exists.
+
+Rate limiting
+
+POST /api/auth/login is throttled via Symfony's built-in login_throttling
+(5 failed attempts per username+IP per minute, plus an automatic 25/minute
+per-IP floor across all usernames), returning 429 once exceeded.
+POST /api/auth/register is limited to 5 attempts per IP per 10 minutes
+(config/packages/rate_limiter.yaml) as a basic guard against spam signups.
+
+Error tracking
+
+Uncaught exceptions can be reported to Sentry (sentry/sentry-symfony on the
+backend, sentry_flutter on mobile). Both are no-ops until a real DSN is
+supplied — SENTRY_DSN in the backend's .env.local, or
+--dart-define=SENTRY_DSN=... when running/building the mobile app — so
+this is inert by default and doesn't require a Sentry account to develop.
 
 Backend setup
 Requirements
@@ -372,6 +407,10 @@ invalid registration data
 admin courier creation
 courier authentication
 courier authorization
+self-service password change, including the wrong-current-password case
+admin-initiated courier password reset (account recovery)
+login throttling after repeated failed attempts
+registration rate limiting
 admin restaurant, category, product and delivery zone management
 restaurant/product photo upload, replace and remove
 restaurant/product delete, including the has-existing-orders conflict guard
@@ -403,8 +442,8 @@ php bin/phpunit
 
 Current baseline:
 
-158 tests
-956 assertions
+168 tests
+1008 assertions
 
 Tests share a single Postgres database rather than running each in its own
 transaction, so re-running `php bin/phpunit` without resetting the database
@@ -465,6 +504,10 @@ admin courier listing and deactivation
 admin order and delivery visibility
 role-based authorization
 order/delivery status synchronization
+self-service password change
+admin-initiated courier password reset (account recovery)
+login throttling and registration rate limiting
+error tracking (Sentry, inert until a DSN is configured)
 integration tests
 GitHub Actions CI
 Mobile
@@ -484,6 +527,7 @@ delivery details (pickup, drop-off, customer, items, pricing)
 accept / decline / pickup / on-the-way / delivered / fail actions
 a delivery-confirmed screen showing the amount collected
 tap-to-call the customer
+change password (dashboard menu)
 
 Client:
 
@@ -494,7 +538,7 @@ a cart (single-restaurant, quantity steppers, restaurant-switch confirmation)
 checkout (delivery address, delivery zone, optional note, live total)
 order placement (POST /api/orders) and a confirmation screen
 order history and order detail (GET /api/orders, GET /api/orders/{id})
-a profile screen (account info, sign out)
+a profile screen (account info, change password, sign out)
 
 Not yet in the app:
 
@@ -616,11 +660,11 @@ Phase 7 — Production infrastructure
  Nginx / HTTPS
  Database backups
  Monitoring
- Error tracking
+ Error tracking (done — Sentry, inert until a DSN is configured; see "Error tracking" above)
 Phase 8 — Production hardening
  Security review
- Rate limiting
- Authentication hardening
+ Rate limiting (done — login throttling + registration limiter, see "Rate limiting" above)
+ Authentication hardening (partial — password change/reset done, see "Account recovery" above; no 2FA)
  Performance testing
  Load testing
  Beta rollout

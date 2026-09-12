@@ -691,6 +691,189 @@ final class AdminCourierApiTest extends WebTestCase
         );
     }
 
+    public function testAdminCanResetCourierPassword(): void
+    {
+        $client = static::createClient();
+
+        $this->entityManager = self::getContainer()
+            ->get(EntityManagerInterface::class);
+
+        $admin = $this->createTestUser(
+            'ROLE_ADMIN',
+            'Test Admin'
+        );
+
+        $courier = $this->createTestUser(
+            'ROLE_LIVREUR',
+            'Locked Courier'
+        );
+
+        $adminToken = $this->authenticateClient(
+            $client,
+            $admin
+        );
+
+        $client->request(
+            'PATCH',
+            '/api/admin/couriers/'.$courier->getId().'/password',
+            server: [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_AUTHORIZATION' => 'Bearer '.$adminToken,
+            ],
+            content: json_encode([
+                'password' => 'newPassword456',
+            ])
+        );
+
+        self::assertResponseStatusCodeSame(
+            Response::HTTP_OK
+        );
+
+        $client->request(
+            'POST',
+            '/api/auth/login',
+            server: [
+                'CONTENT_TYPE' => 'application/json',
+            ],
+            content: json_encode([
+                'phone' => $courier->getPhone(),
+                'password' => 'newPassword456',
+            ])
+        );
+
+        self::assertResponseStatusCodeSame(
+            Response::HTTP_OK
+        );
+
+        $client->request(
+            'POST',
+            '/api/auth/login',
+            server: [
+                'CONTENT_TYPE' => 'application/json',
+            ],
+            content: json_encode([
+                'phone' => $courier->getPhone(),
+                'password' => 'password123',
+            ])
+        );
+
+        self::assertResponseStatusCodeSame(
+            Response::HTTP_UNAUTHORIZED
+        );
+    }
+
+    public function testNonAdminCannotResetCourierPassword(): void
+    {
+        $client = static::createClient();
+
+        $this->entityManager = self::getContainer()
+            ->get(EntityManagerInterface::class);
+
+        $user = $this->createTestUser(
+            'ROLE_USER',
+            'Test Client'
+        );
+
+        $courier = $this->createTestUser(
+            'ROLE_LIVREUR',
+            'Protected Courier'
+        );
+
+        $token = $this->authenticateClient(
+            $client,
+            $user
+        );
+
+        $client->request(
+            'PATCH',
+            '/api/admin/couriers/'.$courier->getId().'/password',
+            server: [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_AUTHORIZATION' => 'Bearer '.$token,
+            ],
+            content: json_encode([
+                'password' => 'newPassword456',
+            ])
+        );
+
+        self::assertResponseStatusCodeSame(
+            Response::HTTP_FORBIDDEN
+        );
+    }
+
+    public function testAdminGets404WhenResettingUnknownCourierPassword(): void
+    {
+        $client = static::createClient();
+
+        $this->entityManager = self::getContainer()
+            ->get(EntityManagerInterface::class);
+
+        $admin = $this->createTestUser(
+            'ROLE_ADMIN',
+            'Test Admin'
+        );
+
+        $adminToken = $this->authenticateClient(
+            $client,
+            $admin
+        );
+
+        $client->request(
+            'PATCH',
+            '/api/admin/couriers/999999/password',
+            server: [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_AUTHORIZATION' => 'Bearer '.$adminToken,
+            ],
+            content: json_encode([
+                'password' => 'newPassword456',
+            ])
+        );
+
+        self::assertResponseStatusCodeSame(
+            Response::HTTP_NOT_FOUND
+        );
+    }
+
+    public function testCourierPasswordResetRejectsShortPassword(): void
+    {
+        $client = static::createClient();
+
+        $this->entityManager = self::getContainer()
+            ->get(EntityManagerInterface::class);
+
+        $admin = $this->createTestUser(
+            'ROLE_ADMIN',
+            'Test Admin'
+        );
+
+        $courier = $this->createTestUser(
+            'ROLE_LIVREUR',
+            'Short Password Courier'
+        );
+
+        $adminToken = $this->authenticateClient(
+            $client,
+            $admin
+        );
+
+        $client->request(
+            'PATCH',
+            '/api/admin/couriers/'.$courier->getId().'/password',
+            server: [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_AUTHORIZATION' => 'Bearer '.$adminToken,
+            ],
+            content: json_encode([
+                'password' => '123',
+            ])
+        );
+
+        self::assertResponseStatusCodeSame(
+            Response::HTTP_UNPROCESSABLE_ENTITY
+        );
+    }
+
     private function createTestUser(
         string $role,
         string $name,

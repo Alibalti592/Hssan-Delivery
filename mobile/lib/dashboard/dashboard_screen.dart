@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../auth/auth_controller.dart';
+import '../auth/change_password_screen.dart';
 import '../deliveries/available_deliveries_screen.dart';
 import '../deliveries/deliveries_controller.dart';
 import '../deliveries/deliveries_screen.dart';
@@ -27,6 +28,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<DeliveriesController>().refresh();
     });
+  }
+
+  void _openChangePassword() {
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const ChangePasswordScreen()));
   }
 
   Future<void> _confirmSignOut() async {
@@ -99,10 +106,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
               subtitle: _available
                   ? 'Vous êtes disponible'
                   : 'Vous êtes hors-ligne',
-              trailing: IconButton(
-                tooltip: 'Se déconnecter',
-                onPressed: _confirmSignOut,
-                icon: const Icon(Icons.logout, color: Colors.white),
+              trailing: PopupMenuButton<_MenuAction>(
+                icon: const Icon(Icons.more_vert, color: Colors.white),
+                onSelected: (action) {
+                  switch (action) {
+                    case _MenuAction.changePassword:
+                      _openChangePassword();
+                    case _MenuAction.signOut:
+                      _confirmSignOut();
+                  }
+                },
+                itemBuilder: (context) => const [
+                  PopupMenuItem(
+                    value: _MenuAction.changePassword,
+                    child: Text('Changer le mot de passe'),
+                  ),
+                  PopupMenuItem(
+                    value: _MenuAction.signOut,
+                    child: Text('Se déconnecter'),
+                  ),
+                ],
               ),
             ),
             Expanded(
@@ -313,3 +336,5 @@ class _InProgressCard extends StatelessWidget {
     );
   }
 }
+
+enum _MenuAction { changePassword, signOut }

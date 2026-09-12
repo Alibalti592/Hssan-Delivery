@@ -112,6 +112,25 @@ class AuthController extends ChangeNotifier {
     return signIn(phone, password);
   }
 
+  /// Returns an error message on failure, or null on success. Does not
+  /// affect the current session — the existing token stays valid.
+  Future<String?> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    try {
+      await _repository.changePassword(
+        currentPassword: currentPassword,
+        newPassword: newPassword,
+      );
+      return null;
+    } on ApiException catch (e) {
+      return e.message;
+    } on NetworkException catch (e) {
+      return e.message;
+    }
+  }
+
   Future<void> signOut() => _discard();
 
   /// Called by the API client when any request comes back 401.
