@@ -1149,7 +1149,7 @@ final class DeliveryApiTest extends WebTestCase
 
         $deliveryZone = new DeliveryZone();
 
-        $deliveryZone->setName('Test Zone '.random_int(1000, 9999));
+        $deliveryZone->setName('Test Zone '.random_int(1000000, 999999999));
         $deliveryZone->setFee('4.000');
 
         $order = new Order();

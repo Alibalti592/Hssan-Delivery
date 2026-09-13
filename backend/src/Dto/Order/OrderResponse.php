@@ -18,6 +18,10 @@ final class OrderResponse
         public readonly string $totalAmount,
         public readonly string $status,
         public readonly string $createdAt,
+        public readonly ?int $deliveryId,
+        public readonly ?string $deliveryStatus,
+        public readonly ?string $courierName,
+        public readonly ?string $courierPhone,
     ) {
     }
 
@@ -35,6 +39,9 @@ final class OrderResponse
             ];
         }
 
+        $delivery = $order->getDelivery();
+        $courier = $delivery?->getCourier();
+
         return new self(
             id: $order->getId(),
             restaurantId: $order->getRestaurant()->getId(),
@@ -47,6 +54,13 @@ final class OrderResponse
             totalAmount: $order->getTotalAmount(),
             status: $order->getStatus()->value,
             createdAt: $order->getCreatedAt()->format(\DateTimeInterface::ATOM),
+            deliveryId: $delivery?->getId(),
+            deliveryStatus: $delivery?->getStatus()->value,
+            // Only surfaced once a courier is actually assigned — a client
+            // has no one to call before then, and no other way to reach
+            // whoever the platform picks besides this.
+            courierName: $courier?->getName(),
+            courierPhone: $courier?->getPhone(),
         );
     }
 }

@@ -22,7 +22,10 @@ class OrderRepository extends ServiceEntityRepository
     public function paginateAllOrderedByCreatedAtDesc(int $page, int $limit): PaginatedResult
     {
         $qb = $this->createQueryBuilder('o')
-            ->orderBy('o.createdAt', 'DESC');
+            ->orderBy('o.createdAt', 'DESC')
+            // createdAt has only second precision — see DeliveryRepository
+            // for why a tiebreaker is required for stable pagination.
+            ->addOrderBy('o.id', 'DESC');
 
         return Paginator::paginate($qb, $page, $limit);
     }

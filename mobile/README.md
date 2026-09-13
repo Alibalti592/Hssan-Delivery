@@ -21,9 +21,10 @@ separate builds or flavors.
 
 ## Courier (`ROLE_LIVREUR`)
 
-- **Dashboard** (`Tableau de bord`) — greeting, a local availability toggle,
-  today's delivered count and pending-proposal count, and a shortcut to the
-  in-progress delivery if there is one.
+- **Dashboard** (`Tableau de bord`) — greeting, a self-service availability
+  toggle (`PATCH /api/auth/availability`, distinct from the admin-only
+  active/deactivated flag), today's delivered count and pending-proposal
+  count, and a shortcut to the in-progress delivery if there is one.
 - **Available deliveries** (`Courses disponibles`) — deliveries `ASSIGNED` to
   the courier, awaiting a decision: `Accepter` or `Refuser`.
 - **My deliveries** (`Toutes mes courses`) — the queue from
@@ -47,7 +48,9 @@ separate builds or flavors.
 ## Client (`ROLE_CLIENT`)
 
 - **Restaurants** (`Restaurants`) — the public catalogue,
-  `GET /api/restaurants` (available restaurants only).
+  `GET /api/restaurants` (available restaurants only), with a search box
+  that filters by name/description client-side (the catalogue is a single
+  fetched page — see "Pagination" in the root README).
 - **Menu** — categories (as filter chips) and products for a restaurant
   (`GET /api/restaurants/{id}/categories`, `.../products`), with inline
   quantity steppers or a dedicated **product detail** screen (quantity
@@ -64,6 +67,12 @@ separate builds or flavors.
   (`GET /api/orders/{id}`) with a status timeline (pending → confirmed →
   preparing → ready for pickup → completed, or cancelled). A "Charger plus"
   button pages in older orders beyond the first page.
+- **Order tracking** — the order detail screen polls every 15s while the
+  order isn't in a terminal status (pushes alone only cover the
+  on-the-way/delivered transitions), shows the assigned courier's name with
+  a tap-to-call button once one exists, and offers self-service
+  cancellation (`POST /api/orders/{id}/cancel`) while the delivery is still
+  unclaimed or just assigned — gone once a courier accepts.
 - **Saved addresses** (`Mes adresses`, from the profile menu) — list and add
   (`GET`/`POST /api/addresses`); also usable as a picker from checkout.
 - **Profile** — account name/phone, saved addresses, change password, and
@@ -152,8 +161,9 @@ flutter test
 `test/delivery_test.dart` covers the status/action model; `test/app_flow_test.dart`
 drives the auth and delivery controllers against a mocked HTTP client.
 `test/widget/` goes one layer up — it pumps real screens (login, the
-courier dashboard, the courier delivery queue, the client order list)
-with `pumpWidget`/`tester.tap`/`tester.enterText` against the same
+courier dashboard including the availability toggle, the courier delivery
+queue, the client order list, order detail/cancellation, restaurant
+search) with `pumpWidget`/`tester.tap`/`tester.enterText` against the same
 mocked-HTTP pattern, so a layout regression that breaks what the user
 actually sees or taps (not just the underlying controller logic) fails
 CI too.

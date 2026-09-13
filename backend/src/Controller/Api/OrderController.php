@@ -94,4 +94,32 @@ final class OrderController extends AbstractApiController
             Response::HTTP_CREATED
         );
     }
+
+    #[Route('/{id}/cancel', name: 'api_orders_cancel', methods: ['POST'])]
+    public function cancel(int $id): JsonResponse
+    {
+        $user = $this->getUser();
+
+        if (!$user instanceof \App\Entity\User) {
+            return $this->json(
+                ['message' => 'Authentication required.'],
+                Response::HTTP_UNAUTHORIZED
+            );
+        }
+
+        $order = $this->orderService->getUserOrder($id, $user);
+
+        if (null === $order) {
+            return $this->json(
+                ['message' => 'Order not found.'],
+                Response::HTTP_NOT_FOUND
+            );
+        }
+
+        $order = $this->orderService->cancelOrder($order);
+
+        return $this->json(
+            OrderResponse::fromEntity($order)
+        );
+    }
 }

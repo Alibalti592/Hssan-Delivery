@@ -1,6 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+import '../core/api_exception.dart';
 import '../orders/order_models.dart';
 import '../orders/orders_repository.dart';
 import '../theme.dart';
@@ -17,164 +21,317 @@ class OrderDetailScreen extends StatefulWidget {
 }
 
 class _OrderDetailScreenState extends State<OrderDetailScreen> {
-  late Future<ClientOrder> _future;
+  ClientOrder? _order;
+  bool _loading = true;
+  bool _cancelling = false;
+  String? _error;
+  Timer? _pollTimer;
 
   @override
   void initState() {
     super.initState();
-    _future = context.read<OrdersRepository>().getOrder(widget.orderId);
+    _load();
+  }
+
+  @override
+  void dispose() {
+    _pollTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _load({bool silent = false}) async {
+    if (!silent) setState(() => _loading = true);
+    try {
+      final order = await context.read<OrdersRepository>().getOrder(
+        widget.orderId,
+      );
+      if (!mounted) return;
+      setState(() {
+        _order = order;
+        _error = null;
+      });
+      _scheduleNextPoll(order);
+    } on ApiException catch (e) {
+      if (mounted && !silent) setState(() => _error = e.message);
+    } on NetworkException catch (e) {
+      if (mounted && !silent) setState(() => _error = e.message);
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  /// The backend only pushes a notification for two of the six order
+  /// transitions (see DeliveryNotificationListener) — polling covers the
+  /// rest (confirmed/preparing/ready-for-pickup) without needing a
+  /// websocket. Stops once the order reaches a terminal status.
+  void _scheduleNextPoll(ClientOrder order) {
+    _pollTimer?.cancel();
+    if (order.status.isTerminal) return;
+    _pollTimer = Timer(const Duration(seconds: 15), () => _load(silent: true));
+  }
+
+  Future<void> _confirmCancel() async {
+    final order = _order;
+    if (order == null) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Annuler la commande ?'),
+        content: const Text('Cette action est définitive.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Non'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Oui, annuler'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _cancelling = true);
+    try {
+      final updated = await context.read<OrdersRepository>().cancelOrder(
+        order.id,
+      );
+      if (!mounted) return;
+      setState(() => _order = updated);
+      _scheduleNextPoll(updated);
+    } on ApiException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(e.message)));
+      }
+    } on NetworkException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(e.message)));
+      }
+    } finally {
+      if (mounted) setState(() => _cancelling = false);
+    }
+  }
+
+  Future<void> _call(String phone) async {
+    final uri = Uri(scheme: 'tel', path: phone);
+    if (!await launchUrl(uri) && mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Impossible d\'appeler $phone')));
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: Text('Commande #${widget.orderId}')),
-      body: FutureBuilder<ClientOrder>(
-        future: _future,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.hasError) {
-            return const Center(
-              child: Text('Impossible de charger cette commande.'),
-            );
-          }
+      body: _body(),
+    );
+  }
 
-          final order = snapshot.data!;
-          final tracking = order.status != OrderStatus.cancelled;
+  Widget _body() {
+    if (_loading && _order == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_error != null && _order == null) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Impossible de charger cette commande.'),
+            const SizedBox(height: 12),
+            OutlinedButton(
+              onPressed: () => _load(),
+              child: const Text('Réessayer'),
+            ),
+          ],
+        ),
+      );
+    }
 
-          return Column(
-            children: [
-              if (tracking) const DecorativeMap(),
-              Expanded(
-                child: ListView(
-                  padding: const EdgeInsets.all(16),
+    final order = _order!;
+    final tracking = order.status != OrderStatus.cancelled;
+
+    return RefreshIndicator(
+      onRefresh: () => _load(silent: true),
+      child: Column(
+        children: [
+          if (tracking) const DecorativeMap(),
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'Commande #${order.id}',
-                          style: Theme.of(context).textTheme.titleLarge
-                              ?.copyWith(fontWeight: FontWeight.w800),
-                        ),
-                        OrderStatusChip(order.status),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    if (tracking) ...[
-                      Card(
-                        child: Padding(
-                          padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
-                          child: _StatusTimeline(status: order.status),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                    ],
-                    Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                const Icon(Icons.place_outlined, size: 18),
-                                const SizedBox(width: 8),
-                                Expanded(child: Text(order.deliveryAddress)),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            Row(
-                              children: [
-                                const Icon(Icons.map_outlined, size: 18),
-                                const SizedBox(width: 8),
-                                Text(order.deliveryZoneName),
-                              ],
-                            ),
-                            if (order.note != null &&
-                                order.note!.isNotEmpty) ...[
-                              const SizedBox(height: 8),
-                              Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Icon(Icons.notes_outlined, size: 18),
-                                  const SizedBox(width: 8),
-                                  Expanded(child: Text(order.note!)),
-                                ],
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
                     Text(
-                      'Articles',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
+                      'Commande #${order.id}',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w800,
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    Card(
-                      child: Column(
+                    OrderStatusChip(order.status),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                if (tracking) ...[
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+                      child: _StatusTimeline(status: order.status),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+                if (order.courierName != null) ...[
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Row(
                         children: [
-                          for (final item in order.items)
-                            Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 10,
-                              ),
-                              child: Row(
-                                children: [
-                                  Text('${item.quantity}x '),
-                                  Expanded(child: Text(item.productName)),
-                                  Text('${item.unitPrice} DT'),
-                                ],
-                              ),
-                            ),
-                          const Divider(height: 1),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 10,
-                            ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                const Text('Frais de livraison'),
-                                Text('${order.deliveryFee} DT'),
-                              ],
+                          const Icon(Icons.delivery_dining_outlined),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              order.courierName!,
+                              style: Theme.of(context).textTheme.bodyLarge,
                             ),
                           ),
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  'Total',
-                                  style: Theme.of(context).textTheme.titleMedium
-                                      ?.copyWith(fontWeight: FontWeight.w800),
-                                ),
-                                Text(
-                                  '${order.totalAmount} DT',
-                                  style: Theme.of(context).textTheme.titleMedium
-                                      ?.copyWith(fontWeight: FontWeight.w800),
-                                ),
-                              ],
+                          if (order.courierPhone != null &&
+                              order.courierPhone!.isNotEmpty)
+                            OutlinedButton.icon(
+                              onPressed: () => _call(order.courierPhone!),
+                              icon: const Icon(Icons.phone, size: 18),
+                              label: const Text('Appeler'),
                             ),
-                          ),
                         ],
                       ),
                     ),
-                  ],
+                  ),
+                  const SizedBox(height: 16),
+                ],
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(Icons.place_outlined, size: 18),
+                            const SizedBox(width: 8),
+                            Expanded(child: Text(order.deliveryAddress)),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            const Icon(Icons.map_outlined, size: 18),
+                            const SizedBox(width: 8),
+                            Text(order.deliveryZoneName),
+                          ],
+                        ),
+                        if (order.note != null && order.note!.isNotEmpty) ...[
+                          const SizedBox(height: 8),
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Icon(Icons.notes_outlined, size: 18),
+                              const SizedBox(width: 8),
+                              Expanded(child: Text(order.note!)),
+                            ],
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
                 ),
-              ),
-            ],
-          );
-        },
+                const SizedBox(height: 16),
+                Text(
+                  'Articles',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Card(
+                  child: Column(
+                    children: [
+                      for (final item in order.items)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 10,
+                          ),
+                          child: Row(
+                            children: [
+                              Text('${item.quantity}x '),
+                              Expanded(child: Text(item.productName)),
+                              Text('${item.unitPrice} DT'),
+                            ],
+                          ),
+                        ),
+                      const Divider(height: 1),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 10,
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text('Frais de livraison'),
+                            Text('${order.deliveryFee} DT'),
+                          ],
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'Total',
+                              style: Theme.of(context).textTheme.titleMedium
+                                  ?.copyWith(fontWeight: FontWeight.w800),
+                            ),
+                            Text(
+                              '${order.totalAmount} DT',
+                              style: Theme.of(context).textTheme.titleMedium
+                                  ?.copyWith(fontWeight: FontWeight.w800),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (order.canCancel) ...[
+                  const SizedBox(height: 16),
+                  OutlinedButton(
+                    onPressed: _cancelling ? null : _confirmCancel,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: dangerText,
+                    ),
+                    child: _cancelling
+                        ? const SizedBox(
+                            height: 18,
+                            width: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Text('Annuler la commande'),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -7,12 +7,17 @@ class Account {
     required this.name,
     required this.phone,
     required this.roles,
+    required this.isAvailable,
   });
 
   final int id;
   final String name;
   final String phone;
   final List<String> roles;
+
+  /// Self-service courier availability (meaningless for a client account).
+  /// See AuthController::availability.
+  final bool isAvailable;
 
   bool get isCourier => roles.contains('ROLE_LIVREUR');
   bool get isClient => roles.contains('ROLE_CLIENT');
@@ -25,6 +30,7 @@ class Account {
       roles: ((json['roles'] as List<dynamic>?) ?? const [])
           .map((e) => e.toString())
           .toList(growable: false),
+      isAvailable: json['isAvailable'] as bool? ?? true,
     );
   }
 }

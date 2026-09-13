@@ -35,6 +35,9 @@ class ApiClient {
   Future<dynamic> delete(String path, [Object? body]) =>
       _send('DELETE', path, body);
 
+  Future<dynamic> patch(String path, [Object? body]) =>
+      _send('PATCH', path, body);
+
   Future<dynamic> _send(String method, String path, [Object? body]) async {
     final uri = Uri.parse('${AppConfig.apiBaseUrl}$path');
     final request = http.Request(method, uri);

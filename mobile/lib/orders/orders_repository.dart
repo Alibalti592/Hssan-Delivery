@@ -46,4 +46,12 @@ class OrdersRepository {
     final body = await _api.get('/api/orders/$id');
     return ClientOrder.fromJson(body as Map<String, dynamic>);
   }
+
+  /// Only succeeds while the order's delivery is still unclaimed or just
+  /// assigned — see ClientOrder.canCancel and the backend's
+  /// OrderService::cancelOrder.
+  Future<ClientOrder> cancelOrder(int id) async {
+    final body = await _api.post('/api/orders/$id/cancel');
+    return ClientOrder.fromJson(body as Map<String, dynamic>);
+  }
 }
