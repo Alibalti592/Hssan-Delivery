@@ -20,7 +20,7 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
-  bool _available = true;
+  bool _updatingAvailability = false;
 
   @override
   void initState() {
@@ -28,6 +28,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<DeliveriesController>().refresh();
     });
+  }
+
+  Future<void> _toggleAvailability(bool value) async {
+    setState(() => _updatingAvailability = true);
+    final error = await context.read<AuthController>().setAvailability(value);
+    if (mounted) {
+      setState(() => _updatingAvailability = false);
+      if (error != null) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(error)));
+      }
+    }
   }
 
   void _openChangePassword() {
@@ -103,7 +116,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           children: [
             DarkHeader(
               title: 'Bonjour, $firstName',
-              subtitle: _available
+              subtitle: (account?.isAvailable ?? true)
                   ? 'Vous êtes disponible'
                   : 'Vous êtes hors-ligne',
               trailing: PopupMenuButton<_MenuAction>(
@@ -148,11 +161,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 style: TextStyle(fontWeight: FontWeight.w600),
                               ),
                             ),
-                            Switch(
-                              value: _available,
-                              onChanged: (value) =>
-                                  setState(() => _available = value),
-                            ),
+                            _updatingAvailability
+                                ? const SizedBox(
+                                    height: 20,
+                                    width: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : Switch(
+                                    value: account?.isAvailable ?? true,
+                                    onChanged: _toggleAvailability,
+                                  ),
                           ],
                         ),
                       ),

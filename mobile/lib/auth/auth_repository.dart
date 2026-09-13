@@ -39,6 +39,14 @@ class AuthRepository {
     return Account.fromJson(body as Map<String, dynamic>);
   }
 
+  /// Self-service courier availability toggle. See AuthController::availability.
+  Future<Account> setAvailability(bool isAvailable) async {
+    final body = await _api.patch('/api/auth/availability', {
+      'isAvailable': isAvailable,
+    });
+    return Account.fromJson(body as Map<String, dynamic>);
+  }
+
   /// Self-service password change. Requires the caller's current password.
   Future<void> changePassword({
     required String currentPassword,

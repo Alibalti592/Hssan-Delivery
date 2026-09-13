@@ -1,3 +1,5 @@
+import '../deliveries/delivery.dart' show DeliveryStatus;
+
 /// Client order lifecycle, mirrors the backend `OrderStatus` enum.
 enum OrderStatus {
   pending('PENDING', 'En attente'),
@@ -58,6 +60,9 @@ class ClientOrder {
     required this.totalAmount,
     required this.status,
     required this.createdAt,
+    required this.deliveryStatus,
+    required this.courierName,
+    required this.courierPhone,
   });
 
   final int id;
@@ -71,6 +76,16 @@ class ClientOrder {
   final String totalAmount;
   final OrderStatus status;
   final DateTime? createdAt;
+  final DeliveryStatus? deliveryStatus;
+  final String? courierName;
+  final String? courierPhone;
+
+  /// A client can back out while the delivery is unclaimed or just assigned,
+  /// but not once a courier has actually accepted it — mirrors the backend's
+  /// own DeliveryService::cancelDelivery restriction, see OrdersRepository.cancelOrder.
+  bool get canCancel =>
+      deliveryStatus == DeliveryStatus.pending ||
+      deliveryStatus == DeliveryStatus.assigned;
 
   factory ClientOrder.fromJson(Map<String, dynamic> json) {
     return ClientOrder(
@@ -89,6 +104,11 @@ class ClientOrder {
       createdAt: json['createdAt'] is String
           ? DateTime.tryParse(json['createdAt'] as String)
           : null,
+      deliveryStatus: json['deliveryStatus'] is String
+          ? DeliveryStatus.fromWire(json['deliveryStatus'] as String)
+          : null,
+      courierName: json['courierName'] as String?,
+      courierPhone: json['courierPhone'] as String?,
     );
   }
 }

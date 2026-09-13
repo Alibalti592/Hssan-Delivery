@@ -139,6 +139,23 @@ class AuthController extends ChangeNotifier {
     }
   }
 
+  /// Returns an error message on failure, or null on success. Reverts to the
+  /// previous value on failure, since the caller's toggle UI updates
+  /// optimistically before this resolves.
+  Future<String?> setAvailability(bool isAvailable) async {
+    try {
+      _account = await _repository.setAvailability(isAvailable);
+      notifyListeners();
+      return null;
+    } on ApiException catch (e) {
+      notifyListeners();
+      return e.message;
+    } on NetworkException catch (e) {
+      notifyListeners();
+      return e.message;
+    }
+  }
+
   Future<void> signOut() => _discard();
 
   /// Called by the API client when any request comes back 401.

@@ -15,11 +15,22 @@ class RestaurantsScreen extends StatefulWidget {
 
 class _RestaurantsScreenState extends State<RestaurantsScreen> {
   late Future<List<Restaurant>> _future;
+  final _searchController = TextEditingController();
+  String _query = '';
 
   @override
   void initState() {
     super.initState();
     _future = _load();
+    _searchController.addListener(() {
+      setState(() => _query = _searchController.text.trim().toLowerCase());
+    });
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   Future<List<Restaurant>> _load() {
@@ -32,73 +43,118 @@ class _RestaurantsScreenState extends State<RestaurantsScreen> {
     await future;
   }
 
+  bool _matches(Restaurant restaurant) {
+    if (_query.isEmpty) return true;
+    return restaurant.name.toLowerCase().contains(_query) ||
+        (restaurant.description?.toLowerCase().contains(_query) ?? false);
+  }
+
   @override
   Widget build(BuildContext context) {
-    return RefreshIndicator(
-      onRefresh: _refresh,
-      child: FutureBuilder<List<Restaurant>>(
-        future: _future,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.hasError) {
-            return ListView(
-              children: [
-                const SizedBox(height: 100),
-                Icon(
-                  Icons.wifi_off,
-                  size: 56,
-                  color: Theme.of(context).colorScheme.outline,
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'Impossible de charger les restaurants',
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-                const SizedBox(height: 16),
-                Center(
-                  child: OutlinedButton(
-                    onPressed: _refresh,
-                    child: const Text('Réessayer'),
-                  ),
-                ),
-              ],
-            );
-          }
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+          child: TextField(
+            controller: _searchController,
+            decoration: InputDecoration(
+              hintText: 'Rechercher un restaurant',
+              prefixIcon: const Icon(Icons.search),
+              suffixIcon: _query.isEmpty
+                  ? null
+                  : IconButton(
+                      icon: const Icon(Icons.clear),
+                      onPressed: _searchController.clear,
+                    ),
+            ),
+          ),
+        ),
+        Expanded(
+          child: RefreshIndicator(
+            onRefresh: _refresh,
+            child: FutureBuilder<List<Restaurant>>(
+              future: _future,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                if (snapshot.hasError) {
+                  return ListView(
+                    children: [
+                      const SizedBox(height: 100),
+                      Icon(
+                        Icons.wifi_off,
+                        size: 56,
+                        color: Theme.of(context).colorScheme.outline,
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Impossible de charger les restaurants',
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: 16),
+                      Center(
+                        child: OutlinedButton(
+                          onPressed: _refresh,
+                          child: const Text('Réessayer'),
+                        ),
+                      ),
+                    ],
+                  );
+                }
 
-          final restaurants = snapshot.data ?? const [];
-          if (restaurants.isEmpty) {
-            return ListView(
-              children: const [
-                SizedBox(height: 100),
-                Center(
-                  child: Text('Aucun restaurant disponible pour le moment.'),
-                ),
-              ],
-            );
-          }
+                final all = snapshot.data ?? const [];
+                final restaurants = all.where(_matches).toList();
 
-          return ListView.separated(
-            padding: const EdgeInsets.all(16),
-            itemCount: restaurants.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 12),
-            itemBuilder: (context, index) {
-              final restaurant = restaurants[index];
-              return _RestaurantCard(
-                restaurant: restaurant,
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) =>
-                        RestaurantMenuScreen(restaurant: restaurant),
-                  ),
-                ),
-              );
-            },
-          );
-        },
-      ),
+                if (all.isEmpty) {
+                  return ListView(
+                    children: const [
+                      SizedBox(height: 100),
+                      Center(
+                        child: Text(
+                          'Aucun restaurant disponible pour le moment.',
+                        ),
+                      ),
+                    ],
+                  );
+                }
+
+                if (restaurants.isEmpty) {
+                  return ListView(
+                    children: const [
+                      SizedBox(height: 100),
+                      Center(
+                        child: Text(
+                          'Aucun restaurant ne correspond à votre recherche.',
+                        ),
+                      ),
+                    ],
+                  );
+                }
+
+                return ListView.separated(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: restaurants.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 12),
+                  itemBuilder: (context, index) {
+                    final restaurant = restaurants[index];
+                    return _RestaurantCard(
+                      restaurant: restaurant,
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              RestaurantMenuScreen(restaurant: restaurant),
+                        ),
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
