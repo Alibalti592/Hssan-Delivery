@@ -49,30 +49,31 @@ flutter:
           weight: 800
 
 # Native launcher icon, regenerated with `dart run flutter_launcher_icons`.
-# Android gets an adaptive icon (navy background + white "H" foreground);
-# everything else gets the flat navy/white square. Source art:
+# Android gets an adaptive icon (black background + chrome "DH" script
+# monogram foreground, echoing the client's logo); everything else gets the
+# flat black/monogram square. Source art:
 # assets/icon/app_icon.png (1024x1024, no transparency) and
 # assets/icon/app_icon_foreground.png (transparent, glyph inside the safe zone).
 flutter_launcher_icons:
   android: true
   ios: true
   image_path: "assets/icon/app_icon.png"
-  adaptive_icon_background: "#1B2437"
+  adaptive_icon_background: "#000000"
   adaptive_icon_foreground: "assets/icon/app_icon_foreground.png"
   min_sdk_android: 21
   remove_alpha_ios: true
 
 # Native splash screen, regenerated with `dart run flutter_native_splash:create`.
-# Same navy brand background in both themes with the white "H" mark centered —
-# there's no separate dark-mode splash asset because the brand background is
-# already dark navy.
+# Same black brand background in both themes with the chrome "DH" monogram
+# centered — there's no separate dark-mode splash asset because the brand
+# background is already black.
 flutter_native_splash:
-  color: "#1B2437"
+  color: "#000000"
   image: assets/icon/splash_logo.png
-  color_dark: "#1B2437"
+  color_dark: "#000000"
   image_dark: assets/icon/splash_logo.png
   android_12:
     image: assets/icon/splash_logo.png
-    icon_background_color: "#1B2437"
+    icon_background_color: "#000000"
     image_dark: assets/icon/splash_logo.png
-    icon_background_color_dark: "#1B2437"
+    icon_background_color_dark: "#000000"

@@ -2,10 +2,11 @@ import 'package:flutter/material.dart';
 
 import 'deliveries/delivery.dart';
 
-/// Brand navy from the Delivery Hassen design. Used as the seed and as a
-/// literal accent (splash/login/dark-header background, primary buttons,
-/// active icons).
-const navy = Color(0xFF1B2437);
+/// Brand black from the Delivery Hassen logo (silver monogram on black).
+/// Used as the seed and as a literal accent (splash/login/dark-header
+/// background, primary buttons, active icons). Kept as `navy` rather than
+/// renamed — it's referenced across a dozen screens as "the brand color".
+const navy = Color(0xFF000000);
 
 /// Status palette shared by delivery and order status chips.
 const successText = Color(0xFF276749);
@@ -28,7 +29,7 @@ ThemeData buildTheme(Brightness brightness) {
     useMaterial3: true,
     fontFamily: 'Roboto',
     scaffoldBackgroundColor: brightness == Brightness.light
-        ? const Color(0xFFF7F8FA)
+        ? Colors.white
         : scheme.surface,
     appBarTheme: AppBarTheme(
       backgroundColor: Colors.transparent,
