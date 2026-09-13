@@ -23,9 +23,8 @@ class Promotion {
 
   /// A short "-10%" / "-5 DT" label for the promotion card, matching the
   /// two discount types the backend supports (see App\Enum\DiscountType).
-  String get discountLabel => discountType == 'PERCENTAGE'
-      ? '-$discountValue%'
-      : '-$discountValue DT';
+  String get discountLabel =>
+      discountType == 'PERCENTAGE' ? '-$discountValue%' : '-$discountValue DT';
 
   factory Promotion.fromJson(Map<String, dynamic> json) {
     return Promotion(

@@ -732,11 +732,7 @@ void main() {
                         'id': 1,
                         'status': 'ACCEPTED',
                         'courierId': 3,
-                        'order': {
-                          'id': 10,
-                          'status': 'CONFIRMED',
-                          'items': [],
-                        },
+                        'order': {'id': 10, 'status': 'CONFIRMED', 'items': []},
                       },
                     ]
                   : [
@@ -744,11 +740,7 @@ void main() {
                         'id': 1,
                         'status': 'DELIVERED',
                         'courierId': 3,
-                        'order': {
-                          'id': 10,
-                          'status': 'COMPLETED',
-                          'items': [],
-                        },
+                        'order': {'id': 10, 'status': 'COMPLETED', 'items': []},
                       },
                     ],
             ),

@@ -266,7 +266,10 @@ class _PromotionsSection extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   const Text('Impossible de charger les promotions.'),
-                  TextButton(onPressed: onRetry, child: const Text('Réessayer')),
+                  TextButton(
+                    onPressed: onRetry,
+                    child: const Text('Réessayer'),
+                  ),
                 ],
               ),
             ),

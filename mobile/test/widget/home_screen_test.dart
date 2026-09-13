@@ -69,28 +69,29 @@ void main() {
     expect(find.text('Service bientôt disponible'), findsOneWidget);
   });
 
-  testWidgets('shows the promotions carousel when the backend has active promos', (
-    tester,
-  ) async {
-    final repository = PromotionsRepository(
-      ApiClient(
-        tokenProvider: () => 'jwt-123',
-        onUnauthorized: () {},
-        httpClient: MockClient(
-          (request) async => jsonResponse([
-            _promotion(1, 'Summer Discount'),
-            _promotion(2, 'Weekend Special'),
-          ]),
+  testWidgets(
+    'shows the promotions carousel when the backend has active promos',
+    (tester) async {
+      final repository = PromotionsRepository(
+        ApiClient(
+          tokenProvider: () => 'jwt-123',
+          onUnauthorized: () {},
+          httpClient: MockClient(
+            (request) async => jsonResponse([
+              _promotion(1, 'Summer Discount'),
+              _promotion(2, 'Weekend Special'),
+            ]),
+          ),
         ),
-      ),
-    );
+      );
 
-    await tester.pumpWidget(_wrap(repository));
-    await tester.pumpAndSettle();
+      await tester.pumpWidget(_wrap(repository));
+      await tester.pumpAndSettle();
 
-    expect(find.text('Summer Discount'), findsOneWidget);
-    expect(find.text('Weekend Special'), findsOneWidget);
-  });
+      expect(find.text('Summer Discount'), findsOneWidget);
+      expect(find.text('Weekend Special'), findsOneWidget);
+    },
+  );
 
   testWidgets('shows nothing extra when there are no active promotions', (
     tester,
