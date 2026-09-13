@@ -6,6 +6,7 @@ use App\Dto\Admin\CreateRestaurantRequest;
 use App\Dto\Admin\RestaurantResponse;
 use App\Dto\Admin\UpdateRestaurantAvailabilityRequest;
 use App\Dto\Admin\UpdateRestaurantRequest;
+use App\Enum\RestaurantType;
 use App\Exception\InvalidOperationException;
 use App\Service\RestaurantService;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -47,9 +48,13 @@ final class AdminRestaurantController extends AbstractApiController
     #[Route('', name: 'api_admin_restaurant_list', methods: ['GET'])]
     public function list(Request $request): JsonResponse
     {
+        $typeParam = $request->query->get('type');
+        $type = null !== $typeParam ? RestaurantType::tryFrom($typeParam) : null;
+
         $result = $this->restaurantService->list(
             $this->paginationPage($request),
-            $this->paginationLimit($request)
+            $this->paginationLimit($request),
+            $type
         );
 
         return $this->paginatedJson($result, static fn ($restaurant) => RestaurantResponse::fromEntity($restaurant));

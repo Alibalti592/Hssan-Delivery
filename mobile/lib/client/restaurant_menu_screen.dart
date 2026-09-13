@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../cart/cart.dart';
 import '../catalogue/catalogue_models.dart';
 import '../catalogue/catalogue_repository.dart';
+import '../config.dart';
 import '../theme.dart';
 import 'cart_screen.dart';
 import 'product_detail_screen.dart';
@@ -304,7 +305,7 @@ class _ProductRow extends StatelessWidget {
               borderRadius: BorderRadius.circular(6),
               child: product.photoUrl != null
                   ? Image.network(
-                      product.photoUrl!,
+                      AppConfig.resolvePhotoUrl(product.photoUrl!),
                       width: 44,
                       height: 44,
                       fit: BoxFit.cover,

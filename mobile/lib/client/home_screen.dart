@@ -1,15 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../catalogue/catalogue_models.dart' show RestaurantType;
+import '../config.dart';
 import '../promotions/promotion_model.dart';
 import '../promotions/promotions_repository.dart';
 import '../theme.dart';
 import 'restaurants_screen.dart';
 
 /// Pastel, organic-shaped service cards — the four entry points the client
-/// can currently reach from the home screen. Restaurants is the only one
-/// wired to a real backend; the rest are UI-only placeholders (see
-/// App\Controller — there is no Factures/Courses/Colis backend yet).
+/// can currently reach from the home screen. Restaurants and Courses are
+/// wired to a real backend (a grocery store is just a Restaurant row with
+/// a different type — see RestaurantType); Factures/Colis remain UI-only
+/// placeholders since there's no bill-payment or parcel backend yet.
 class _Service {
   const _Service({
     required this.title,
@@ -18,6 +21,7 @@ class _Service {
     required this.background,
     required this.foreground,
     this.comingSoon = false,
+    this.restaurantType,
   });
 
   final String title;
@@ -26,6 +30,10 @@ class _Service {
   final Color background;
   final Color foreground;
   final bool comingSoon;
+
+  /// Set when tapping this card should open RestaurantsScreen browsing
+  /// this type — null (and comingSoon true) for a placeholder service.
+  final RestaurantType? restaurantType;
 }
 
 const _services = [
@@ -35,6 +43,7 @@ const _services = [
     icon: Icons.restaurant_menu,
     background: Color(0xFFFFE8D6),
     foreground: Color(0xFFB3541E),
+    restaurantType: RestaurantType.restaurant,
   ),
   _Service(
     title: 'Factures',
@@ -50,7 +59,7 @@ const _services = [
     icon: Icons.shopping_basket_outlined,
     background: Color(0xFFE1F3E0),
     foreground: Color(0xFF347A34),
-    comingSoon: true,
+    restaurantType: RestaurantType.grocery,
   ),
   _Service(
     title: 'Colis',
@@ -105,11 +114,13 @@ class _HomeScreenState extends State<HomeScreen> {
       return;
     }
 
+    final type = service.restaurantType ?? RestaurantType.restaurant;
+
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => Scaffold(
-          appBar: AppBar(title: const Text('Restaurants')),
-          body: const RestaurantsScreen(),
+          appBar: AppBar(title: Text(service.title)),
+          body: RestaurantsScreen(type: type),
         ),
       ),
     );
@@ -315,11 +326,11 @@ class _PromotionCard extends StatelessWidget {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            // Matches the existing Restaurant/Product photo convention in
-            // this app, which also uses the raw photoUrl directly without
-            // prefixing AppConfig.apiBaseUrl (see RestaurantsScreen).
             promotion.photoUrl != null
-                ? Image.network(promotion.photoUrl!, fit: BoxFit.cover)
+                ? Image.network(
+                    AppConfig.resolvePhotoUrl(promotion.photoUrl!),
+                    fit: BoxFit.cover,
+                  )
                 : Container(color: fieldFill),
             Positioned.fill(
               child: DecoratedBox(

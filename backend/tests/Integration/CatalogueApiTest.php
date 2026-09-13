@@ -6,6 +6,7 @@ use App\Entity\Category;
 use App\Entity\Product;
 use App\Entity\Restaurant;
 use App\Entity\User;
+use App\Enum\RestaurantType;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
@@ -61,6 +62,64 @@ final class CatalogueApiTest extends WebTestCase
 
         self::assertArrayHasKey('photoUrl', $listed);
         self::assertArrayHasKey('isAvailable', $listed);
+    }
+
+    public function testDefaultCatalogueListExcludesGroceryStores(): void
+    {
+        $client = static::createClient();
+
+        $this->entityManager = self::getContainer()
+            ->get(EntityManagerInterface::class);
+
+        $customer = $this->createTestUser('ROLE_CLIENT', 'Test Client');
+
+        $restaurant = $this->createRestaurant('Plain Restaurant', true);
+        $grocery = $this->createRestaurant('Corner Grocery', true, RestaurantType::GROCERY);
+
+        $token = $this->authenticateClient($client, $customer);
+
+        $client->request(
+            'GET',
+            '/api/restaurants',
+            server: ['HTTP_AUTHORIZATION' => 'Bearer '.$token]
+        );
+
+        self::assertResponseStatusCodeSame(Response::HTTP_OK);
+
+        $response = json_decode($client->getResponse()->getContent(), true);
+        $names = array_column($response['items'], 'name');
+
+        self::assertContains('Plain Restaurant', $names);
+        self::assertNotContains('Corner Grocery', $names);
+    }
+
+    public function testGroceryTypeFilterOnlyReturnsGroceryStores(): void
+    {
+        $client = static::createClient();
+
+        $this->entityManager = self::getContainer()
+            ->get(EntityManagerInterface::class);
+
+        $customer = $this->createTestUser('ROLE_CLIENT', 'Test Client');
+
+        $restaurant = $this->createRestaurant('Plain Restaurant Two', true);
+        $grocery = $this->createRestaurant('Corner Grocery Two', true, RestaurantType::GROCERY);
+
+        $token = $this->authenticateClient($client, $customer);
+
+        $client->request(
+            'GET',
+            '/api/restaurants?type=GROCERY',
+            server: ['HTTP_AUTHORIZATION' => 'Bearer '.$token]
+        );
+
+        self::assertResponseStatusCodeSame(Response::HTTP_OK);
+
+        $response = json_decode($client->getResponse()->getContent(), true);
+        $names = array_column($response['items'], 'name');
+
+        self::assertContains('Corner Grocery Two', $names);
+        self::assertNotContains('Plain Restaurant Two', $names);
     }
 
     public function testUnauthenticatedRequestIsRejected(): void
@@ -310,12 +369,16 @@ final class CatalogueApiTest extends WebTestCase
         );
     }
 
-    private function createRestaurant(string $name, bool $isAvailable): Restaurant
-    {
+    private function createRestaurant(
+        string $name,
+        bool $isAvailable,
+        RestaurantType $type = RestaurantType::RESTAURANT,
+    ): Restaurant {
         $restaurant = (new Restaurant())
             ->setName($name)
             ->setDescription(null)
-            ->setIsAvailable($isAvailable);
+            ->setIsAvailable($isAvailable)
+            ->setType($type);
 
         $this->entityManager->persist($restaurant);
         $this->entityManager->flush();

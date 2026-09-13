@@ -12,6 +12,7 @@ import type {
   Product,
   Promotion,
   Restaurant,
+  RestaurantType,
 } from './types';
 
 export interface PageParams {
@@ -19,12 +20,17 @@ export interface PageParams {
   limit?: number;
 }
 
-function toQuery(params?: PageParams): string {
+export interface RestaurantListParams extends PageParams {
+  type?: RestaurantType;
+}
+
+function toQuery(params?: PageParams | RestaurantListParams): string {
   if (!params) return '';
 
   const qs = new URLSearchParams();
   if (params.page !== undefined) qs.set('page', String(params.page));
   if (params.limit !== undefined) qs.set('limit', String(params.limit));
+  if ('type' in params && params.type !== undefined) qs.set('type', params.type);
 
   const s = qs.toString();
   return s ? `?${s}` : '';
@@ -38,13 +44,19 @@ export const authApi = {
 };
 
 // Restaurants
+export interface RestaurantPayload {
+  name: string;
+  description: string | null;
+  isAvailable: boolean;
+  type: RestaurantType;
+}
+
 export const restaurantsApi = {
-  list: (params?: PageParams) =>
+  list: (params?: RestaurantListParams) =>
     api.get<Paginated<Restaurant>>(`/api/admin/restaurants${toQuery(params)}`),
   get: (id: number) => api.get<Restaurant>(`/api/admin/restaurants/${id}`),
-  create: (data: { name: string; description: string | null; isAvailable: boolean }) =>
-    api.post<Restaurant>('/api/admin/restaurants', data),
-  update: (id: number, data: { name: string; description: string | null; isAvailable: boolean }) =>
+  create: (data: RestaurantPayload) => api.post<Restaurant>('/api/admin/restaurants', data),
+  update: (id: number, data: RestaurantPayload) =>
     api.put<Restaurant>(`/api/admin/restaurants/${id}`, data),
   setAvailability: (id: number, isAvailable: boolean) =>
     api.patch<Restaurant>(`/api/admin/restaurants/${id}/availability`, { isAvailable }),

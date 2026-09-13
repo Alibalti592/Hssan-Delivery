@@ -12,8 +12,12 @@ class CatalogueRepository {
 
   final ApiClient _api;
 
-  Future<List<Restaurant>> listRestaurants() async {
-    final body = await _api.get('/api/restaurants?limit=$_catalogueLimit');
+  Future<List<Restaurant>> listRestaurants({
+    RestaurantType type = RestaurantType.restaurant,
+  }) async {
+    final body = await _api.get(
+      '/api/restaurants?limit=$_catalogueLimit&type=${type.wire}',
+    );
     final items = (body as Map<String, dynamic>)['items'] as List<dynamic>;
     return items
         .map((e) => Restaurant.fromJson(e as Map<String, dynamic>))

@@ -2,12 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../catalogue/catalogue_models.dart';
+import '../config.dart';
 import '../catalogue/catalogue_repository.dart';
 import '../theme.dart';
 import 'restaurant_menu_screen.dart';
 
 class RestaurantsScreen extends StatefulWidget {
-  const RestaurantsScreen({super.key});
+  const RestaurantsScreen({this.type = RestaurantType.restaurant, super.key});
+
+  /// Which vertical to browse — restaurants or grocery stores (see mobile
+  /// HomeScreen's "Restaurants"/"Courses" services). Both reuse this same
+  /// screen; only the copy and the backend filter differ.
+  final RestaurantType type;
 
   @override
   State<RestaurantsScreen> createState() => _RestaurantsScreenState();
@@ -17,6 +23,8 @@ class _RestaurantsScreenState extends State<RestaurantsScreen> {
   late Future<List<Restaurant>> _future;
   final _searchController = TextEditingController();
   String _query = '';
+
+  bool get _isGrocery => widget.type == RestaurantType.grocery;
 
   @override
   void initState() {
@@ -34,7 +42,9 @@ class _RestaurantsScreenState extends State<RestaurantsScreen> {
   }
 
   Future<List<Restaurant>> _load() {
-    return context.read<CatalogueRepository>().listRestaurants();
+    return context.read<CatalogueRepository>().listRestaurants(
+      type: widget.type,
+    );
   }
 
   Future<void> _refresh() async {
@@ -58,7 +68,9 @@ class _RestaurantsScreenState extends State<RestaurantsScreen> {
           child: TextField(
             controller: _searchController,
             decoration: InputDecoration(
-              hintText: 'Rechercher un restaurant',
+              hintText: _isGrocery
+                  ? 'Rechercher un magasin'
+                  : 'Rechercher un restaurant',
               prefixIcon: const Icon(Icons.search),
               suffixIcon: _query.isEmpty
                   ? null
@@ -89,7 +101,9 @@ class _RestaurantsScreenState extends State<RestaurantsScreen> {
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        'Impossible de charger les restaurants',
+                        _isGrocery
+                            ? 'Impossible de charger les magasins'
+                            : 'Impossible de charger les restaurants',
                         textAlign: TextAlign.center,
                         style: Theme.of(context).textTheme.titleMedium,
                       ),
@@ -109,11 +123,13 @@ class _RestaurantsScreenState extends State<RestaurantsScreen> {
 
                 if (all.isEmpty) {
                   return ListView(
-                    children: const [
-                      SizedBox(height: 100),
+                    children: [
+                      const SizedBox(height: 100),
                       Center(
                         child: Text(
-                          'Aucun restaurant disponible pour le moment.',
+                          _isGrocery
+                              ? 'Aucun magasin disponible pour le moment.'
+                              : 'Aucun restaurant disponible pour le moment.',
                         ),
                       ),
                     ],
@@ -122,11 +138,13 @@ class _RestaurantsScreenState extends State<RestaurantsScreen> {
 
                 if (restaurants.isEmpty) {
                   return ListView(
-                    children: const [
-                      SizedBox(height: 100),
+                    children: [
+                      const SizedBox(height: 100),
                       Center(
                         child: Text(
-                          'Aucun restaurant ne correspond à votre recherche.',
+                          _isGrocery
+                              ? 'Aucun magasin ne correspond à votre recherche.'
+                              : 'Aucun restaurant ne correspond à votre recherche.',
                         ),
                       ),
                     ],
@@ -177,13 +195,18 @@ class _RestaurantCard extends StatelessWidget {
             AspectRatio(
               aspectRatio: 16 / 9,
               child: restaurant.photoUrl != null
-                  ? Image.network(restaurant.photoUrl!, fit: BoxFit.cover)
+                  ? Image.network(
+                      AppConfig.resolvePhotoUrl(restaurant.photoUrl!),
+                      fit: BoxFit.cover,
+                    )
                   : Container(
                       color: Theme.of(
                         context,
                       ).colorScheme.surfaceContainerHighest,
                       child: Icon(
-                        Icons.storefront_outlined,
+                        restaurant.type == RestaurantType.grocery
+                            ? Icons.shopping_basket_outlined
+                            : Icons.storefront_outlined,
                         size: 40,
                         color: Theme.of(context).colorScheme.outline,
                       ),

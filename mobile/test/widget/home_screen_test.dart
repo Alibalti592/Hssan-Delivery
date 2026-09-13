@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/testing.dart';
+import 'package:mobile/catalogue/catalogue_repository.dart';
 import 'package:mobile/client/home_screen.dart';
 import 'package:mobile/core/api_client.dart';
 import 'package:mobile/promotions/promotions_repository.dart';
@@ -109,5 +110,50 @@ void main() {
 
     expect(find.text('Services'), findsOneWidget);
     expect(find.text('Impossible de charger les promotions.'), findsNothing);
+  });
+
+  testWidgets('tapping Courses opens grocery stores filtered by type', (
+    tester,
+  ) async {
+    String? requestedUrl;
+
+    final catalogueRepository = CatalogueRepository(
+      ApiClient(
+        tokenProvider: () => 'jwt-123',
+        onUnauthorized: () {},
+        httpClient: MockClient((request) async {
+          requestedUrl = request.url.toString();
+          return jsonResponse(pagedBody([]));
+        }),
+      ),
+    );
+    final promotionsRepository = PromotionsRepository(
+      ApiClient(
+        tokenProvider: () => 'jwt-123',
+        onUnauthorized: () {},
+        httpClient: MockClient((request) async => jsonResponse([])),
+      ),
+    );
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          Provider<PromotionsRepository>.value(value: promotionsRepository),
+          Provider<CatalogueRepository>.value(value: catalogueRepository),
+        ],
+        child: const MaterialApp(home: Scaffold(body: HomeScreen())),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Courses'));
+    await tester.pumpAndSettle();
+
+    expect(requestedUrl, contains('type=GROCERY'));
+    expect(find.text('Service bientôt disponible'), findsNothing);
+    expect(
+      find.text('Aucun magasin disponible pour le moment.'),
+      findsOneWidget,
+    );
   });
 }

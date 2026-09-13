@@ -14,4 +14,7 @@ final class CreateRestaurantRequest
     public ?string $description = null;
 
     public bool $isAvailable = true;
+
+    #[Assert\Choice(choices: ['RESTAURANT', 'GROCERY'])]
+    public string $type = 'RESTAURANT';
 }

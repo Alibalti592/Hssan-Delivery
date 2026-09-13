@@ -9,6 +9,7 @@ use App\Entity\DeliveryZone;
 use App\Entity\Order;
 use App\Entity\Product;
 use App\Enum\OrderStatus;
+use App\Enum\RestaurantType;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
@@ -108,6 +109,138 @@ final class AdminRestaurantApiTest extends WebTestCase
 
         self::assertTrue(
             $restaurant->isAvailable()
+        );
+    }
+
+    public function testAdminCanCreateGroceryRestaurant(): void
+    {
+        $client = static::createClient();
+
+        $this->entityManager = self::getContainer()
+            ->get(EntityManagerInterface::class);
+
+        $admin = $this->createTestUser(
+            'ROLE_ADMIN',
+            'Test Admin'
+        );
+
+        $adminToken = $this->authenticateClient(
+            $client,
+            $admin
+        );
+
+        $client->request(
+            'POST',
+            '/api/admin/restaurants',
+            server: [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_AUTHORIZATION' => 'Bearer '.$adminToken,
+            ],
+            content: json_encode([
+                'name' => 'Test Grocery',
+                'description' => 'A test grocery store',
+                'isAvailable' => true,
+                'type' => 'GROCERY',
+            ])
+        );
+
+        self::assertResponseStatusCodeSame(
+            Response::HTTP_CREATED
+        );
+
+        $response = json_decode(
+            $client->getResponse()->getContent(),
+            true
+        );
+
+        self::assertSame('GROCERY', $response['type']);
+
+        $this->entityManager->clear();
+
+        $restaurant = $this->entityManager
+            ->getRepository(Restaurant::class)
+            ->find($response['id']);
+
+        self::assertSame(RestaurantType::GROCERY, $restaurant->getType());
+    }
+
+    public function testCreatingRestaurantWithoutTypeDefaultsToRestaurant(): void
+    {
+        $client = static::createClient();
+
+        $this->entityManager = self::getContainer()
+            ->get(EntityManagerInterface::class);
+
+        $admin = $this->createTestUser(
+            'ROLE_ADMIN',
+            'Test Admin'
+        );
+
+        $adminToken = $this->authenticateClient(
+            $client,
+            $admin
+        );
+
+        $client->request(
+            'POST',
+            '/api/admin/restaurants',
+            server: [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_AUTHORIZATION' => 'Bearer '.$adminToken,
+            ],
+            content: json_encode([
+                'name' => 'No Type Restaurant',
+                'description' => null,
+                'isAvailable' => true,
+            ])
+        );
+
+        self::assertResponseStatusCodeSame(
+            Response::HTTP_CREATED
+        );
+
+        $response = json_decode(
+            $client->getResponse()->getContent(),
+            true
+        );
+
+        self::assertSame('RESTAURANT', $response['type']);
+    }
+
+    public function testCreatingRestaurantWithInvalidTypeIsRejected(): void
+    {
+        $client = static::createClient();
+
+        $this->entityManager = self::getContainer()
+            ->get(EntityManagerInterface::class);
+
+        $admin = $this->createTestUser(
+            'ROLE_ADMIN',
+            'Test Admin'
+        );
+
+        $adminToken = $this->authenticateClient(
+            $client,
+            $admin
+        );
+
+        $client->request(
+            'POST',
+            '/api/admin/restaurants',
+            server: [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_AUTHORIZATION' => 'Bearer '.$adminToken,
+            ],
+            content: json_encode([
+                'name' => 'Bad Type Restaurant',
+                'description' => null,
+                'isAvailable' => true,
+                'type' => 'PARCEL',
+            ])
+        );
+
+        self::assertResponseStatusCodeSame(
+            Response::HTTP_UNPROCESSABLE_ENTITY
         );
     }
 
@@ -764,6 +897,60 @@ final class AdminRestaurantApiTest extends WebTestCase
         self::assertContains('Restaurant One', $names);
         self::assertContains('Restaurant Two', $names);
         self::assertGreaterThanOrEqual(2, $response['meta']['total']);
+    }
+
+    public function testAdminCanFilterRestaurantsByType(): void
+    {
+        $client = static::createClient();
+
+        $this->entityManager = self::getContainer()
+            ->get(EntityManagerInterface::class);
+
+        $admin = $this->createTestUser(
+            'ROLE_ADMIN',
+            'Test Admin'
+        );
+
+        $restaurant = (new Restaurant())
+            ->setName('Filter Restaurant')
+            ->setDescription(null)
+            ->setIsAvailable(true)
+            ->setType(RestaurantType::RESTAURANT);
+
+        $grocery = (new Restaurant())
+            ->setName('Filter Grocery')
+            ->setDescription(null)
+            ->setIsAvailable(true)
+            ->setType(RestaurantType::GROCERY);
+
+        $this->entityManager->persist($restaurant);
+        $this->entityManager->persist($grocery);
+        $this->entityManager->flush();
+
+        $adminToken = $this->authenticateClient(
+            $client,
+            $admin
+        );
+
+        $client->request(
+            'GET',
+            '/api/admin/restaurants?type=GROCERY',
+            server: [
+                'HTTP_AUTHORIZATION' => 'Bearer '.$adminToken,
+            ]
+        );
+
+        self::assertResponseIsSuccessful();
+
+        $response = json_decode(
+            $client->getResponse()->getContent(),
+            true
+        );
+
+        $names = array_column($response['items'], 'name');
+
+        self::assertContains('Filter Grocery', $names);
+        self::assertNotContains('Filter Restaurant', $names);
     }
 
     public function testNonAdminCannotListRestaurants(): void

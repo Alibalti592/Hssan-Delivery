@@ -1,8 +1,11 @@
+export type RestaurantType = 'RESTAURANT' | 'GROCERY';
+
 export interface Restaurant {
   id: number;
   name: string;
   description: string | null;
   isAvailable: boolean;
+  type: RestaurantType;
   photoUrl: string | null;
   createdAt: string;
   updatedAt: string;

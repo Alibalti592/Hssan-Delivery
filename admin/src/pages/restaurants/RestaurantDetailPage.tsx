@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { restaurantsApi } from '../../api/resources';
+import type { RestaurantType } from '../../api/types';
 import { PageHeader, Loading, ErrorBanner, Breadcrumb } from '../../components/ui';
 import { PhotoUploader } from '../../components/PhotoUploader';
 
@@ -19,12 +20,14 @@ export default function RestaurantDetailPage() {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [isAvailable, setIsAvailable] = useState(true);
+  const [type, setType] = useState<RestaurantType>('RESTAURANT');
 
   useEffect(() => {
     if (data) {
       setName(data.name);
       setDescription(data.description ?? '');
       setIsAvailable(data.isAvailable);
+      setType(data.type);
     }
   }, [data]);
 
@@ -34,6 +37,7 @@ export default function RestaurantDetailPage() {
         name,
         description: description || null,
         isAvailable,
+        type,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['restaurants'] });
@@ -154,6 +158,20 @@ export default function RestaurantDetailPage() {
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
               />
+            </div>
+            <div className="field-group">
+              <label className="field-label" htmlFor="type">
+                Type
+              </label>
+              <select
+                id="type"
+                className="field-select"
+                value={type}
+                onChange={(e) => setType(e.target.value as RestaurantType)}
+              >
+                <option value="RESTAURANT">Restaurant</option>
+                <option value="GROCERY">Grocery store</option>
+              </select>
             </div>
             <div className="field-group">
               <label className="field-checkbox">

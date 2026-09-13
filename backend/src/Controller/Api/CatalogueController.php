@@ -6,6 +6,7 @@ use App\Dto\Admin\CategoryResponse;
 use App\Dto\Admin\ProductResponse;
 use App\Dto\Admin\RestaurantResponse;
 use App\Entity\Restaurant;
+use App\Enum\RestaurantType;
 use App\Service\CategoryService;
 use App\Service\ProductService;
 use App\Service\RestaurantService;
@@ -38,9 +39,15 @@ final class CatalogueController extends AbstractController
     #[Route('', name: 'api_catalogue_restaurant_list', methods: ['GET'])]
     public function list(Request $request): JsonResponse
     {
+        // Defaults to RESTAURANT so existing clients that never pass ?type
+        // keep seeing only restaurants — grocery stores are opt-in via
+        // ?type=GROCERY (see mobile HomeScreen's "Courses" service).
+        $type = RestaurantType::tryFrom((string) $request->query->get('type')) ?? RestaurantType::RESTAURANT;
+
         $result = $this->restaurantService->listAvailable(
             $this->paginationPage($request),
-            $this->paginationLimit($request)
+            $this->paginationLimit($request),
+            $type
         );
 
         return $this->paginatedJson($result, static fn ($restaurant) => RestaurantResponse::fromEntity($restaurant));

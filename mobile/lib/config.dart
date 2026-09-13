@@ -13,6 +13,12 @@ class AppConfig {
     defaultValue: 'http://10.0.2.2:8000',
   );
 
+  /// Photo endpoints (Restaurant/Product/Promotion) return a relative path
+  /// like "/uploads/restaurants/xyz.jpg" — resolve it against the API host
+  /// before handing it to Image.network, which otherwise treats a relative
+  /// path as an invalid URL and fails to load the image.
+  static String resolvePhotoUrl(String path) => '$apiBaseUrl$path';
+
   /// Error tracking (Sentry). Empty by default — the SDK no-ops without a
   /// DSN, so this is inert until one is supplied:
   ///   flutter run --dart-define=SENTRY_DSN=https://...@sentry.io/...
