@@ -28,10 +28,7 @@ ThemeData buildTheme(Brightness brightness) {
   // into anything using colorScheme.primary/surfaceContainerHighest/outline
   // (filled buttons, image placeholders). Override those roles with true
   // black/white/gray so the "black and white" brand actually stays neutral.
-  final seeded = ColorScheme.fromSeed(
-    seedColor: navy,
-    brightness: brightness,
-  );
+  final seeded = ColorScheme.fromSeed(seedColor: navy, brightness: brightness);
   final scheme = brightness == Brightness.light
       ? seeded.copyWith(
           primary: navy,
