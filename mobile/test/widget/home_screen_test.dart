@@ -151,6 +151,9 @@ void main() {
 
     expect(requestedUrl, contains('type=GROCERY'));
     expect(find.text('Service bientôt disponible'), findsNothing);
-    expect(find.text('Aucun magasin disponible pour le moment.'), findsOneWidget);
+    expect(
+      find.text('Aucun magasin disponible pour le moment.'),
+      findsOneWidget,
+    );
   });
 }
