@@ -11,6 +11,8 @@ import 'catalogue/catalogue_repository.dart';
 import 'client/client_home_screen.dart';
 import 'config.dart';
 import 'core/api_client.dart';
+import 'courier_location/courier_location_repository.dart';
+import 'courier_location/courier_location_service.dart';
 import 'core/onboarding_storage.dart';
 import 'core/token_storage.dart';
 import 'dashboard/dashboard_screen.dart';
@@ -21,6 +23,7 @@ import 'notifications/push_notification_service.dart';
 import 'onboarding/onboarding_screen.dart';
 import 'onboarding/splash_screen.dart';
 import 'orders/orders_repository.dart';
+import 'promotions/promotions_repository.dart';
 import 'theme.dart';
 
 Future<void> main() async {
@@ -47,6 +50,8 @@ class _HssanDeliveryAppState extends State<HssanDeliveryApp> {
   late final CatalogueRepository _catalogue;
   late final OrdersRepository _orders;
   late final AddressRepository _addresses;
+  late final PromotionsRepository _promotions;
+  late final CourierLocationService _courierLocation;
   late final CartController _cart;
 
   @override
@@ -69,6 +74,11 @@ class _HssanDeliveryAppState extends State<HssanDeliveryApp> {
     _catalogue = CatalogueRepository(_api);
     _orders = OrdersRepository(_api);
     _addresses = AddressRepository(_api);
+    _promotions = PromotionsRepository(_api);
+    _courierLocation = CourierLocationService(
+      CourierLocationRepository(_api),
+      _deliveries,
+    );
     _cart = CartController();
 
     _pushNotifications.initialize();
@@ -79,6 +89,7 @@ class _HssanDeliveryAppState extends State<HssanDeliveryApp> {
   void dispose() {
     _api.close();
     _auth.dispose();
+    _courierLocation.dispose();
     _deliveries.dispose();
     _cart.dispose();
     super.dispose();
@@ -94,6 +105,7 @@ class _HssanDeliveryAppState extends State<HssanDeliveryApp> {
         Provider.value(value: _catalogue),
         Provider.value(value: _orders),
         Provider.value(value: _addresses),
+        Provider.value(value: _promotions),
       ],
       child: MaterialApp(
         title: 'Delivery Hassen',

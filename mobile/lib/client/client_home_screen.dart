@@ -4,9 +4,9 @@ import 'package:provider/provider.dart';
 import '../cart/cart.dart';
 import '../widgets/dark_header.dart';
 import 'cart_screen.dart';
+import 'home_screen.dart';
 import 'orders_screen.dart';
 import 'profile_screen.dart';
-import 'restaurants_screen.dart';
 
 class _CartTab extends StatelessWidget {
   const _CartTab();
@@ -33,9 +33,9 @@ class ClientHomeScreen extends StatefulWidget {
 class _ClientHomeScreenState extends State<ClientHomeScreen> {
   int _index = 0;
 
-  static const _titles = ['Restaurants', 'Mes commandes'];
+  static const _titles = ['Accueil', 'Mes commandes'];
   static const _tabs = [
-    RestaurantsScreen(),
+    HomeScreen(),
     OrdersScreen(),
     _CartTab(),
     ProfileScreen(),
@@ -60,9 +60,9 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
         onDestinationSelected: (value) => setState(() => _index = value),
         destinations: const [
           NavigationDestination(
-            icon: Icon(Icons.storefront_outlined),
-            selectedIcon: Icon(Icons.storefront),
-            label: 'Restaurants',
+            icon: Icon(Icons.home_outlined),
+            selectedIcon: Icon(Icons.home),
+            label: 'Accueil',
           ),
           NavigationDestination(
             icon: Icon(Icons.receipt_long_outlined),

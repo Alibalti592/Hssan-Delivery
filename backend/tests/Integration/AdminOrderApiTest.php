@@ -33,6 +33,7 @@ final class AdminOrderApiTest extends WebTestCase
             $this->entityManager->createQuery('DELETE FROM App\Entity\Order o')->execute();
             $this->entityManager->createQuery('DELETE FROM App\Entity\Product p')->execute();
             $this->entityManager->createQuery('DELETE FROM App\Entity\Category c')->execute();
+            $this->entityManager->createQuery('DELETE FROM App\Entity\Promotion pr')->execute();
             $this->entityManager->createQuery('DELETE FROM App\Entity\Restaurant r')->execute();
             $this->entityManager->createQuery('DELETE FROM App\Entity\DeliveryZone z')->execute();
 

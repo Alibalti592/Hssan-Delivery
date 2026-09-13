@@ -826,6 +826,10 @@ final class AdminRestaurantApiTest extends WebTestCase
              ->execute();
 
         $this->entityManager
+            ->createQuery('DELETE FROM App\Entity\Promotion pr')
+            ->execute();
+
+        $this->entityManager
             ->createQuery('DELETE FROM App\Entity\Restaurant r')
             ->execute();
 

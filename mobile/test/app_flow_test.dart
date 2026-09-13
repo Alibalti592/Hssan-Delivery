@@ -1,12 +1,15 @@
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:http/testing.dart';
 import 'package:http/http.dart' as http;
 import 'package:mobile/auth/auth_controller.dart';
 import 'package:mobile/auth/auth_repository.dart';
 import 'package:mobile/core/api_client.dart';
 import 'package:mobile/core/token_storage.dart';
+import 'package:mobile/courier_location/courier_location_repository.dart';
+import 'package:mobile/courier_location/courier_location_service.dart';
 import 'package:mobile/deliveries/deliveries_controller.dart';
 import 'package:mobile/deliveries/delivery.dart';
 import 'package:mobile/deliveries/delivery_repository.dart';
@@ -618,5 +621,170 @@ void main() {
         expect(auth.status, AuthStatus.signedOut);
       },
     );
+  });
+
+  group('CourierLocationService', () {
+    Position fakePosition(double lat, double lng) => Position(
+      latitude: lat,
+      longitude: lng,
+      timestamp: DateTime(2026),
+      accuracy: 0,
+      altitude: 0,
+      altitudeAccuracy: 0,
+      heading: 0,
+      headingAccuracy: 0,
+      speed: 0,
+      speedAccuracy: 0,
+    );
+
+    test('reports a position as soon as a delivery becomes active', () async {
+      final calls = <Map<String, dynamic>>[];
+      final mock = MockClient((request) async {
+        if (request.url.path == '/api/deliveries/mine') {
+          return _json(
+            _pagedBody([
+              {
+                'id': 1,
+                'status': 'ACCEPTED',
+                'courierId': 3,
+                'order': {'id': 10, 'status': 'CONFIRMED', 'items': []},
+              },
+            ]),
+          );
+        }
+        calls.add(jsonDecode(request.body) as Map<String, dynamic>);
+        return http.Response('', 204);
+      });
+
+      final api = ApiClient(
+        tokenProvider: () => 'jwt',
+        onUnauthorized: () {},
+        httpClient: mock,
+      );
+      final deliveries = DeliveriesController(DeliveryRepository(api));
+      final service = CourierLocationService(
+        CourierLocationRepository(api),
+        deliveries,
+        interval: const Duration(minutes: 5),
+        ensurePermission: () async => true,
+        getPosition: () async => fakePosition(36.8, 10.18),
+      );
+      addTearDown(service.dispose);
+
+      await deliveries.refresh();
+      await Future<void>.delayed(Duration.zero);
+
+      expect(calls, [
+        {'latitude': 36.8, 'longitude': 10.18},
+      ]);
+    });
+
+    test('never reports when location permission is unavailable', () async {
+      var reported = false;
+      final mock = MockClient((request) async {
+        if (request.url.path == '/api/deliveries/mine') {
+          return _json(
+            _pagedBody([
+              {
+                'id': 1,
+                'status': 'ACCEPTED',
+                'courierId': 3,
+                'order': {'id': 10, 'status': 'CONFIRMED', 'items': []},
+              },
+            ]),
+          );
+        }
+        reported = true;
+        return http.Response('', 204);
+      });
+
+      final api = ApiClient(
+        tokenProvider: () => 'jwt',
+        onUnauthorized: () {},
+        httpClient: mock,
+      );
+      final deliveries = DeliveriesController(DeliveryRepository(api));
+      final service = CourierLocationService(
+        CourierLocationRepository(api),
+        deliveries,
+        interval: const Duration(minutes: 5),
+        ensurePermission: () async => false,
+        getPosition: () async => fakePosition(36.8, 10.18),
+      );
+      addTearDown(service.dispose);
+
+      await deliveries.refresh();
+      await Future<void>.delayed(Duration.zero);
+
+      expect(reported, isFalse);
+    });
+
+    test('stops reporting once no delivery is active anymore', () async {
+      var hasActiveDelivery = true;
+      final calls = <Map<String, dynamic>>[];
+      final mock = MockClient((request) async {
+        if (request.url.path == '/api/deliveries/mine') {
+          return _json(
+            _pagedBody(
+              hasActiveDelivery
+                  ? [
+                      {
+                        'id': 1,
+                        'status': 'ACCEPTED',
+                        'courierId': 3,
+                        'order': {
+                          'id': 10,
+                          'status': 'CONFIRMED',
+                          'items': [],
+                        },
+                      },
+                    ]
+                  : [
+                      {
+                        'id': 1,
+                        'status': 'DELIVERED',
+                        'courierId': 3,
+                        'order': {
+                          'id': 10,
+                          'status': 'COMPLETED',
+                          'items': [],
+                        },
+                      },
+                    ],
+            ),
+          );
+        }
+        calls.add(jsonDecode(request.body) as Map<String, dynamic>);
+        return http.Response('', 204);
+      });
+
+      final api = ApiClient(
+        tokenProvider: () => 'jwt',
+        onUnauthorized: () {},
+        httpClient: mock,
+      );
+      final deliveries = DeliveriesController(DeliveryRepository(api));
+      final service = CourierLocationService(
+        CourierLocationRepository(api),
+        deliveries,
+        // Short enough to observe more than one tick within the test, long
+        // enough not to be flaky on a loaded CI runner.
+        interval: const Duration(milliseconds: 20),
+        ensurePermission: () async => true,
+        getPosition: () async => fakePosition(36.8, 10.18),
+      );
+      addTearDown(service.dispose);
+
+      await deliveries.refresh();
+      await Future<void>.delayed(const Duration(milliseconds: 70));
+      final countWhileActive = calls.length;
+      expect(countWhileActive, greaterThan(1));
+
+      hasActiveDelivery = false;
+      await deliveries.refresh();
+      await Future<void>.delayed(const Duration(milliseconds: 70));
+
+      expect(calls.length, countWhileActive);
+    });
   });
 }

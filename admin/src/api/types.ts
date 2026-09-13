@@ -109,6 +109,37 @@ export interface AdminDelivery {
   createdAt: string;
 }
 
+export type DiscountType = 'PERCENTAGE' | 'FIXED_AMOUNT';
+
+export interface Promotion {
+  id: number;
+  title: string;
+  description: string | null;
+  photoUrl: string | null;
+  discountType: DiscountType;
+  discountValue: string;
+  promoCode: string | null;
+  startAt: string;
+  endAt: string;
+  isActive: boolean;
+  restaurantId: number | null;
+  restaurantName: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type CourierMapStatus = 'ONLINE' | 'ON_DELIVERY' | 'OFFLINE';
+
+export interface CourierLocationEntry {
+  courierId: number;
+  name: string;
+  status: CourierMapStatus;
+  latitude: number | null;
+  longitude: number | null;
+  updatedAt: string | null;
+  currentDeliveryId: number | null;
+}
+
 export interface CurrentUser {
   id: number;
   name: string;

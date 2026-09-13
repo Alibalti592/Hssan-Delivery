@@ -7,6 +7,7 @@ use App\Dto\Admin\CreateCourierRequest;
 use App\Dto\Admin\ResetCourierPasswordRequest;
 use App\Dto\Admin\UpdateCourierActiveRequest;
 use App\Service\AuthService;
+use App\Service\CourierLocationService;
 use App\Service\CourierService;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -27,8 +28,21 @@ final class AdminCourierController extends AbstractApiController
         ValidatorInterface $validator,
         private readonly AuthService $authService,
         private readonly CourierService $courierService,
+        private readonly CourierLocationService $courierLocationService,
     ) {
         parent::__construct($serializer, $validator);
+    }
+
+    /**
+     * Powers the admin courier map: every courier paired with their last
+     * known GPS position (if they've ever reported one) and a derived
+     * status. See CourierLocationService for the "last known, not
+     * real-time" caveat and the ON_DELIVERY/ONLINE/OFFLINE heuristic.
+     */
+    #[Route('/locations', name: 'api_admin_courier_locations', methods: ['GET'])]
+    public function locations(): JsonResponse
+    {
+        return $this->json($this->courierLocationService->listForAdmin());
     }
 
     #[Route('', name: 'api_admin_courier_create', methods: ['POST'])]
