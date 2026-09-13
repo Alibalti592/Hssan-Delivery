@@ -915,7 +915,10 @@ final class OrderApiTest extends WebTestCase
     ): DeliveryZone {
         $zone = new DeliveryZone();
 
-        $zone->setName('Test Zone '.random_int(1000, 9999));
+        // A 4-digit range (9000 values) collides often enough across a
+        // 185+ test suite creating dozens of zones per run to fail CI on
+        // the unique name constraint — seen in practice, not theoretical.
+        $zone->setName('Test Zone '.random_int(1000000, 999999999));
         $zone->setFee($fee);
 
         $this->entityManager->persist($zone);
