@@ -1,13 +1,32 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/testing.dart';
+import 'package:mobile/addresses/address_repository.dart';
+import 'package:mobile/auth/auth_controller.dart';
+import 'package:mobile/auth/auth_repository.dart';
+import 'package:mobile/cart/cart.dart';
+import 'package:mobile/catalogue/catalogue_models.dart';
 import 'package:mobile/catalogue/catalogue_repository.dart';
 import 'package:mobile/client/home_screen.dart';
 import 'package:mobile/core/api_client.dart';
+import 'package:mobile/core/token_storage.dart';
 import 'package:mobile/promotions/promotions_repository.dart';
 import 'package:provider/provider.dart';
 
 import 'test_utils.dart';
+
+class _MemoryTokenStorage extends TokenStorage {
+  String? _token;
+
+  @override
+  Future<String?> read() async => _token;
+
+  @override
+  Future<void> write(String token) async => _token = token;
+
+  @override
+  Future<void> clear() async => _token = null;
+}
 
 Map<String, dynamic> _promotion(int id, String title) => {
   'id': id,
@@ -21,10 +40,44 @@ Map<String, dynamic> _promotion(int id, String title) => {
   'restaurantName': null,
 };
 
-Widget _wrap(PromotionsRepository repository) {
-  return Provider<PromotionsRepository>.value(
-    value: repository,
-    child: const MaterialApp(home: Scaffold(body: HomeScreen())),
+/// Wires up the full provider graph HomeScreen now depends on (address,
+/// catalogue, auth, cart — mirroring main.dart's real composition), with an
+/// empty-but-valid response for everything not explicitly overridden.
+Widget _wrap({
+  List<dynamic> promotions = const [],
+  List<dynamic> restaurants = const [],
+  CartController? cart,
+}) {
+  final api = ApiClient(
+    tokenProvider: () => 'jwt-123',
+    onUnauthorized: () {},
+    httpClient: MockClient((request) async {
+      if (request.url.path == '/api/addresses') {
+        return jsonResponse(const []);
+      }
+      if (request.url.path == '/api/restaurants') {
+        return jsonResponse(pagedBody(restaurants));
+      }
+      return jsonResponse(promotions);
+    }),
+  );
+
+  return MultiProvider(
+    providers: [
+      Provider<PromotionsRepository>.value(value: PromotionsRepository(api)),
+      Provider<CatalogueRepository>.value(value: CatalogueRepository(api)),
+      Provider<AddressRepository>.value(value: AddressRepository(api)),
+      ChangeNotifierProvider<AuthController>.value(
+        value: AuthController(
+          repository: AuthRepository(api),
+          storage: _MemoryTokenStorage(),
+        ),
+      ),
+      ChangeNotifierProvider<CartController>.value(
+        value: cart ?? CartController(),
+      ),
+    ],
+    child: MaterialApp(home: Scaffold(body: HomeScreen())),
   );
 }
 
@@ -32,18 +85,10 @@ void main() {
   testWidgets('shows exactly the four service cards, Restaurants first', (
     tester,
   ) async {
-    final repository = PromotionsRepository(
-      ApiClient(
-        tokenProvider: () => 'jwt-123',
-        onUnauthorized: () {},
-        httpClient: MockClient((request) async => jsonResponse([])),
-      ),
-    );
-
-    await tester.pumpWidget(_wrap(repository));
+    await tester.pumpWidget(_wrap());
     await tester.pumpAndSettle();
 
-    expect(find.text('Restaurants'), findsOneWidget);
+    expect(find.text('Restaurants'), findsWidgets);
     expect(find.text('Factures'), findsOneWidget);
     expect(find.text('Courses'), findsOneWidget);
     expect(find.text('Colis'), findsOneWidget);
@@ -53,15 +98,7 @@ void main() {
   testWidgets('tapping a coming-soon service shows the placeholder dialog', (
     tester,
   ) async {
-    final repository = PromotionsRepository(
-      ApiClient(
-        tokenProvider: () => 'jwt-123',
-        onUnauthorized: () {},
-        httpClient: MockClient((request) async => jsonResponse([])),
-      ),
-    );
-
-    await tester.pumpWidget(_wrap(repository));
+    await tester.pumpWidget(_wrap());
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('Factures'));
@@ -73,20 +110,14 @@ void main() {
   testWidgets(
     'shows the promotions carousel when the backend has active promos',
     (tester) async {
-      final repository = PromotionsRepository(
-        ApiClient(
-          tokenProvider: () => 'jwt-123',
-          onUnauthorized: () {},
-          httpClient: MockClient(
-            (request) async => jsonResponse([
-              _promotion(1, 'Summer Discount'),
-              _promotion(2, 'Weekend Special'),
-            ]),
-          ),
+      await tester.pumpWidget(
+        _wrap(
+          promotions: [
+            _promotion(1, 'Summer Discount'),
+            _promotion(2, 'Weekend Special'),
+          ],
         ),
       );
-
-      await tester.pumpWidget(_wrap(repository));
       await tester.pumpAndSettle();
 
       expect(find.text('Summer Discount'), findsOneWidget);
@@ -97,19 +128,33 @@ void main() {
   testWidgets('shows nothing extra when there are no active promotions', (
     tester,
   ) async {
-    final repository = PromotionsRepository(
-      ApiClient(
-        tokenProvider: () => 'jwt-123',
-        onUnauthorized: () {},
-        httpClient: MockClient((request) async => jsonResponse([])),
-      ),
-    );
-
-    await tester.pumpWidget(_wrap(repository));
+    await tester.pumpWidget(_wrap());
     await tester.pumpAndSettle();
 
     expect(find.text('Services'), findsOneWidget);
     expect(find.text('Impossible de charger les promotions.'), findsNothing);
+  });
+
+  testWidgets('shows a cart badge once an item is added', (tester) async {
+    final cart = CartController()
+      ..add(
+        Product.fromJson({
+          'id': 1,
+          'name': 'Classic Smash',
+          'description': null,
+          'price': '12.500',
+          'isAvailable': true,
+          'photoUrl': null,
+          'restaurantId': 1,
+          'categoryId': 1,
+        }),
+        restaurantName: 'Le Bon Burger',
+      );
+
+    await tester.pumpWidget(_wrap(cart: cart));
+    await tester.pumpAndSettle();
+
+    expect(find.text('1'), findsOneWidget);
   });
 
   testWidgets('tapping Courses opens grocery stores filtered by type', (
@@ -117,34 +162,38 @@ void main() {
   ) async {
     String? requestedUrl;
 
-    final catalogueRepository = CatalogueRepository(
-      ApiClient(
-        tokenProvider: () => 'jwt-123',
-        onUnauthorized: () {},
-        httpClient: MockClient((request) async {
+    final api = ApiClient(
+      tokenProvider: () => 'jwt-123',
+      onUnauthorized: () {},
+      httpClient: MockClient((request) async {
+        if (request.url.path == '/api/restaurants') {
           requestedUrl = request.url.toString();
-          return jsonResponse(pagedBody([]));
-        }),
-      ),
-    );
-    final promotionsRepository = PromotionsRepository(
-      ApiClient(
-        tokenProvider: () => 'jwt-123',
-        onUnauthorized: () {},
-        httpClient: MockClient((request) async => jsonResponse([])),
-      ),
+        }
+        return jsonResponse(pagedBody(const []));
+      }),
     );
 
     await tester.pumpWidget(
       MultiProvider(
         providers: [
-          Provider<PromotionsRepository>.value(value: promotionsRepository),
-          Provider<CatalogueRepository>.value(value: catalogueRepository),
+          Provider<PromotionsRepository>.value(
+            value: PromotionsRepository(api),
+          ),
+          Provider<CatalogueRepository>.value(value: CatalogueRepository(api)),
+          Provider<AddressRepository>.value(value: AddressRepository(api)),
+          ChangeNotifierProvider<AuthController>.value(
+            value: AuthController(
+              repository: AuthRepository(api),
+              storage: _MemoryTokenStorage(),
+            ),
+          ),
+          ChangeNotifierProvider<CartController>.value(value: CartController()),
         ],
-        child: const MaterialApp(home: Scaffold(body: HomeScreen())),
+        child: MaterialApp(home: Scaffold(body: HomeScreen())),
       ),
     );
     await tester.pumpAndSettle();
+    requestedUrl = null; // discard the home feed's own restaurant-type fetch
 
     await tester.tap(find.text('Courses'));
     await tester.pumpAndSettle();

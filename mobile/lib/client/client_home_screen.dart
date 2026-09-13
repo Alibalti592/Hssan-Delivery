@@ -33,7 +33,6 @@ class ClientHomeScreen extends StatefulWidget {
 class _ClientHomeScreenState extends State<ClientHomeScreen> {
   int _index = 0;
 
-  static const _titles = ['Accueil', 'Mes commandes'];
   static const _tabs = [
     HomeScreen(),
     OrdersScreen(),
@@ -43,13 +42,15 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // The first two tabs (browse/history) keep a plain light AppBar; the
-    // cart and profile tabs render their own dark header instead (matching
-    // the design's primary-action screens), so no outer AppBar there.
-    final showLightAppBar = _index < _titles.length;
+    // Home renders its own address/cart header, and the cart/profile tabs
+    // render their own dark header (matching the design's primary-action
+    // screens) — only "Mes commandes" needs the generic outer AppBar.
+    final showLightAppBar = _index == 1;
 
     return Scaffold(
-      appBar: showLightAppBar ? AppBar(title: Text(_titles[_index])) : null,
+      appBar: showLightAppBar
+          ? AppBar(title: const Text('Mes commandes'))
+          : null,
       body: SafeArea(
         top: !showLightAppBar,
         bottom: false,

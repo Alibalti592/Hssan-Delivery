@@ -1,11 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../catalogue/catalogue_models.dart' show RestaurantType;
+import '../addresses/address_models.dart';
+import '../addresses/address_repository.dart';
+import '../auth/auth_controller.dart';
+import '../cart/cart.dart';
+import '../catalogue/catalogue_models.dart' show Restaurant, RestaurantType;
+import '../catalogue/catalogue_repository.dart';
 import '../config.dart';
 import '../promotions/promotion_model.dart';
 import '../promotions/promotions_repository.dart';
 import '../theme.dart';
+import 'cart_screen.dart';
+import 'restaurant_menu_screen.dart';
 import 'restaurants_screen.dart';
 
 /// Pastel, organic-shaped service cards — the four entry points the client
@@ -18,8 +25,6 @@ class _Service {
     required this.title,
     required this.subtitle,
     required this.icon,
-    required this.background,
-    required this.foreground,
     this.comingSoon = false,
     this.restaurantType,
   });
@@ -27,8 +32,6 @@ class _Service {
   final String title;
   final String subtitle;
   final IconData icon;
-  final Color background;
-  final Color foreground;
   final bool comingSoon;
 
   /// Set when tapping this card should open RestaurantsScreen browsing
@@ -41,32 +44,24 @@ const _services = [
     title: 'Restaurants',
     subtitle: 'Vos plats préférés',
     icon: Icons.restaurant_menu,
-    background: Color(0xFFFFE8D6),
-    foreground: Color(0xFFB3541E),
     restaurantType: RestaurantType.restaurant,
   ),
   _Service(
     title: 'Factures',
     subtitle: 'Paiement rapide',
     icon: Icons.receipt_long,
-    background: Color(0xFFDCEBFF),
-    foreground: Color(0xFF2A5DA6),
     comingSoon: true,
   ),
   _Service(
     title: 'Courses',
     subtitle: 'Produits du quotidien',
     icon: Icons.shopping_basket_outlined,
-    background: Color(0xFFE1F3E0),
-    foreground: Color(0xFF347A34),
     restaurantType: RestaurantType.grocery,
   ),
   _Service(
     title: 'Colis',
     subtitle: 'Envoi rapide',
     icon: Icons.local_shipping_outlined,
-    background: Color(0xFFF0E4FA),
-    foreground: Color(0xFF7B4CA8),
     comingSoon: true,
   ),
 ];
@@ -80,21 +75,27 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   late Future<List<Promotion>> _promotionsFuture;
+  late Future<List<Restaurant>> _restaurantsFuture;
+  late Future<List<SavedAddress>> _addressesFuture;
 
   @override
   void initState() {
     super.initState();
-    _promotionsFuture = _load();
-  }
-
-  Future<List<Promotion>> _load() {
-    return context.read<PromotionsRepository>().listActive();
+    _promotionsFuture = context.read<PromotionsRepository>().listActive();
+    _restaurantsFuture = context.read<CatalogueRepository>().listRestaurants();
+    _addressesFuture = context.read<AddressRepository>().list();
   }
 
   Future<void> _refresh() async {
-    final future = _load();
-    setState(() => _promotionsFuture = future);
-    await future;
+    final promotions = context.read<PromotionsRepository>().listActive();
+    final restaurants = context.read<CatalogueRepository>().listRestaurants();
+    final addresses = context.read<AddressRepository>().list();
+    setState(() {
+      _promotionsFuture = promotions;
+      _restaurantsFuture = restaurants;
+      _addressesFuture = addresses;
+    });
+    await Future.wait([promotions, restaurants, addresses]);
   }
 
   void _openService(_Service service) {
@@ -126,6 +127,14 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  void _openRestaurant(Restaurant restaurant) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => RestaurantMenuScreen(restaurant: restaurant),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return RefreshIndicator(
@@ -133,19 +142,25 @@ class _HomeScreenState extends State<HomeScreen> {
       child: ListView(
         padding: const EdgeInsets.only(bottom: 24),
         children: [
-          _PromotionsSection(future: _promotionsFuture, onRetry: _refresh),
-          const SizedBox(height: 8),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-            child: Text(
-              'Services',
-              style: Theme.of(
-                context,
-              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+          _TopBar(addressesFuture: _addressesFuture),
+          const SizedBox(height: 18),
+          const _Greeting(),
+          const SizedBox(height: 16),
+          _SearchBar(
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => Scaffold(
+                  appBar: AppBar(title: const Text('Restaurants')),
+                  body: const RestaurantsScreen(),
+                ),
+              ),
             ),
           ),
+          _PromotionsSection(future: _promotionsFuture, onRetry: _refresh),
+          const SizedBox(height: 8),
+          const _SectionHeader(title: 'Services'),
           SizedBox(
-            height: 140,
+            height: 144,
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -160,6 +175,263 @@ class _HomeScreenState extends State<HomeScreen> {
               },
             ),
           ),
+          const SizedBox(height: 8),
+          _SectionHeader(
+            title: 'Restaurants',
+            onSeeAll: () => Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => Scaffold(
+                  appBar: AppBar(title: const Text('Restaurants')),
+                  body: const RestaurantsScreen(),
+                ),
+              ),
+            ),
+          ),
+          _RestaurantsPreview(
+            future: _restaurantsFuture,
+            onTapRestaurant: _openRestaurant,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Address (left) + cart shortcut (right), full-bleed at the top of the
+/// scrollable home feed.
+class _TopBar extends StatelessWidget {
+  const _TopBar({required this.addressesFuture});
+
+  final Future<List<SavedAddress>> addressesFuture;
+
+  @override
+  Widget build(BuildContext context) {
+    final cart = context.watch<CartController>();
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.location_on_outlined,
+                      size: 14,
+                      color: mutedText,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      'LIVRER À',
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: mutedText,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.6,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 2),
+                FutureBuilder<List<SavedAddress>>(
+                  future: addressesFuture,
+                  builder: (context, snapshot) {
+                    final addresses = snapshot.data ?? const [];
+                    final label = addresses.isEmpty
+                        ? 'Choisir une adresse'
+                        : (addresses.firstWhere(
+                            (a) => a.isDefault,
+                            orElse: () => addresses.first,
+                          )).label;
+                    return Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            label,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.titleSmall
+                                ?.copyWith(fontWeight: FontWeight.w800),
+                          ),
+                        ),
+                        const Icon(
+                          Icons.keyboard_arrow_down,
+                          size: 18,
+                          color: navy,
+                        ),
+                      ],
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          InkWell(
+            borderRadius: BorderRadius.circular(12),
+            onTap: () => Navigator.of(
+              context,
+            ).push(MaterialPageRoute(builder: (_) => const CartScreen())),
+            child: Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: navy,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  const Center(
+                    child: Icon(
+                      Icons.shopping_bag_outlined,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                  ),
+                  if (!cart.isEmpty)
+                    Positioned(
+                      right: -4,
+                      top: -4,
+                      child: Container(
+                        padding: const EdgeInsets.all(3),
+                        constraints: const BoxConstraints(
+                          minWidth: 18,
+                          minHeight: 18,
+                        ),
+                        decoration: const BoxDecoration(
+                          color: Colors.white,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Text(
+                          '${cart.itemCount}',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: navy,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Greeting extends StatelessWidget {
+  const _Greeting();
+
+  @override
+  Widget build(BuildContext context) {
+    final account = context.watch<AuthController>().account;
+    final firstName = (account?.name ?? '').split(' ').first;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Text.rich(
+        TextSpan(
+          style: Theme.of(
+            context,
+          ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w500),
+          children: [
+            const TextSpan(text: 'Bonjour'),
+            if (firstName.isNotEmpty) ...[
+              const TextSpan(text: ', '),
+              TextSpan(
+                text: firstName,
+                style: const TextStyle(fontWeight: FontWeight.w800),
+              ),
+            ],
+            const TextSpan(text: ' !'),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SearchBar extends StatelessWidget {
+  const _SearchBar({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+          decoration: BoxDecoration(
+            color: fieldFill,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.search, color: mutedText, size: 20),
+              const SizedBox(width: 10),
+              Text(
+                'Rechercher un plat, un restaurant',
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyMedium?.copyWith(color: mutedText),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader({required this.title, this.onSeeAll});
+
+  final String title;
+  final VoidCallback? onSeeAll;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 20, 16, 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            title,
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+          ),
+          if (onSeeAll != null)
+            TextButton(
+              onPressed: onSeeAll,
+              style: TextButton.styleFrom(
+                foregroundColor: mutedText,
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Voir tout',
+                    style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                  ),
+                  Icon(Icons.chevron_right, size: 18),
+                ],
+              ),
+            ),
         ],
       ),
     );
@@ -175,71 +447,228 @@ class _ServiceCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 128,
+      width: 104,
       child: Material(
-        color: service.background,
-        borderRadius: BorderRadius.circular(24),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
         child: InkWell(
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(16),
           onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.all(14),
+          child: Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: cardBorder),
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                Stack(
                   children: [
-                    Icon(service.icon, color: service.foreground, size: 26),
+                    Container(
+                      width: 40,
+                      height: 40,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: fieldFill,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(service.icon, color: navy, size: 20),
+                    ),
                     if (service.comingSoon)
-                      Flexible(
-                        child: FittedBox(
-                          fit: BoxFit.scaleDown,
-                          alignment: Alignment.centerRight,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 6,
-                              vertical: 2,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.6),
-                              borderRadius: BorderRadius.circular(999),
-                            ),
-                            child: Text(
-                              'Bientôt',
-                              style: TextStyle(
-                                fontSize: 9,
-                                fontWeight: FontWeight.w700,
-                                color: service.foreground,
-                              ),
+                      Positioned(
+                        right: -2,
+                        top: -2,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 5,
+                            vertical: 1,
+                          ),
+                          decoration: BoxDecoration(
+                            color: mutedText,
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: const Text(
+                            'Bientôt',
+                            style: TextStyle(
+                              fontSize: 8,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
                             ),
                           ),
                         ),
                       ),
                   ],
                 ),
-                const Spacer(),
+                const SizedBox(height: 10),
                 Text(
                   service.title,
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontWeight: FontWeight.w800,
-                    fontSize: 14,
-                    color: service.foreground,
+                    fontSize: 13,
                   ),
                 ),
-                const SizedBox(height: 2),
+                const SizedBox(height: 1),
                 Text(
                   service.subtitle,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: service.foreground.withValues(alpha: 0.85),
-                  ),
+                  style: const TextStyle(fontSize: 10.5, color: mutedText),
                 ),
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _RestaurantsPreview extends StatelessWidget {
+  const _RestaurantsPreview({
+    required this.future,
+    required this.onTapRestaurant,
+  });
+
+  final Future<List<Restaurant>> future;
+  final void Function(Restaurant) onTapRestaurant;
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<List<Restaurant>>(
+      future: future,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Padding(
+            padding: EdgeInsets.symmetric(vertical: 40),
+            child: Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        if (snapshot.hasError) {
+          return const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            child: Text('Impossible de charger les restaurants.'),
+          );
+        }
+
+        // The home feed only ever teases restaurants — "Voir tout" is where
+        // the full, searchable list lives — so cap it well short of a full
+        // page's worth even when the catalogue is large.
+        final restaurants = (snapshot.data ?? const []).take(4).toList();
+
+        if (restaurants.isEmpty) {
+          return const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            child: Text('Aucun restaurant disponible pour le moment.'),
+          );
+        }
+
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Column(
+            children: [
+              for (final restaurant in restaurants)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: _RestaurantPreviewCard(
+                    restaurant: restaurant,
+                    onTap: () => onTapRestaurant(restaurant),
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _RestaurantPreviewCard extends StatelessWidget {
+  const _RestaurantPreviewCard({required this.restaurant, required this.onTap});
+
+  final Restaurant restaurant;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            AspectRatio(
+              aspectRatio: 16 / 9,
+              child: restaurant.photoUrl != null
+                  ? Image.network(
+                      AppConfig.resolvePhotoUrl(restaurant.photoUrl!),
+                      fit: BoxFit.cover,
+                    )
+                  : Container(
+                      color: fieldFill,
+                      child: const Icon(
+                        Icons.storefront_outlined,
+                        size: 36,
+                        color: mutedText,
+                      ),
+                    ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(14),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          restaurant.name,
+                          style: Theme.of(context).textTheme.titleSmall
+                              ?.copyWith(fontWeight: FontWeight.w800),
+                        ),
+                        if (restaurant.description != null &&
+                            restaurant.description!.isNotEmpty) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            restaurant.description!,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 12.5,
+                              color: mutedText,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: restaurant.isAvailable ? successBg : dangerBg,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      restaurant.isAvailable ? 'Ouvert' : 'Fermé',
+                      style: TextStyle(
+                        color: restaurant.isAvailable
+                            ? successText
+                            : dangerText,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 10,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -300,7 +729,7 @@ class _PromotionsSection extends StatelessWidget {
           height: 150,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
             itemCount: promotions.length,
             separatorBuilder: (_, __) => const SizedBox(width: 12),
             itemBuilder: (context, index) =>
