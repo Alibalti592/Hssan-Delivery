@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../catalogue/catalogue_models.dart';
+import '../config.dart';
 import '../catalogue/catalogue_repository.dart';
 import '../theme.dart';
 import 'restaurant_menu_screen.dart';
@@ -177,7 +178,10 @@ class _RestaurantCard extends StatelessWidget {
             AspectRatio(
               aspectRatio: 16 / 9,
               child: restaurant.photoUrl != null
-                  ? Image.network(restaurant.photoUrl!, fit: BoxFit.cover)
+                  ? Image.network(
+                      AppConfig.resolvePhotoUrl(restaurant.photoUrl!),
+                      fit: BoxFit.cover,
+                    )
                   : Container(
                       color: Theme.of(
                         context,

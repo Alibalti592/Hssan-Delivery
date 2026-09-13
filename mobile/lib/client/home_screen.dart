@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../config.dart';
 import '../promotions/promotion_model.dart';
 import '../promotions/promotions_repository.dart';
 import '../theme.dart';
@@ -315,11 +316,11 @@ class _PromotionCard extends StatelessWidget {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            // Matches the existing Restaurant/Product photo convention in
-            // this app, which also uses the raw photoUrl directly without
-            // prefixing AppConfig.apiBaseUrl (see RestaurantsScreen).
             promotion.photoUrl != null
-                ? Image.network(promotion.photoUrl!, fit: BoxFit.cover)
+                ? Image.network(
+                    AppConfig.resolvePhotoUrl(promotion.photoUrl!),
+                    fit: BoxFit.cover,
+                  )
                 : Container(color: fieldFill),
             Positioned.fill(
               child: DecoratedBox(

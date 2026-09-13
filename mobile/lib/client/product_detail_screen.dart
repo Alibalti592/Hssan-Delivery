@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../cart/cart.dart';
 import '../catalogue/catalogue_models.dart';
+import '../config.dart';
 import '../theme.dart';
 
 class ProductDetailScreen extends StatefulWidget {
@@ -79,7 +80,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   height: 200,
                   width: double.infinity,
                   child: product.photoUrl != null
-                      ? Image.network(product.photoUrl!, fit: BoxFit.cover)
+                      ? Image.network(
+                          AppConfig.resolvePhotoUrl(product.photoUrl!),
+                          fit: BoxFit.cover,
+                        )
                       : Container(
                           color: fieldFill,
                           child: const Icon(
