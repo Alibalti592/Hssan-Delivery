@@ -57,7 +57,7 @@ class Order
     #[ORM\Column(length: 50, enumType: OrderStatus::class)]
     private OrderStatus $status = OrderStatus::PENDING;
 
-    #[ORM\Column(length: 20, enumType: DeliveryType::class)]
+    #[ORM\Column(length: 20, enumType: DeliveryType::class, options: ['default' => 'RESTAURANT'])]
     private DeliveryType $deliveryType = DeliveryType::RESTAURANT;
 
     #[ORM\Column]
