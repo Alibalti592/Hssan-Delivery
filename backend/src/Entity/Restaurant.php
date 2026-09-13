@@ -2,6 +2,7 @@
 
 namespace App\Entity;
 
+use App\Enum\RestaurantType;
 use App\Repository\RestaurantRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
@@ -24,6 +25,9 @@ class Restaurant
 
     #[ORM\Column]
     private bool $isAvailable = true;
+
+    #[ORM\Column(length: 20, enumType: RestaurantType::class, options: ['default' => 'RESTAURANT'])]
+    private RestaurantType $type = RestaurantType::RESTAURANT;
 
     #[ORM\Column(length: 255, nullable: true)]
     private ?string $photoFilename = null;
@@ -104,6 +108,18 @@ class Restaurant
     public function setIsAvailable(bool $isAvailable): static
     {
         $this->isAvailable = $isAvailable;
+
+        return $this;
+    }
+
+    public function getType(): RestaurantType
+    {
+        return $this->type;
+    }
+
+    public function setType(RestaurantType $type): static
+    {
+        $this->type = $type;
 
         return $this;
     }

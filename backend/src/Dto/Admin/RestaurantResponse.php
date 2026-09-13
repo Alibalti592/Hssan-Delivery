@@ -14,6 +14,7 @@ final class RestaurantResponse
             'name' => $restaurant->getName(),
             'description' => $restaurant->getDescription(),
             'isAvailable' => $restaurant->isAvailable(),
+            'type' => $restaurant->getType()->value,
             'photoUrl' => PhotoUploader::url($restaurant->getPhotoFilename(), 'restaurants'),
             'createdAt' => $restaurant->getCreatedAt()?->format(\DateTimeInterface::ATOM),
             'updatedAt' => $restaurant->getUpdatedAt()?->format(\DateTimeInterface::ATOM),

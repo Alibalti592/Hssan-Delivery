@@ -15,4 +15,7 @@ final class UpdateRestaurantRequest
 
     #[Assert\Type('bool')]
     public bool $isAvailable = true;
+
+    #[Assert\Choice(choices: ['RESTAURANT', 'GROCERY'])]
+    public string $type = 'RESTAURANT';
 }

@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { API_URL } from '../../api/client';
 import { restaurantsApi } from '../../api/resources';
+import type { RestaurantType } from '../../api/types';
 import {
   PageHeader,
   Loading,
@@ -13,14 +14,28 @@ import {
   formatDate,
 } from '../../components/ui';
 
+const TYPE_LABEL: Record<RestaurantType, string> = {
+  RESTAURANT: 'Restaurant',
+  GROCERY: 'Grocery store',
+};
+
+type TypeFilter = RestaurantType | 'ALL';
+
 export default function RestaurantsListPage() {
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
+  const [typeFilter, setTypeFilter] = useState<TypeFilter>('ALL');
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ['restaurants', page],
-    queryFn: () => restaurantsApi.list({ page }),
+    queryKey: ['restaurants', page, typeFilter],
+    queryFn: () =>
+      restaurantsApi.list({ page, ...(typeFilter !== 'ALL' ? { type: typeFilter } : {}) }),
   });
+
+  function handleTypeFilterChange(value: TypeFilter) {
+    setTypeFilter(value);
+    setPage(1);
+  }
 
   const toggleAvailability = useMutation({
     mutationFn: ({ id, isAvailable }: { id: number; isAvailable: boolean }) =>
@@ -34,9 +49,20 @@ export default function RestaurantsListPage() {
         title="Restaurants"
         subtitle={`${data?.meta.total ?? 0} restaurants`}
         actions={
-          <Link to="/restaurants/new" className="btn">
-            + New restaurant
-          </Link>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+            <select
+              className="field-select"
+              value={typeFilter}
+              onChange={(e) => handleTypeFilterChange(e.target.value as TypeFilter)}
+            >
+              <option value="ALL">All types</option>
+              <option value="RESTAURANT">Restaurants</option>
+              <option value="GROCERY">Grocery stores</option>
+            </select>
+            <Link to="/restaurants/new" className="btn">
+              + New restaurant
+            </Link>
+          </div>
         }
       />
       <div className="content">
@@ -44,7 +70,11 @@ export default function RestaurantsListPage() {
         {isLoading ? (
           <Loading />
         ) : !data || data.items.length === 0 ? (
-          <EmptyState>No restaurants yet.</EmptyState>
+          <EmptyState>
+            {typeFilter === 'ALL'
+              ? 'No restaurants yet.'
+              : `No ${TYPE_LABEL[typeFilter].toLowerCase()}s yet.`}
+          </EmptyState>
         ) : (
           <div className="card">
             <table>
@@ -52,6 +82,7 @@ export default function RestaurantsListPage() {
                 <tr>
                   <th></th>
                   <th>Name</th>
+                  <th>Type</th>
                   <th>Description</th>
                   <th>Status</th>
                   <th>Created</th>
@@ -73,6 +104,7 @@ export default function RestaurantsListPage() {
                       </div>
                     </td>
                     <td className="rname">{r.name}</td>
+                    <td>{TYPE_LABEL[r.type]}</td>
                     <td>{r.description ?? '—'}</td>
                     <td>
                       <AvailabilityBadge isAvailable={r.isAvailable} />

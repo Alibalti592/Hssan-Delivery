@@ -11,6 +11,7 @@ use App\Entity\User;
 use App\Enum\DeliveryStatus;
 use App\Enum\DeliveryType;
 use App\Enum\OrderStatus;
+use App\Enum\RestaurantType;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
@@ -134,6 +135,55 @@ final class OrderApiTest extends WebTestCase
         self::assertSame(
             DeliveryType::RESTAURANT,
             $delivery->getOrder()->getDeliveryType()
+        );
+    }
+
+    public function testOrderAgainstAGroceryStoreGetsGroceryDeliveryType(): void
+    {
+        $client = static::createClient();
+
+        $this->entityManager = self::getContainer()
+            ->get(EntityManagerInterface::class);
+
+        $user = $this->createTestUser();
+
+        $grocery = $this->createTestRestaurant(true, RestaurantType::GROCERY);
+        $category = $this->createTestCategory($grocery);
+        $product = $this->createTestProduct($grocery, $category);
+        $zone = $this->createTestDeliveryZone('4.000');
+
+        $token = $this->authenticateClient($client, $user);
+
+        $client->request(
+            'POST',
+            '/api/orders',
+            server: [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_AUTHORIZATION' => 'Bearer ' . $token,
+            ],
+            content: json_encode([
+                'restaurantId' => $grocery->getId(),
+                'items' => [
+                    [
+                        'productId' => $product->getId(),
+                        'quantity' => 1,
+                    ],
+                ],
+                'deliveryAddress' => 'Tunis, Tunisia',
+                'deliveryZoneId' => $zone->getId(),
+            ])
+        );
+
+        self::assertResponseStatusCodeSame(201);
+
+        $responseData = json_decode(
+            $client->getResponse()->getContent(),
+            true
+        );
+
+        self::assertSame(
+            DeliveryType::GROCERY->value,
+            $responseData['deliveryType']
         );
     }
 
@@ -866,7 +916,8 @@ final class OrderApiTest extends WebTestCase
     }
 
     private function createTestRestaurant(
-        bool $available = true
+        bool $available = true,
+        RestaurantType $type = RestaurantType::RESTAURANT,
     ): Restaurant {
         $restaurant = new Restaurant();
 
@@ -875,6 +926,7 @@ final class OrderApiTest extends WebTestCase
         );
 
         $restaurant->setIsAvailable($available);
+        $restaurant->setType($type);
 
         $this->entityManager->persist($restaurant);
         $this->entityManager->flush();

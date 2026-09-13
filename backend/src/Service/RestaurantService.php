@@ -5,6 +5,7 @@ namespace App\Service;
 use App\Dto\Admin\CreateRestaurantRequest;
 use App\Dto\Admin\UpdateRestaurantRequest;
 use App\Entity\Restaurant;
+use App\Enum\RestaurantType;
 use App\Exception\ConflictException;
 use App\Pagination\PaginatedResult;
 use App\Pagination\Paginator;
@@ -30,7 +31,8 @@ final class RestaurantService
         $restaurant
             ->setName($dto->name)
             ->setDescription($dto->description)
-            ->setIsAvailable($dto->isAvailable);
+            ->setIsAvailable($dto->isAvailable)
+            ->setType(RestaurantType::from($dto->type));
 
         $this->entityManager->persist($restaurant);
         $this->entityManager->flush();
@@ -41,7 +43,7 @@ final class RestaurantService
     /**
      * @return PaginatedResult<Restaurant>
      */
-    public function list(int $page, int $limit): PaginatedResult
+    public function list(int $page, int $limit, ?RestaurantType $type = null): PaginatedResult
     {
         $qb = $this->entityManager
             ->getRepository(Restaurant::class)
@@ -51,21 +53,28 @@ final class RestaurantService
             // for why a tiebreaker is required for stable pagination.
             ->addOrderBy('r.id', 'DESC');
 
+        if (null !== $type) {
+            $qb->andWhere('r.type = :type')->setParameter('type', $type);
+        }
+
         return Paginator::paginate($qb, $page, $limit);
     }
 
     /**
-     * The public catalogue: open restaurants only, alphabetical for browsing.
+     * The public catalogue: open restaurants (or grocery stores, depending
+     * on $type) only, alphabetical for browsing.
      *
      * @return PaginatedResult<Restaurant>
      */
-    public function listAvailable(int $page, int $limit): PaginatedResult
+    public function listAvailable(int $page, int $limit, RestaurantType $type = RestaurantType::RESTAURANT): PaginatedResult
     {
         $qb = $this->entityManager
             ->getRepository(Restaurant::class)
             ->createQueryBuilder('r')
             ->andWhere('r.isAvailable = :available')
+            ->andWhere('r.type = :type')
             ->setParameter('available', true)
+            ->setParameter('type', $type)
             ->orderBy('r.name', 'ASC')
             // Two restaurants can share a name — see DeliveryRepository for
             // why a tiebreaker is required for stable pagination.
@@ -88,7 +97,8 @@ final class RestaurantService
         $restaurant
             ->setName($dto->name)
             ->setDescription($dto->description)
-            ->setIsAvailable($dto->isAvailable);
+            ->setIsAvailable($dto->isAvailable)
+            ->setType(RestaurantType::from($dto->type));
 
         $this->entityManager->flush();
 

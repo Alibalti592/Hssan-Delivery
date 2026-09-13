@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { restaurantsApi } from '../../api/resources';
+import type { RestaurantType } from '../../api/types';
 import { PageHeader, ErrorBanner, Breadcrumb } from '../../components/ui';
 
 export default function RestaurantFormPage() {
@@ -10,10 +11,11 @@ export default function RestaurantFormPage() {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [isAvailable, setIsAvailable] = useState(true);
+  const [type, setType] = useState<RestaurantType>('RESTAURANT');
 
   const create = useMutation({
     mutationFn: () =>
-      restaurantsApi.create({ name, description: description || null, isAvailable }),
+      restaurantsApi.create({ name, description: description || null, isAvailable, type }),
     onSuccess: (restaurant) => {
       queryClient.invalidateQueries({ queryKey: ['restaurants'] });
       navigate(`/restaurants/${restaurant.id}`);
@@ -56,6 +58,20 @@ export default function RestaurantFormPage() {
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
               />
+            </div>
+            <div className="field-group">
+              <label className="field-label" htmlFor="type">
+                Type
+              </label>
+              <select
+                id="type"
+                className="field-select"
+                value={type}
+                onChange={(e) => setType(e.target.value as RestaurantType)}
+              >
+                <option value="RESTAURANT">Restaurant</option>
+                <option value="GROCERY">Grocery store</option>
+              </select>
             </div>
             <div className="field-group">
               <label className="field-checkbox">
