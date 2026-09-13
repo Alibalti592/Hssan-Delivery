@@ -27,6 +27,7 @@ final class OrderService
         private readonly RestaurantRepository $restaurantRepository,
         private readonly ProductRepository $productRepository,
         private readonly DeliveryZoneRepository $deliveryZoneRepository,
+        private readonly DeliveryService $deliveryService,
     ) {
     }
 
@@ -133,7 +134,10 @@ final class OrderService
         $qb = $this->orderRepository->createQueryBuilder('o')
             ->andWhere('o.user = :user')
             ->setParameter('user', $user)
-            ->orderBy('o.createdAt', 'DESC');
+            ->orderBy('o.createdAt', 'DESC')
+            // createdAt has only second precision — see DeliveryRepository
+            // for why a tiebreaker is required for stable pagination.
+            ->addOrderBy('o.id', 'DESC');
 
         return Paginator::paginate($qb, $page, $limit);
     }
@@ -144,5 +148,25 @@ final class OrderService
             'id' => $orderId,
             'user' => $user,
         ]);
+    }
+
+    /**
+     * Cancelling an order cancels its (1:1) delivery, which is the source of
+     * truth for whether cancellation is still allowed — a client can back
+     * out while it's unclaimed or just assigned, but not once a courier has
+     * actually accepted it. See DeliveryService::cancelDelivery.
+     */
+    public function cancelOrder(Order $order): Order
+    {
+        $delivery = $order->getDelivery();
+
+        if (null === $delivery) {
+            // Data-integrity invariant: every order is created with a delivery.
+            throw new \LogicException('Order must be associated with a delivery.');
+        }
+
+        $this->deliveryService->cancelDelivery($delivery);
+
+        return $order;
     }
 }

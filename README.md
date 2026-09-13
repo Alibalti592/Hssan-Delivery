@@ -144,10 +144,11 @@ Restaurant preparation states such as PREPARING remain part of the planned resta
 
 Backend API
 Authentication
-POST /api/auth/register
-POST /api/auth/login
-GET  /api/auth/me
-POST /api/auth/change-password
+POST  /api/auth/register
+POST  /api/auth/login
+GET   /api/auth/me
+POST  /api/auth/change-password
+PATCH /api/auth/availability
 Admin courier management
 POST  /api/admin/couriers
 GET   /api/admin/couriers
@@ -216,6 +217,7 @@ Orders
 POST /api/orders
 GET  /api/orders
 GET  /api/orders/{id}
+POST /api/orders/{id}/cancel
 Catalogue (what a signed-in client browses before ordering)
 GET /api/restaurants
 GET /api/restaurants/{id}
@@ -334,6 +336,28 @@ FIREBASE_CREDENTIALS in backend/.env.example and the FIREBASE_* dart-defines
 documented in mobile/lib/config.dart — so this doesn't require a Firebase
 account to develop, and a failed or skipped push never blocks the
 delivery/order action that triggered it.
+
+Client order cancellation
+
+A client can cancel their own order via POST /api/orders/{id}/cancel while
+its delivery is still unclaimed (PENDING) or just assigned (ASSIGNED) —
+the same boundary DeliveryService::cancelDelivery already enforces for
+admin cancellation, reused here rather than duplicated. Once a courier has
+accepted it, the client can no longer self-cancel. The order response also
+carries deliveryStatus, courierName and courierPhone (once a courier is
+assigned) so the mobile client order screen can show who's delivering and
+call them — the reverse of the courier-can-call-the-client direction that
+already existed.
+
+Courier availability
+
+A courier can self-report availability via PATCH /api/auth/availability
+(GET /api/auth/me and every other user-response endpoint returns
+isAvailable too). This is separate from isActive, which is an admin-only
+deactivation — a courier stepping away for a break sets their own
+availability; only an admin can deactivate the account entirely. The
+mobile dashboard's availability toggle is wired to this field rather than
+being purely cosmetic local state.
 
 Docker / CD pipeline
 
@@ -507,8 +531,8 @@ php bin/phpunit
 
 Current baseline:
 
-179 tests
-1086 assertions
+185 tests
+1128 assertions
 
 Tests share a single Postgres database rather than running each in its own
 transaction, so re-running `php bin/phpunit` without resetting the database
@@ -576,6 +600,8 @@ error tracking (Sentry, inert until a DSN is configured)
 pagination on every list endpoint likely to grow unbounded
 admin dashboard stats via dedicated COUNT queries
 push notifications on delivery status changes (FCM, inert until a Firebase project is configured)
+client-initiated order cancellation (while still unclaimed or just assigned)
+courier self-service availability toggle
 integration tests
 GitHub Actions CI
 Mobile
@@ -588,7 +614,8 @@ client home). See `mobile/README.md`.
 Courier:
 
 courier authentication (ROLE_LIVREUR only)
-a dashboard (availability toggle, today's stats, current delivery shortcut)
+a dashboard (real self-service availability toggle backed by PATCH
+/api/auth/availability, today's stats, current delivery shortcut)
 an available-deliveries screen to accept/decline a proposed delivery
 delivery queue (GET /api/deliveries/mine, active vs. history, "load more" for older history)
 delivery details (pickup, drop-off, customer, items, pricing)
@@ -601,12 +628,15 @@ push notification registration (FCM, inert without a Firebase project — see "P
 Client:
 
 client registration and authentication (ROLE_CLIENT)
-restaurant browsing (GET /api/restaurants)
+restaurant browsing with a search box (GET /api/restaurants)
 menu browsing by category with add-to-cart (GET .../categories, .../products)
 a cart (single-restaurant, quantity steppers, restaurant-switch confirmation)
 checkout (delivery address, delivery zone, optional note, live total)
 order placement (POST /api/orders) and a confirmation screen
 order history and order detail (GET /api/orders, GET /api/orders/{id}, "load more" for older orders)
+order tracking that polls for status changes and shows/calls the assigned
+courier once one exists, plus self-service cancellation while still
+possible (POST /api/orders/{id}/cancel)
 a profile screen (account info, change password, sign out)
 push notification registration (FCM, inert without a Firebase project — see "Push notifications" above)
 

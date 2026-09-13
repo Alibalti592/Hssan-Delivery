@@ -24,7 +24,12 @@ class DeliveryRepository extends ServiceEntityRepository
         $qb = $this->createQueryBuilder('d')
             ->andWhere('d.courier = :courier')
             ->setParameter('courier', $courier)
-            ->orderBy('d.createdAt', 'DESC');
+            ->orderBy('d.createdAt', 'DESC')
+            // createdAt has only second precision, so rows created within
+            // the same second tie — without this, LIMIT/OFFSET pagination
+            // can return a row twice (or skip one) across separate page
+            // requests, since a tie has no stable relative order otherwise.
+            ->addOrderBy('d.id', 'DESC');
 
         return Paginator::paginate($qb, $page, $limit);
     }
@@ -35,7 +40,8 @@ class DeliveryRepository extends ServiceEntityRepository
     public function paginateAllOrderedByCreatedAtDesc(int $page, int $limit): PaginatedResult
     {
         $qb = $this->createQueryBuilder('d')
-            ->orderBy('d.createdAt', 'DESC');
+            ->orderBy('d.createdAt', 'DESC')
+            ->addOrderBy('d.id', 'DESC');
 
         return Paginator::paginate($qb, $page, $limit);
     }

@@ -49,7 +49,10 @@ class UserRepository extends ServiceEntityRepository implements PasswordUpgrader
         $qb = $this->createQueryBuilder('u')
             ->andWhere('u.id IN (:ids)')
             ->setParameter('ids', $ids)
-            ->orderBy('u.createdAt', 'DESC');
+            ->orderBy('u.createdAt', 'DESC')
+            // createdAt has only second precision — see DeliveryRepository
+            // for why a tiebreaker is required for stable pagination.
+            ->addOrderBy('u.id', 'DESC');
 
         return Paginator::paginate($qb, $page, $limit);
     }

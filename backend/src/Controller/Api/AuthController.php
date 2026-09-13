@@ -4,6 +4,7 @@ namespace App\Controller\Api;
 
 use App\Dto\Auth\ChangePasswordRequest;
 use App\Dto\Auth\RegisterUserRequest;
+use App\Dto\Auth\UpdateAvailabilityRequest;
 use App\Dto\Auth\UserResponse;
 use App\Entity\User;
 use App\Service\AuthService;
@@ -13,6 +14,7 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\RateLimiter\RateLimiterFactory;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Security\Http\Attribute\IsGranted;
 use Symfony\Component\Serializer\SerializerInterface;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
 
@@ -92,5 +94,25 @@ class AuthController extends AbstractApiController
         $this->authService->changePassword($user, $dto->currentPassword, $dto->newPassword);
 
         return new JsonResponse(null, Response::HTTP_NO_CONTENT);
+    }
+
+    /**
+     * Self-service toggle for a courier's own availability — distinct from
+     * AdminCourierController::active(), which is an admin deactivating the
+     * account entirely, not the courier stepping away for a break.
+     */
+    #[Route('/availability', name: 'api_auth_availability', methods: ['PATCH'])]
+    #[IsGranted('ROLE_LIVREUR')]
+    public function availability(Request $request): JsonResponse
+    {
+        /** @var User $user */
+        $user = $this->security->getUser();
+
+        /** @var UpdateAvailabilityRequest $dto */
+        $dto = $this->deserializeAndValidate($request, UpdateAvailabilityRequest::class);
+
+        $this->authService->setAvailability($user, $dto->isAvailable);
+
+        return new JsonResponse(UserResponse::fromEntity($user));
     }
 }

@@ -208,6 +208,10 @@ final class AuthApiTest extends WebTestCase
             $response['isVerified']
         );
 
+        self::assertTrue(
+            $response['isAvailable']
+        );
+
         self::assertArrayNotHasKey(
             'password',
             $response
@@ -659,6 +663,76 @@ final class AuthApiTest extends WebTestCase
         );
     }
 
+    public function testCourierCanToggleOwnAvailability(): void
+    {
+        $client = static::createClient();
+
+        $this->entityManager = self::getContainer()
+            ->get(EntityManagerInterface::class);
+
+        $courier = $this->createTestCourier();
+        $token = $this->authenticateClient($client, $courier);
+
+        $client->request(
+            'PATCH',
+            '/api/auth/availability',
+            server: [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_AUTHORIZATION' => 'Bearer ' . $token,
+            ],
+            content: json_encode(['isAvailable' => false])
+        );
+
+        self::assertResponseIsSuccessful();
+
+        $response = json_decode(
+            $client->getResponse()->getContent(),
+            true
+        );
+
+        self::assertFalse($response['isAvailable']);
+
+        $client->request(
+            'GET',
+            '/api/auth/me',
+            server: [
+                'HTTP_AUTHORIZATION' => 'Bearer ' . $token,
+            ]
+        );
+
+        $me = json_decode(
+            $client->getResponse()->getContent(),
+            true
+        );
+
+        self::assertFalse($me['isAvailable']);
+    }
+
+    public function testClientCannotToggleAvailability(): void
+    {
+        $client = static::createClient();
+
+        $this->entityManager = self::getContainer()
+            ->get(EntityManagerInterface::class);
+
+        $user = $this->createTestUser();
+        $token = $this->authenticateClient($client, $user);
+
+        $client->request(
+            'PATCH',
+            '/api/auth/availability',
+            server: [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_AUTHORIZATION' => 'Bearer ' . $token,
+            ],
+            content: json_encode(['isAvailable' => false])
+        );
+
+        self::assertResponseStatusCodeSame(
+            Response::HTTP_FORBIDDEN
+        );
+    }
+
     private function createTestUser(): User
     {
         $phone = $this->uniquePhone();
@@ -686,6 +760,28 @@ final class AuthApiTest extends WebTestCase
         $this->entityManager->flush();
 
         return $user;
+    }
+
+    private function createTestCourier(): User
+    {
+        $courier = new User();
+
+        $courier->setName('Test Courier');
+        $courier->setPhone($this->uniquePhone());
+        $courier->setRoles(['ROLE_LIVREUR']);
+        $courier->setVerifiedAt(new \DateTimeImmutable());
+
+        $passwordHasher = self::getContainer()
+            ->get(UserPasswordHasherInterface::class);
+
+        $courier->setPassword(
+            $passwordHasher->hashPassword($courier, 'password123')
+        );
+
+        $this->entityManager->persist($courier);
+        $this->entityManager->flush();
+
+        return $courier;
     }
 
     private function authenticateClient(

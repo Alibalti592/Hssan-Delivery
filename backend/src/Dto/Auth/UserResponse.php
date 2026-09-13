@@ -17,6 +17,7 @@ final class UserResponse
         public readonly string $phone,
         public readonly array $roles,
         public readonly bool $isVerified,
+        public readonly bool $isAvailable,
     ) {
     }
 
@@ -28,6 +29,7 @@ final class UserResponse
             phone: $user->getPhone(),
             roles: $user->getRoles(),
             isVerified: $user->isVerified(),
+            isAvailable: $user->isAvailable(),
         );
     }
 }

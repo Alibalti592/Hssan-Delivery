@@ -105,4 +105,16 @@ final class AuthService
 
         $this->entityManager->flush();
     }
+
+    /**
+     * Self-service toggle for a courier's own availability. Any account can
+     * call it (no ROLE_LIVREUR check here — the route itself is gated), and
+     * it's meaningless-but-harmless for a client to have it set.
+     */
+    public function setAvailability(User $user, bool $isAvailable): void
+    {
+        $user->setAvailable($isAvailable);
+
+        $this->entityManager->flush();
+    }
 }

@@ -50,6 +50,14 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\Column(options: ['default' => true])]
     private bool $isActive = true;
 
+    /**
+     * Self-service toggle for a courier: whether they're currently open to
+     * new deliveries. Meaningless for non-couriers (defaults true, never
+     * read). Distinct from isActive, which is an admin-only deactivation.
+     */
+    #[ORM\Column(options: ['default' => true])]
+    private bool $isAvailable = true;
+
     #[ORM\Column]
     private ?\DateTimeImmutable $createdAt = null;
 
@@ -187,6 +195,18 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function setActive(bool $isActive): static
     {
         $this->isActive = $isActive;
+
+        return $this;
+    }
+
+    public function isAvailable(): bool
+    {
+        return $this->isAvailable;
+    }
+
+    public function setAvailable(bool $isAvailable): static
+    {
+        $this->isAvailable = $isAvailable;
 
         return $this;
     }

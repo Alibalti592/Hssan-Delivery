@@ -70,7 +70,10 @@ final class ProductService
         $qb = $this->productRepository->createQueryBuilder('p')
             ->andWhere('p.restaurant = :restaurant')
             ->setParameter('restaurant', $restaurant)
-            ->orderBy('p.createdAt', 'ASC');
+            ->orderBy('p.createdAt', 'ASC')
+            // createdAt has only second precision — see DeliveryRepository
+            // for why a tiebreaker is required for stable pagination.
+            ->addOrderBy('p.id', 'ASC');
 
         return Paginator::paginate($qb, $page, $limit);
     }
@@ -90,7 +93,8 @@ final class ProductService
             ->andWhere('p.isAvailable = :available')
             ->setParameter('restaurant', $restaurant)
             ->setParameter('available', true)
-            ->orderBy('p.createdAt', 'ASC');
+            ->orderBy('p.createdAt', 'ASC')
+            ->addOrderBy('p.id', 'ASC');
 
         return Paginator::paginate($qb, $page, $limit);
     }

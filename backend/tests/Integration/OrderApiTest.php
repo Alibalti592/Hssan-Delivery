@@ -594,6 +594,209 @@ final class OrderApiTest extends WebTestCase
         self::assertSame(2, $response['meta']['page']);
     }
 
+    public function testClientCanCancelAPendingOrder(): void
+    {
+        $client = static::createClient();
+
+        $this->entityManager = self::getContainer()
+            ->get(EntityManagerInterface::class);
+
+        $user = $this->createTestUser();
+        $restaurant = $this->createTestRestaurant();
+        $category = $this->createTestCategory($restaurant);
+        $product = $this->createTestProduct($restaurant, $category);
+        $zone = $this->createTestDeliveryZone('4.000');
+
+        $token = $this->authenticateClient($client, $user);
+
+        $orderId = $this->placeOrderAndGetId($client, $token, $restaurant, $product, $zone);
+
+        $client->request(
+            'POST',
+            "/api/orders/{$orderId}/cancel",
+            server: [
+                'HTTP_AUTHORIZATION' => 'Bearer ' . $token,
+            ]
+        );
+
+        self::assertResponseIsSuccessful();
+
+        $response = json_decode(
+            $client->getResponse()->getContent(),
+            true
+        );
+
+        self::assertSame(OrderStatus::CANCELLED->value, $response['status']);
+        self::assertSame(DeliveryStatus::CANCELLED->value, $response['deliveryStatus']);
+    }
+
+    public function testClientCannotCancelAnotherUsersOrder(): void
+    {
+        $client = static::createClient();
+
+        $this->entityManager = self::getContainer()
+            ->get(EntityManagerInterface::class);
+
+        $owner = $this->createTestUser();
+        $intruder = $this->createTestUser();
+        $restaurant = $this->createTestRestaurant();
+        $category = $this->createTestCategory($restaurant);
+        $product = $this->createTestProduct($restaurant, $category);
+        $zone = $this->createTestDeliveryZone('4.000');
+
+        $ownerToken = $this->authenticateClient($client, $owner);
+        $orderId = $this->placeOrderAndGetId($client, $ownerToken, $restaurant, $product, $zone);
+
+        $intruderToken = $this->authenticateClient($client, $intruder);
+
+        $client->request(
+            'POST',
+            "/api/orders/{$orderId}/cancel",
+            server: [
+                'HTTP_AUTHORIZATION' => 'Bearer ' . $intruderToken,
+            ]
+        );
+
+        self::assertResponseStatusCodeSame(404);
+    }
+
+    public function testClientCannotCancelOnceCourierHasAccepted(): void
+    {
+        $client = static::createClient();
+
+        $this->entityManager = self::getContainer()
+            ->get(EntityManagerInterface::class);
+
+        $user = $this->createTestUser();
+        $restaurant = $this->createTestRestaurant();
+        $category = $this->createTestCategory($restaurant);
+        $product = $this->createTestProduct($restaurant, $category);
+        $zone = $this->createTestDeliveryZone('4.000');
+
+        $token = $this->authenticateClient($client, $user);
+        $orderId = $this->placeOrderAndGetId($client, $token, $restaurant, $product, $zone);
+
+        $courier = $this->createTestUser();
+        $courier->setRoles(['ROLE_LIVREUR']);
+
+        $delivery = $this->entityManager
+            ->getRepository(\App\Entity\Delivery::class)
+            ->findOneBy(['order' => $orderId]);
+
+        self::assertNotNull($delivery);
+
+        $delivery->setCourier($courier);
+        $delivery->setStatus(DeliveryStatus::ACCEPTED);
+        $this->entityManager->flush();
+
+        $client->request(
+            'POST',
+            "/api/orders/{$orderId}/cancel",
+            server: [
+                'HTTP_AUTHORIZATION' => 'Bearer ' . $token,
+            ]
+        );
+
+        self::assertResponseStatusCodeSame(400);
+
+        $response = json_decode(
+            $client->getResponse()->getContent(),
+            true
+        );
+
+        self::assertSame(
+            'This delivery cannot be cancelled at its current status.',
+            $response['message']
+        );
+    }
+
+    public function testOrderResponseIncludesAssignedCourierNameAndPhone(): void
+    {
+        $client = static::createClient();
+
+        $this->entityManager = self::getContainer()
+            ->get(EntityManagerInterface::class);
+
+        $user = $this->createTestUser();
+        $restaurant = $this->createTestRestaurant();
+        $category = $this->createTestCategory($restaurant);
+        $product = $this->createTestProduct($restaurant, $category);
+        $zone = $this->createTestDeliveryZone('4.000');
+
+        $token = $this->authenticateClient($client, $user);
+        $orderId = $this->placeOrderAndGetId($client, $token, $restaurant, $product, $zone);
+
+        $courier = $this->createTestUser();
+        $courier->setRoles(['ROLE_LIVREUR']);
+        $courier->setName('Sami Courier');
+
+        $delivery = $this->entityManager
+            ->getRepository(\App\Entity\Delivery::class)
+            ->findOneBy(['order' => $orderId]);
+
+        self::assertNotNull($delivery);
+
+        $delivery->setCourier($courier);
+        $delivery->setStatus(DeliveryStatus::ASSIGNED);
+        $this->entityManager->flush();
+
+        $client->request(
+            'GET',
+            "/api/orders/{$orderId}",
+            server: [
+                'HTTP_AUTHORIZATION' => 'Bearer ' . $token,
+            ]
+        );
+
+        self::assertResponseIsSuccessful();
+
+        $response = json_decode(
+            $client->getResponse()->getContent(),
+            true
+        );
+
+        self::assertSame('Sami Courier', $response['courierName']);
+        self::assertSame($courier->getPhone(), $response['courierPhone']);
+        self::assertSame(DeliveryStatus::ASSIGNED->value, $response['deliveryStatus']);
+    }
+
+    private function placeOrderAndGetId(
+        KernelBrowser $client,
+        string $token,
+        Restaurant $restaurant,
+        Product $product,
+        DeliveryZone $zone,
+    ): int {
+        $client->request(
+            'POST',
+            '/api/orders',
+            server: [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_AUTHORIZATION' => 'Bearer ' . $token,
+            ],
+            content: json_encode([
+                'restaurantId' => $restaurant->getId(),
+                'items' => [
+                    [
+                        'productId' => $product->getId(),
+                        'quantity' => 1,
+                    ],
+                ],
+                'deliveryAddress' => 'Tunis, Tunisia',
+                'deliveryZoneId' => $zone->getId(),
+            ])
+        );
+
+        self::assertResponseStatusCodeSame(201);
+
+        $response = json_decode(
+            $client->getResponse()->getContent(),
+            true
+        );
+
+        return $response['id'];
+    }
+
     private function placeOrder(
         KernelBrowser $client,
         string $token,

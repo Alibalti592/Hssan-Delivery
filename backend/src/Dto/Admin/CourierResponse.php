@@ -15,6 +15,7 @@ final class CourierResponse
             'roles' => $courier->getRoles(),
             'verified' => $courier->isVerified(),
             'isActive' => $courier->isActive(),
+            'isAvailable' => $courier->isAvailable(),
             'createdAt' => $courier->getCreatedAt()?->format(\DateTimeInterface::ATOM),
             'updatedAt' => $courier->getUpdatedAt()?->format(\DateTimeInterface::ATOM),
         ];

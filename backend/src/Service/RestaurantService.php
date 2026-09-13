@@ -46,7 +46,10 @@ final class RestaurantService
         $qb = $this->entityManager
             ->getRepository(Restaurant::class)
             ->createQueryBuilder('r')
-            ->orderBy('r.createdAt', 'DESC');
+            ->orderBy('r.createdAt', 'DESC')
+            // createdAt has only second precision — see DeliveryRepository
+            // for why a tiebreaker is required for stable pagination.
+            ->addOrderBy('r.id', 'DESC');
 
         return Paginator::paginate($qb, $page, $limit);
     }
@@ -63,7 +66,10 @@ final class RestaurantService
             ->createQueryBuilder('r')
             ->andWhere('r.isAvailable = :available')
             ->setParameter('available', true)
-            ->orderBy('r.name', 'ASC');
+            ->orderBy('r.name', 'ASC')
+            // Two restaurants can share a name — see DeliveryRepository for
+            // why a tiebreaker is required for stable pagination.
+            ->addOrderBy('r.id', 'ASC');
 
         return Paginator::paginate($qb, $page, $limit);
     }
