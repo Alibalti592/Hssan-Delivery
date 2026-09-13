@@ -165,6 +165,7 @@ final class AdminOrderApiTest extends WebTestCase
         self::assertSame('Test Client Two', $response['userName']);
         self::assertSame('16.500', $response['totalAmount']);
         self::assertSame('4.000', $response['deliveryFee']);
+        self::assertSame('RESTAURANT', $response['deliveryType']);
         self::assertCount(1, $response['items']);
     }
 

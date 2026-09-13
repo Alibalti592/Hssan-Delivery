@@ -35,6 +35,7 @@ final class OrderResponse
             'deliveryFee' => $order->getDeliveryFee(),
             'totalAmount' => $order->getTotalAmount(),
             'status' => $order->getStatus()->value,
+            'deliveryType' => $order->getDeliveryType()->value,
             'deliveryId' => $order->getDelivery()?->getId(),
             'createdAt' => $order->getCreatedAt()?->format(\DateTimeInterface::ATOM),
             'updatedAt' => $order->getUpdatedAt()?->format(\DateTimeInterface::ATOM),

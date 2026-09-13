@@ -11,6 +11,7 @@ import {
   Pagination,
   money,
   formatDate,
+  deliveryTypeLabel,
 } from '../../components/ui';
 
 export default function OrdersListPage() {
@@ -37,6 +38,7 @@ export default function OrdersListPage() {
                   <th>Order</th>
                   <th>Customer</th>
                   <th>Restaurant</th>
+                  <th>Service</th>
                   <th>Total</th>
                   <th>Status</th>
                   <th>Placed</th>
@@ -52,6 +54,7 @@ export default function OrdersListPage() {
                       <div className="rmeta">{o.userPhone}</div>
                     </td>
                     <td>{o.restaurantName}</td>
+                    <td>{deliveryTypeLabel(o.deliveryType)}</td>
                     <td>{money(o.totalAmount)}</td>
                     <td>
                       <StatusBadge status={o.status} />

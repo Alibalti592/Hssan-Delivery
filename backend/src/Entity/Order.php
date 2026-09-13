@@ -2,6 +2,7 @@
 
 namespace App\Entity;
 
+use App\Enum\DeliveryType;
 use App\Enum\OrderStatus;
 use App\Repository\OrderRepository;
 use Doctrine\Common\Collections\ArrayCollection;
@@ -55,6 +56,9 @@ class Order
 
     #[ORM\Column(length: 50, enumType: OrderStatus::class)]
     private OrderStatus $status = OrderStatus::PENDING;
+
+    #[ORM\Column(length: 20, enumType: DeliveryType::class)]
+    private DeliveryType $deliveryType = DeliveryType::RESTAURANT;
 
     #[ORM\Column]
     private ?\DateTimeImmutable $createdAt = null;
@@ -210,6 +214,18 @@ class Order
     public function setStatus(OrderStatus $status): static
     {
         $this->status = $status;
+
+        return $this;
+    }
+
+    public function getDeliveryType(): DeliveryType
+    {
+        return $this->deliveryType;
+    }
+
+    public function setDeliveryType(DeliveryType $deliveryType): static
+    {
+        $this->deliveryType = $deliveryType;
 
         return $this;
     }

@@ -759,6 +759,7 @@ final class DeliveryApiTest extends WebTestCase
         self::assertSame('Delivery Test Client', $order['customerName']);
         self::assertNotEmpty($order['customerPhone']);
         self::assertNotEmpty($order['restaurantName']);
+        self::assertSame('RESTAURANT', $order['deliveryType']);
         self::assertCount(1, $order['items']);
         self::assertSame(1, $order['items'][0]['quantity']);
         self::assertSame('12.500', $order['items'][0]['unitPrice']);

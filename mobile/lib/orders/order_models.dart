@@ -59,6 +59,7 @@ class ClientOrder {
     required this.deliveryFee,
     required this.totalAmount,
     required this.status,
+    required this.deliveryType,
     required this.createdAt,
     required this.deliveryStatus,
     required this.courierName,
@@ -75,6 +76,12 @@ class ClientOrder {
   final String deliveryFee;
   final String totalAmount;
   final OrderStatus status;
+
+  /// Which of the client home screen's four services this order belongs to
+  /// (see mobile HomeScreen) — 'RESTAURANT', 'BILL', 'GROCERY', or 'PARCEL'.
+  /// Only RESTAURANT is ever produced today; carried as a plain string since
+  /// there's no branching logic on it yet.
+  final String deliveryType;
   final DateTime? createdAt;
   final DeliveryStatus? deliveryStatus;
   final String? courierName;
@@ -101,6 +108,7 @@ class ClientOrder {
       deliveryFee: json['deliveryFee'] as String? ?? '0.000',
       totalAmount: json['totalAmount'] as String? ?? '0.000',
       status: OrderStatus.fromWire(json['status'] as String? ?? 'PENDING'),
+      deliveryType: json['deliveryType'] as String? ?? 'RESTAURANT',
       createdAt: json['createdAt'] is String
           ? DateTime.tryParse(json['createdAt'] as String)
           : null,

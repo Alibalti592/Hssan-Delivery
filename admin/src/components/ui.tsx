@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { ApiError } from '../api/client';
+import type { DeliveryType } from '../api/types';
 
 export function PageHeader({
   title,
@@ -149,6 +150,20 @@ export function Pagination({
       </button>
     </div>
   );
+}
+
+const DELIVERY_TYPE_LABEL: Record<DeliveryType, string> = {
+  RESTAURANT: 'Restaurant',
+  BILL: 'Bill payment',
+  GROCERY: 'Grocery',
+  PARCEL: 'Parcel',
+};
+
+// Only RESTAURANT is backed by a real ordering flow today (see backend
+// App\Enum\DeliveryType) — the other three exist so an order/delivery row
+// doesn't need another migration once those services get their own backend.
+export function deliveryTypeLabel(type: DeliveryType): string {
+  return DELIVERY_TYPE_LABEL[type] ?? type;
 }
 
 export function money(amount: string): string {

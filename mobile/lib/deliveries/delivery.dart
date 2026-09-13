@@ -95,6 +95,7 @@ class DeliveryOrder {
     required this.note,
     required this.deliveryFee,
     required this.totalAmount,
+    required this.deliveryType,
     required this.items,
   });
 
@@ -106,6 +107,10 @@ class DeliveryOrder {
   final String? note;
   final String deliveryFee;
   final String totalAmount;
+
+  /// Which of the four client services this delivery is for — see
+  /// ClientOrder.deliveryType. Only 'RESTAURANT' is ever produced today.
+  final String deliveryType;
   final List<DeliveryItem> items;
 
   factory DeliveryOrder.fromJson(Map<String, dynamic> json) {
@@ -118,6 +123,7 @@ class DeliveryOrder {
       note: json['note'] as String?,
       deliveryFee: json['deliveryFee'] as String? ?? '0.000',
       totalAmount: json['totalAmount'] as String? ?? '0.000',
+      deliveryType: json['deliveryType'] as String? ?? 'RESTAURANT',
       items: ((json['items'] as List<dynamic>?) ?? const [])
           .map((e) => DeliveryItem.fromJson(e as Map<String, dynamic>))
           .toList(growable: false),

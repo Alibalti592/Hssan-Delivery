@@ -49,6 +49,7 @@ final class DeliveryResponse
         return [
             'id' => $order->getId(),
             'status' => $order->getStatus()->value,
+            'deliveryType' => $order->getDeliveryType()->value,
             'restaurantName' => $order->getRestaurant()?->getName(),
             'customerName' => $order->getUser()?->getName(),
             'customerPhone' => $order->getUser()?->getPhone(),

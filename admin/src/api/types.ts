@@ -59,6 +59,8 @@ export interface OrderItem {
   unitPrice: string;
 }
 
+export type DeliveryType = 'RESTAURANT' | 'BILL' | 'GROCERY' | 'PARCEL';
+
 export interface AdminOrder {
   id: number;
   userId: number;
@@ -74,6 +76,7 @@ export interface AdminOrder {
   deliveryFee: string;
   totalAmount: string;
   status: OrderStatus;
+  deliveryType: DeliveryType;
   deliveryId: number | null;
   createdAt: string;
   updatedAt: string;
