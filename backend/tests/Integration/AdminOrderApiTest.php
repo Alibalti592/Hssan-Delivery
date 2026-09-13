@@ -33,6 +33,7 @@ final class AdminOrderApiTest extends WebTestCase
             $this->entityManager->createQuery('DELETE FROM App\Entity\Order o')->execute();
             $this->entityManager->createQuery('DELETE FROM App\Entity\Product p')->execute();
             $this->entityManager->createQuery('DELETE FROM App\Entity\Category c')->execute();
+            $this->entityManager->createQuery('DELETE FROM App\Entity\Promotion pr')->execute();
             $this->entityManager->createQuery('DELETE FROM App\Entity\Restaurant r')->execute();
             $this->entityManager->createQuery('DELETE FROM App\Entity\DeliveryZone z')->execute();
 
@@ -164,6 +165,7 @@ final class AdminOrderApiTest extends WebTestCase
         self::assertSame('Test Client Two', $response['userName']);
         self::assertSame('16.500', $response['totalAmount']);
         self::assertSame('4.000', $response['deliveryFee']);
+        self::assertSame('RESTAURANT', $response['deliveryType']);
         self::assertCount(1, $response['items']);
     }
 

@@ -1,7 +1,16 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link, useParams } from 'react-router-dom';
 import { ordersApi } from '../../api/resources';
-import { PageHeader, Loading, ErrorBanner, Breadcrumb, StatusBadge, money, formatDate } from '../../components/ui';
+import {
+  PageHeader,
+  Loading,
+  ErrorBanner,
+  Breadcrumb,
+  StatusBadge,
+  money,
+  formatDate,
+  deliveryTypeLabel,
+} from '../../components/ui';
 
 export default function OrderDetailPage() {
   const { id } = useParams();
@@ -43,6 +52,10 @@ export default function OrderDetailPage() {
                 <div className="detail-item">
                   <div className="field-label">Restaurant</div>
                   <div className="value">{data.restaurantName}</div>
+                </div>
+                <div className="detail-item">
+                  <div className="field-label">Service</div>
+                  <div className="value">{deliveryTypeLabel(data.deliveryType)}</div>
                 </div>
                 <div className="detail-item">
                   <div className="field-label">Delivery address</div>

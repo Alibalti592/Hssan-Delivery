@@ -8,6 +8,7 @@ use App\Entity\Order;
 use App\Entity\OrderItem;
 use App\Entity\User;
 use App\Enum\DeliveryStatus;
+use App\Enum\DeliveryType;
 use App\Enum\OrderStatus;
 use App\Exception\InvalidOperationException;
 use App\Pagination\PaginatedResult;
@@ -59,6 +60,8 @@ final class OrderService
         $order->setDeliveryAddress($dto->deliveryAddress);
         $order->setDeliveryZone($deliveryZone);
         $order->setStatus(OrderStatus::PENDING);
+        // Only the restaurant ordering flow exists today — see DeliveryType.
+        $order->setDeliveryType(DeliveryType::RESTAURANT);
 
         $totalMillimes = 0;
 

@@ -4,6 +4,7 @@ namespace App\Repository;
 
 use App\Entity\Delivery;
 use App\Entity\User;
+use App\Enum\DeliveryStatus;
 use App\Pagination\PaginatedResult;
 use App\Pagination\Paginator;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
@@ -11,9 +12,36 @@ use Doctrine\Persistence\ManagerRegistry;
 
 class DeliveryRepository extends ServiceEntityRepository
 {
+    private const ACTIVE_STATUSES = [
+        DeliveryStatus::PENDING,
+        DeliveryStatus::ASSIGNED,
+        DeliveryStatus::ACCEPTED,
+        DeliveryStatus::PICKED_UP,
+        DeliveryStatus::ON_THE_WAY,
+    ];
+
     public function __construct(ManagerRegistry $registry)
     {
         parent::__construct($registry, Delivery::class);
+    }
+
+    /**
+     * The delivery a courier is currently working, if any — used by the
+     * admin courier map to show "on delivery" status and link the marker to
+     * the relevant delivery. A courier has at most one of these at a time.
+     */
+    public function findActiveForCourier(User $courier): ?Delivery
+    {
+        return $this->createQueryBuilder('d')
+            ->andWhere('d.courier = :courier')
+            ->andWhere('d.status IN (:statuses)')
+            ->setParameter('courier', $courier)
+            ->setParameter('statuses', self::ACTIVE_STATUSES)
+            ->orderBy('d.createdAt', 'DESC')
+            ->addOrderBy('d.id', 'DESC')
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
     }
 
     /**

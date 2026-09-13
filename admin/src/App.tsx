@@ -16,6 +16,9 @@ import OrdersListPage from './pages/orders/OrdersListPage';
 import OrderDetailPage from './pages/orders/OrderDetailPage';
 import DeliveriesListPage from './pages/deliveries/DeliveriesListPage';
 import DeliveryDetailPage from './pages/deliveries/DeliveryDetailPage';
+import PromotionsListPage from './pages/promotions/PromotionsListPage';
+import PromotionFormPage from './pages/promotions/PromotionFormPage';
+import CourierMapPage from './pages/courier-map/CourierMapPage';
 
 export default function App() {
   return (
@@ -49,6 +52,12 @@ export default function App() {
 
         <Route path="deliveries" element={<DeliveriesListPage />} />
         <Route path="deliveries/:id" element={<DeliveryDetailPage />} />
+
+        <Route path="promotions" element={<PromotionsListPage />} />
+        <Route path="promotions/new" element={<PromotionFormPage />} />
+        <Route path="promotions/:promotionId/edit" element={<PromotionFormPage />} />
+
+        <Route path="courier-map" element={<CourierMapPage />} />
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>

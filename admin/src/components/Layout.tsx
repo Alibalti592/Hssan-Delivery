@@ -8,6 +8,8 @@ const NAV_ITEMS = [
   { to: '/couriers', label: 'Couriers' },
   { to: '/orders', label: 'Orders' },
   { to: '/deliveries', label: 'Deliveries' },
+  { to: '/promotions', label: 'Promotions' },
+  { to: '/courier-map', label: 'Courier Map' },
 ];
 
 export default function Layout() {

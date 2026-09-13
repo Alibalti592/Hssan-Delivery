@@ -47,5 +47,11 @@
 		<true/>
 		<key>UIStatusBarHidden</key>
 		<false/>
+		<!-- Foreground-only (see CourierLocationService): shown when a
+		     courier's app reports its position while a delivery is active.
+		     No NSLocationAlwaysAndWhenInUseUsageDescription — background
+		     location tracking is not implemented. -->
+		<key>NSLocationWhenInUseUsageDescription</key>
+		<string>Hssan Delivery utilise votre position pour indiquer votre localisation à l'administrateur pendant une course.</string>
 	</dict>
 </plist>

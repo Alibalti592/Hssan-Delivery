@@ -4,10 +4,13 @@ import type {
   AdminOrder,
   Category,
   Courier,
+  CourierLocationEntry,
   CurrentUser,
   DeliveryZoneAdmin,
+  DiscountType,
   Paginated,
   Product,
+  Promotion,
   Restaurant,
 } from './types';
 
@@ -103,6 +106,40 @@ export const couriersApi = {
     api.patch<Courier>(`/api/admin/couriers/${id}/active`, { isActive }),
   resetPassword: (id: number, password: string) =>
     api.patch<Courier>(`/api/admin/couriers/${id}/password`, { password }),
+};
+
+// Promotions
+export interface PromotionPayload {
+  title: string;
+  description: string | null;
+  discountType: DiscountType;
+  discountValue: string;
+  promoCode: string | null;
+  startAt: string;
+  endAt: string;
+  isActive: boolean;
+  restaurantId: number | null;
+}
+
+export const promotionsApi = {
+  list: (params?: PageParams) =>
+    api.get<Paginated<Promotion>>(`/api/admin/promotions${toQuery(params)}`),
+  get: (id: number) => api.get<Promotion>(`/api/admin/promotions/${id}`),
+  create: (data: PromotionPayload) => api.post<Promotion>('/api/admin/promotions', data),
+  update: (id: number, data: PromotionPayload) =>
+    api.put<Promotion>(`/api/admin/promotions/${id}`, data),
+  setActive: (id: number, isActive: boolean) =>
+    api.patch<Promotion>(`/api/admin/promotions/${id}/active`, { isActive }),
+  delete: (id: number) => api.delete<void>(`/api/admin/promotions/${id}`),
+  uploadPhoto: (id: number, file: File) =>
+    api.upload<Promotion>(`/api/admin/promotions/${id}/photo`, file),
+  removePhoto: (id: number) => api.delete<Promotion>(`/api/admin/promotions/${id}/photo`),
+};
+
+// Courier map (last known GPS location per courier — see backend
+// CourierLocationService for the "last known, not real-time" caveat)
+export const courierLocationsApi = {
+  list: () => api.get<CourierLocationEntry[]>('/api/admin/couriers/locations'),
 };
 
 // Dashboard summary

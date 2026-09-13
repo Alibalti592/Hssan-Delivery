@@ -9,6 +9,7 @@ use App\Entity\Product;
 use App\Entity\Restaurant;
 use App\Entity\User;
 use App\Enum\DeliveryStatus;
+use App\Enum\DeliveryType;
 use App\Enum\OrderStatus;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
@@ -79,6 +80,11 @@ final class OrderApiTest extends WebTestCase
         );
 
         self::assertSame(
+            DeliveryType::RESTAURANT->value,
+            $responseData['deliveryType']
+        );
+
+        self::assertSame(
             '4.000',
             $responseData['deliveryFee']
         );
@@ -123,6 +129,11 @@ final class OrderApiTest extends WebTestCase
         self::assertSame(
             $orderId,
             $delivery->getOrder()->getId()
+        );
+
+        self::assertSame(
+            DeliveryType::RESTAURANT,
+            $delivery->getOrder()->getDeliveryType()
         );
     }
 
