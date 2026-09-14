@@ -22,7 +22,7 @@ RUN composer install --no-dev --no-scripts --no-autoloader --prefer-dist --no-in
 COPY . .
 RUN composer dump-autoload --optimize --no-dev --classmap-authoritative
 
-FROM php:8.2-apache AS app
+FROM php:8.5-apache AS app
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
         libpq-dev \
