@@ -22,7 +22,38 @@ const fieldFill = Color(0xFFEAF0F7);
 const cardBorder = Color(0xFFEDF0F4);
 
 ThemeData buildTheme(Brightness brightness) {
-  final scheme = ColorScheme.fromSeed(seedColor: navy, brightness: brightness);
+  // ColorScheme.fromSeed(seedColor: Colors.black) doesn't stay neutral —
+  // Material 3's tonal palette algorithm falls back to a low-chroma pink/
+  // mauve hue for a seed with no real chroma of its own, which then leaks
+  // into anything using colorScheme.primary/surfaceContainerHighest/outline
+  // (filled buttons, image placeholders). Override those roles with true
+  // black/white/gray so the "black and white" brand actually stays neutral.
+  final seeded = ColorScheme.fromSeed(seedColor: navy, brightness: brightness);
+  final scheme = brightness == Brightness.light
+      ? seeded.copyWith(
+          primary: navy,
+          onPrimary: Colors.white,
+          secondary: const Color(0xFF4A4A4A),
+          onSecondary: Colors.white,
+          secondaryContainer: const Color(0xFFEDEDED),
+          onSecondaryContainer: navy,
+          surface: Colors.white,
+          onSurface: navy,
+          surfaceContainerHighest: const Color(0xFFEDEDED),
+          outline: const Color(0xFFBDBDBD),
+        )
+      : seeded.copyWith(
+          primary: Colors.white,
+          onPrimary: navy,
+          secondary: const Color(0xFFBDBDBD),
+          onSecondary: navy,
+          secondaryContainer: const Color(0xFF2A2A2A),
+          onSecondaryContainer: Colors.white,
+          surface: const Color(0xFF121212),
+          onSurface: Colors.white,
+          surfaceContainerHighest: const Color(0xFF2A2A2A),
+          outline: const Color(0xFF5A5A5A),
+        );
 
   return ThemeData(
     colorScheme: scheme,
@@ -86,6 +117,28 @@ ThemeData buildTheme(Brightness brightness) {
       side: BorderSide.none,
       shape: const StadiumBorder(),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+    ),
+    navigationBarTheme: NavigationBarThemeData(
+      backgroundColor: scheme.surface,
+      indicatorColor: scheme.secondaryContainer,
+      labelTextStyle: WidgetStateProperty.resolveWith(
+        (states) => TextStyle(
+          fontSize: 11,
+          fontWeight: states.contains(WidgetState.selected)
+              ? FontWeight.w700
+              : FontWeight.w500,
+          color: states.contains(WidgetState.selected)
+              ? scheme.onSurface
+              : mutedText,
+        ),
+      ),
+      iconTheme: WidgetStateProperty.resolveWith(
+        (states) => IconThemeData(
+          color: states.contains(WidgetState.selected)
+              ? scheme.onSecondaryContainer
+              : mutedText,
+        ),
+      ),
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
