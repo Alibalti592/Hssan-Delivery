@@ -118,7 +118,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
     return ListView.separated(
       padding: const EdgeInsets.all(16),
       itemCount: _orders.length + (_page < _pages ? 1 : 0),
-      separatorBuilder: (_, __) => const SizedBox(height: 12),
+      separatorBuilder: (_, _) => const SizedBox(height: 12),
       itemBuilder: (context, index) {
         if (index == _orders.length) {
           return Center(

@@ -11,7 +11,7 @@ class NotificationsRepository {
   Future<void> registerDeviceToken(String token, {String? platform}) async {
     await _api.post('/api/notifications/device-token', {
       'token': token,
-      if (platform != null) 'platform': platform,
+      'platform': ?platform,
     });
   }
 

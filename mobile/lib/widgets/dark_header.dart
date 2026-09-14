@@ -67,7 +67,7 @@ class DarkHeader extends StatelessWidget {
                     fontWeight: FontWeight.w800,
                   ),
                 ),
-              if (trailing != null) trailing!,
+              ?trailing,
             ],
           ),
           if (subtitle != null) ...[
