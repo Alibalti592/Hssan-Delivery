@@ -15,10 +15,12 @@ Hssan-Delivery/
     └── workflows/
         └── backend.yml
 
-Current status: The Symfony backend is the most advanced component, followed by
-the admin dashboard (covers restaurant/category/product/delivery-zone/courier
-management and order/delivery visibility — see `admin/README.md`). The Flutter
-application is not yet implemented as a production-ready application.
+Current status: all three components are in active use end-to-end against a
+real backend — Symfony API, React admin dashboard (restaurant/category/
+product/delivery-zone/courier/promotion management, order/delivery
+visibility, and a live courier map — see `admin/README.md`), and the Flutter
+app (client + courier, three of four planned services live — see
+`mobile/README.md`).
 
 Technology stack
 Backend
@@ -31,9 +33,11 @@ PHPUnit
 Mobile
 Flutter
 Dart
-Planned administration dashboard
+Admin dashboard
 React
 Vite
+TypeScript
+Playwright (e2e)
 CI
 GitHub Actions
 PostgreSQL 16
@@ -51,9 +55,10 @@ A client can:
 
 create an account
 authenticate with phone and password
-browse the available catalogue
+browse the available catalogue (restaurants, or grocery stores via `?type=GROCERY`)
 save multiple labeled delivery addresses
-create orders
+create a restaurant/grocery order, or a Colis parcel-delivery request (pickup
+address, drop-off address, named recipient — no restaurant or items involved)
 receive a linked delivery
 Livreur
 
@@ -73,19 +78,39 @@ mark a delivery as picked up
 mark a delivery as on the way
 mark a delivery as delivered
 report a delivery as failed
+report their live GPS location while a delivery is active (backs the admin
+courier map)
 Admin
 
 The administrator can currently:
 
-authenticate
+authenticate (session is an httpOnly cookie — see "Admin authentication" below)
 create courier accounts
 list and view courier accounts
 deactivate/reactivate a courier account
 view all orders and deliveries
 assign deliveries to couriers
 cancel eligible deliveries
+manage promotions (create/update/delete, activate/deactivate, photo)
+view active couriers' live locations on a map
 
 Additional administration features are planned.
+
+Admin authentication
+
+The admin dashboard authenticates like every other client (`POST
+/api/auth/login`), but instead of reading the JWT out of the response body
+and holding it in JS, the backend also mirrors it into an httpOnly,
+`SameSite=Lax` cookie (`config/packages/lexik_jwt_authentication.yaml`) that
+the browser sends automatically and JavaScript can never read — closing off
+the obvious XSS-steals-the-token attack that plain `localStorage` storage
+had. `POST /api/auth/logout` clears that cookie (JS can't do it itself for
+an httpOnly cookie). Mobile is unaffected: it still reads the token from the
+JSON body and sends it as `Authorization: Bearer <jwt>`; both extractors run
+on the same firewall. `JWT_COOKIE_SECURE` (see `.env.example`) must be set
+to `true` once the admin dashboard is served over HTTPS — a `Secure` cookie
+is silently dropped by browsers over plain `http://`, so it defaults to
+`false` for local development.
 
 Order workflow
 
@@ -146,15 +171,28 @@ Backend API
 Authentication
 POST  /api/auth/register
 POST  /api/auth/login
+POST  /api/auth/logout
 GET   /api/auth/me
 POST  /api/auth/change-password
 PATCH /api/auth/availability
+Courier location
+POST /api/couriers/location
 Admin courier management
 POST  /api/admin/couriers
 GET   /api/admin/couriers
 GET   /api/admin/couriers/{id}
+GET   /api/admin/couriers/locations
 PATCH /api/admin/couriers/{id}/active
 PATCH /api/admin/couriers/{id}/password
+Admin promotion management
+POST   /api/admin/promotions
+GET    /api/admin/promotions
+GET    /api/admin/promotions/{id}
+PUT    /api/admin/promotions/{id}
+DELETE /api/admin/promotions/{id}
+PATCH  /api/admin/promotions/{id}/active
+POST   /api/admin/promotions/{id}/photo
+DELETE /api/admin/promotions/{id}/photo
 Admin restaurant management
 POST   /api/admin/restaurants
 GET    /api/admin/restaurants
@@ -215,11 +253,16 @@ address, customer name + phone, items, fee, total) so a courier has everything
 needed to carry out the job in one call.
 Orders
 POST /api/orders
+POST /api/orders/parcels
 GET  /api/orders
 GET  /api/orders/{id}
 POST /api/orders/{id}/cancel
+
+POST /api/orders/parcels creates a Colis (parcel-delivery) order: no
+restaurant, no items, just a pickup address, drop-off address, and a named
+recipient — see "Colis (parcel delivery)" below.
 Catalogue (what a signed-in client browses before ordering)
-GET /api/restaurants
+GET /api/restaurants[?type=RESTAURANT|GROCERY]
 GET /api/restaurants/{id}
 GET /api/restaurants/{id}/categories
 GET /api/restaurants/{id}/products
@@ -227,7 +270,16 @@ GET /api/restaurants/{id}/products
 Requires any authenticated account (ROLE_USER, same as /api/orders — no
 separate role check), but not ROLE_ADMIN. Closed restaurants and
 unavailable products are left out entirely, matching what OrderService
-will actually accept.
+will actually accept. `type` defaults to RESTAURANT; the mobile app's
+"Courses" (grocery) service passes `?type=GROCERY` to browse the same
+Restaurant entity's grocery-flagged rows instead (see "Restaurant types"
+below).
+Promotions (what a signed-in client sees on the home screen)
+GET /api/promotions
+GET /api/promotions/{id}
+
+Active promotions only (admins manage the full set, including inactive
+ones, via the admin endpoints above).
 Delivery zones
 GET  /api/delivery-zones
 Addresses
@@ -269,6 +321,30 @@ directly. Zones are seeded via migration and managed through the admin delivery 
 endpoints above (name and fee are updatable; there is no delete endpoint, consistent
 with restaurants/categories/products — zones already referenced by past orders are
 never removed).
+
+Restaurant types
+
+`Restaurant` carries a `type` discriminator (`RESTAURANT` or `GROCERY`)
+rather than a separate entity — a grocery store is administered and browsed
+exactly like a restaurant (categories, products, photos, availability), so
+reusing the entity avoided duplicating that whole stack for what is, at the
+data-model level, the same shape of thing. The mobile app's "Restaurants"
+service passes no `type` (defaults to RESTAURANT); "Courses" passes
+`?type=GROCERY`. The admin dashboard manages both from the same restaurant
+screens, filterable by type.
+
+Colis (parcel delivery)
+
+A Colis order reuses `Order`/`Delivery`/`DeliveryZone` wholesale instead of
+introducing a new entity: `Order.restaurant` is nullable, and a parcel order
+has none, plus no items — just a free-text pickup address, the existing
+`deliveryAddress`, and a named/phoned recipient (`recipientName`,
+`recipientPhone`), who is deliberately modeled as distinct from the
+account holder placing the order. It's priced the same way a restaurant
+order is: the selected `DeliveryZone`'s flat fee, with no item total added
+and no separate payment integration — cash on delivery, same as every other
+service. `deliveryType` on the order is `PARCEL` (the same enum used to tag
+restaurant vs. grocery orders). See `POST /api/orders/parcels` above.
 
 Account recovery
 
@@ -358,6 +434,30 @@ deactivation — a courier stepping away for a break sets their own
 availability; only an admin can deactivate the account entirely. The
 mobile dashboard's availability toggle is wired to this field rather than
 being purely cosmetic local state.
+
+Live courier locations
+
+A courier's mobile app reports its GPS position via POST
+/api/couriers/location whenever it has a non-terminal, non-pending delivery
+(assigned, accepted, picked up, or on the way) and stops otherwise — no
+location is collected once a delivery is delivered/cancelled/failed or
+before one is assigned. The admin dashboard's courier map (GET
+/api/admin/couriers/locations)
+plots every active courier with a reported position, refreshing on a
+timer, so dispatch can see where couriers actually are without a client or
+courier-facing map/navigation feature (still not built — see "Not yet in
+the app" below).
+
+Promotions
+
+Admins create promotions (title, description, a percentage/fixed discount
+value, an optional promo code, a start/end window, an optional photo, and
+an optional linked restaurant) via the /api/admin/promotions endpoints
+above; GET /api/promotions (no /admin prefix) returns only the active ones,
+which is what the mobile client home screen's promotions carousel
+displays. A promotion isn't applied to an order automatically — there's no
+coupon-code redemption flow yet, this is display-only marketing surface for
+now.
 
 Docker / CD pipeline
 
@@ -517,6 +617,11 @@ pagination (page/limit, envelope shape, boundary behavior) on couriers, restaura
 admin dashboard stats (COUNT-based, correct regardless of list size)
 device-token registration/unregistration, including reassignment when a device switches accounts
 a delivery notification firing without blocking the underlying status change even when a device token is registered
+restaurant type filtering (RESTAURANT vs. GROCERY) on the public catalogue
+Colis parcel order creation (no restaurant, priced off the zone fee alone) and its validation/not-found error cases
+promotion CRUD, activation, and photo upload/replace/remove, including the active-only filter on the public endpoint
+courier location reporting and the admin courier-locations endpoint
+the public GET /api/delivery-zones endpoint
 
 It also contains unit tests for the pure logic that backs those workflows: the
 decimal/millimes money conversion and the delivery-to-order status mapping.
@@ -531,8 +636,8 @@ php bin/phpunit
 
 Current baseline:
 
-185 tests
-1128 assertions
+221 tests
+1307 assertions
 
 Tests share a single Postgres database rather than running each in its own
 transaction, so re-running `php bin/phpunit` without resetting the database
@@ -552,6 +657,11 @@ GitHub Actions runs three workflows on pushes and pull requests targeting
 
 The backend job uses temporary JWT credentials and an isolated PostgreSQL database.
 
+Dependabot (.github/dependabot.yml) opens a PR for outdated dependencies
+across composer, npm, pub, Docker base images, and GitHub Actions — these
+still go through the same CI gate and need a human merge, they aren't
+auto-merged.
+
 Security
 
 Never commit:
@@ -570,6 +680,11 @@ as the template for local configuration.
 
 Any secret that has previously been committed to Git history must be considered exposed and should be rotated before staging or production deployment.
 
+Set JWT_COOKIE_SECURE=true once the admin dashboard and backend are served
+over HTTPS in production — see "Admin authentication" above. It defaults to
+false, which is correct for local development but wrong for production over
+plain HTTP.
+
 Current implementation status
 Backend
 
@@ -581,16 +696,22 @@ client registration
 login
 authenticated profile endpoint
 restaurant/product management, including photos, for admins
+grocery stores as a second Restaurant type (RESTAURANT/GROCERY), browsable
+via ?type on the public catalogue
 public catalogue for browsing/ordering (any signed-in account)
 saved delivery addresses
-order creation
+order creation (restaurant/grocery)
+Colis parcel order creation — no restaurant, priced off the zone fee alone
 zone-based delivery pricing
 automatic delivery creation
 delivery assignment
 courier delivery lifecycle
+courier live GPS location reporting while a delivery is active
 admin courier creation
 admin courier listing and deactivation
 admin order and delivery visibility
+admin promotion management (CRUD, activation, photo)
+admin courier-location map data
 role-based authorization
 order/delivery status synchronization
 self-service password change
@@ -602,6 +723,7 @@ admin dashboard stats via dedicated COUNT queries
 push notifications on delivery status changes (FCM, inert until a Firebase project is configured)
 client-initiated order cancellation (while still unclaimed or just assigned)
 courier self-service availability toggle
+httpOnly-cookie session for the admin dashboard (see "Admin authentication" above)
 integration tests
 GitHub Actions CI
 Mobile
@@ -617,23 +739,41 @@ courier authentication (ROLE_LIVREUR only)
 a dashboard (real self-service availability toggle backed by PATCH
 /api/auth/availability, today's stats, current delivery shortcut)
 an available-deliveries screen to accept/decline a proposed delivery
+(shows "Colis" + pickup/drop-off addresses for a parcel proposal, the
+restaurant name for a restaurant/grocery one)
 delivery queue (GET /api/deliveries/mine, active vs. history, "load more" for older history)
-delivery details (pickup, drop-off, customer, items, pricing)
+delivery details — pickup, drop-off, customer/recipient, items, pricing;
+a Colis job shows the pickup address and named recipient instead of a
+restaurant and customer
 accept / decline / pickup / on-the-way / delivered / fail actions
 a delivery-confirmed screen showing the amount collected
-tap-to-call the customer
+tap-to-call the customer (or the recipient, for a Colis job)
+live GPS location reporting while a delivery is active (backs the admin
+courier map, see "Live courier locations" above)
 change password (dashboard menu)
 push notification registration (FCM, inert without a Firebase project — see "Push notifications" above)
 
 Client:
 
 client registration and authentication (ROLE_CLIENT)
+a home screen with four service cards — Restaurants, Courses (grocery),
+and Colis (parcel) are live; Factures (bill payment) is still a "coming
+soon" placeholder — plus a promotions carousel (GET /api/promotions)
 restaurant browsing with a search box (GET /api/restaurants)
+grocery store browsing the same way, via the "Courses" service (GET
+/api/restaurants?type=GROCERY)
 menu browsing by category with add-to-cart (GET .../categories, .../products)
 a cart (single-restaurant, quantity steppers, restaurant-switch confirmation)
 checkout (delivery address, delivery zone, optional note, live total)
-order placement (POST /api/orders) and a confirmation screen
-order history and order detail (GET /api/orders, GET /api/orders/{id}, "load more" for older orders)
+Colis: a dedicated parcel form (pickup address, drop-off address, named
+recipient, delivery zone, optional note) — POST /api/orders/parcels,
+bypassing the cart/checkout flow entirely since there's no catalogue or
+restaurant involved
+order placement and a confirmation screen (copy branches on whether the
+order is a Colis parcel or a restaurant/grocery order)
+order history and order detail (GET /api/orders, GET /api/orders/{id},
+"load more" for older orders) — a Colis order's detail screen shows pickup
+address and recipient instead of a restaurant and an item list
 order tracking that polls for status changes and shows/calls the assigned
 courier once one exists, plus self-service cancellation while still
 possible (POST /api/orders/{id}/cancel)
@@ -642,6 +782,7 @@ push notification registration (FCM, inert without a Firebase project — see "P
 
 Not yet in the app:
 
+Factures (bill payment) — still a placeholder, no biller integration
 map / navigation integration
 saved-address picker in checkout (the backend has `/api/addresses`; checkout
 currently takes a free-text address)
@@ -649,33 +790,39 @@ Admin dashboard
 
 The React/Vite admin dashboard (`admin/`) is implemented and covers:
 
-admin authentication
+admin authentication (httpOnly-cookie session — see "Admin authentication" above)
 dashboard (counts overview, backed by GET /api/admin/stats)
-order visibility (list + detail, paginated with Prev/Next)
+order visibility (list + detail, paginated with Prev/Next) — a Colis
+order's detail shows pickup address and recipient instead of a restaurant
 delivery monitoring (list + detail, paginated with Prev/Next)
 delivery assignment / cancellation
 courier management (list, create, activate/deactivate, password reset, paginated with Prev/Next)
-restaurant management (including delete and photo upload/replace/remove, paginated with Prev/Next)
+a live courier map (GET /api/admin/couriers/locations)
+promotion management (create/edit/delete, activate/deactivate, photo)
+restaurant management (including delete and photo upload/replace/remove,
+paginated with Prev/Next) — covers both restaurants and grocery stores
 category management
 product/menu management (including delete and photo upload/replace/remove, paginated with Prev/Next)
 delivery zone management
+Playwright e2e coverage (admin/e2e/)
 
 Not yet implemented in the dashboard:
 
 operational statistics beyond simple counts
 Future services
 
-The platform is intended to expand beyond restaurant delivery.
+The platform is intended to expand beyond restaurant delivery. Of the five
+originally planned service areas, three are now live (see "Client" above);
+two remain:
 
-Planned service areas include:
-
-Restaurant delivery
-Supermarket delivery
-Parcel delivery
-Bill payment
-Money transfer
-
-These services will be introduced after the core food-delivery workflow is stable.
+Restaurant delivery (done)
+Supermarket/grocery delivery (done — see "Restaurant types" above)
+Parcel delivery (done — see "Colis (parcel delivery)" above)
+Bill payment (not started — needs a biller catalogue and payment method
+integration this project has no information about yet; the mobile "Factures"
+card is a placeholder pending that decision)
+Money transfer (not started — needs a wallet/balance per user and a
+transaction ledger, plus a money-transmission licensing review)
 
 Development roadmap
 Phase 0 — Backend stabilization
@@ -726,29 +873,29 @@ Phase 4 — React admin dashboard (done — see admin/README.md)
 Phase 5 — Real-time features
  Push notifications (done — delivery assigned/on-the-way/delivered via FCM, inert until a Firebase project is configured; see "Push notifications" above)
  Live delivery status
- Courier location updates
+ Courier location updates (done — GPS reporting while active + an admin courier map, see "Live courier locations" above; polling-based, not a live socket)
  Live delivery tracking
  Maps/navigation
 Phase 6 — Additional services
 
-The current schema is hard-coupled to restaurant delivery: `Order` requires a
-`Restaurant` and `Delivery` is always tied 1:1 to an `Order`. None of the
-services below can be added on top of that as-is — `Order`/`Delivery` need
-to be generalized first (e.g. `Order` becoming polymorphic across a
-restaurant order, a parcel job, or a supermarket cart) before any service
-work starts. A `DeliveryType` enum (`RESTAURANT`, `SUPERMARKET`, `PARCEL`)
-already exists in `src/Enum/DeliveryType.php` as a placeholder but isn't
-wired into anything yet.
+`Order`/`Delivery` turned out not to need a schema rewrite to support more
+service types: `Order.restaurant` was made nullable, `Order` gained a
+handful of new nullable columns (`pickupAddress`, `recipientName`,
+`recipientPhone`), and the existing `DeliveryType` enum
+(`RESTAURANT`, `BILL`, `GROCERY`, `PARCEL` — in `src/Enum/DeliveryType.php`)
+was wired in as a discriminator, reusing `Order`/`Delivery`/`DeliveryZone`
+wholesale for both grocery orders (as a second `Restaurant` type — see
+"Restaurant types" above) and parcel orders (see "Colis (parcel delivery)"
+above). No polymorphic rewrite was needed in the end.
 
-Bill payment and money transfer aren't delivery workflows at all — they need
-a wallet/balance per user and a transaction ledger, not a courier. Money
-transfer in particular carries money-transmission licensing considerations
-that depend on jurisdiction and should be scoped before implementation
-starts.
+Bill payment and money transfer are a different shape of problem — not
+delivery workflows at all. They need a wallet/balance per user and a
+transaction ledger, not a courier. Money transfer in particular carries
+money-transmission licensing considerations that depend on jurisdiction and
+should be scoped before implementation starts.
 
- Generalize Order/Delivery schema (prerequisite for every item below)
- Supermarket delivery
- Parcel delivery
+ Supermarket/grocery delivery (done — see "Restaurant types" above)
+ Parcel delivery (done — see "Colis (parcel delivery)" above)
  Bill payment (biller integration, payment method, transaction ledger)
  Money transfer (wallet/balance, transaction ledger, licensing review)
 Phase 7 — Production infrastructure
@@ -763,7 +910,9 @@ Phase 7 — Production infrastructure
 Phase 8 — Production hardening
  Security review
  Rate limiting (done — login throttling + registration limiter, see "Rate limiting" above)
- Authentication hardening (partial — password change/reset done, see "Account recovery" above; no 2FA)
+ Authentication hardening (partial — password change/reset done, see
+"Account recovery" above; admin session moved from localStorage to an
+httpOnly cookie, see "Admin authentication" above; no 2FA)
  Performance testing
  Load testing
  Beta rollout
