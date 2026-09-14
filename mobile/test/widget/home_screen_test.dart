@@ -8,8 +8,10 @@ import 'package:mobile/cart/cart.dart';
 import 'package:mobile/catalogue/catalogue_models.dart';
 import 'package:mobile/catalogue/catalogue_repository.dart';
 import 'package:mobile/client/home_screen.dart';
+import 'package:mobile/client/parcel_form_screen.dart';
 import 'package:mobile/core/api_client.dart';
 import 'package:mobile/core/token_storage.dart';
+import 'package:mobile/orders/orders_repository.dart';
 import 'package:mobile/promotions/promotions_repository.dart';
 import 'package:provider/provider.dart';
 
@@ -67,6 +69,7 @@ Widget _wrap({
       Provider<PromotionsRepository>.value(value: PromotionsRepository(api)),
       Provider<CatalogueRepository>.value(value: CatalogueRepository(api)),
       Provider<AddressRepository>.value(value: AddressRepository(api)),
+      Provider<OrdersRepository>.value(value: OrdersRepository(api)),
       ChangeNotifierProvider<AuthController>.value(
         value: AuthController(
           repository: AuthRepository(api),
@@ -105,6 +108,19 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Service bientôt disponible'), findsOneWidget);
+  });
+
+  testWidgets('tapping Colis opens the parcel form, not the placeholder', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_wrap());
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Colis'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(ParcelFormScreen), findsOneWidget);
+    expect(find.text('Service bientôt disponible'), findsNothing);
   });
 
   testWidgets(

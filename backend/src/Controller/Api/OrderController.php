@@ -3,6 +3,7 @@
 namespace App\Controller\Api;
 
 use App\Dto\Order\CreateOrderRequest;
+use App\Dto\Order\CreateParcelOrderRequest;
 use App\Dto\Order\OrderResponse;
 use App\Service\OrderService;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -46,7 +47,7 @@ final class OrderController extends AbstractApiController
         return $this->paginatedJson($result, static fn (\App\Entity\Order $order) => OrderResponse::fromEntity($order));
     }
 
-    #[Route('/{id}', name: 'api_orders_show', methods: ['GET'])]
+    #[Route('/{id}', name: 'api_orders_show', methods: ['GET'], requirements: ['id' => '\d+'])]
     public function show(int $id): JsonResponse
     {
         $user = $this->getUser();
@@ -95,7 +96,30 @@ final class OrderController extends AbstractApiController
         );
     }
 
-    #[Route('/{id}/cancel', name: 'api_orders_cancel', methods: ['POST'])]
+    #[Route('/parcels', name: 'api_orders_create_parcel', methods: ['POST'])]
+    public function createParcel(Request $request): JsonResponse
+    {
+        /** @var CreateParcelOrderRequest $dto */
+        $dto = $this->deserializeAndValidate($request, CreateParcelOrderRequest::class);
+
+        $user = $this->getUser();
+
+        if (!$user instanceof \App\Entity\User) {
+            return $this->json(
+                ['message' => 'Authentication required.'],
+                Response::HTTP_UNAUTHORIZED
+            );
+        }
+
+        $order = $this->orderService->createParcelOrder($dto, $user);
+
+        return $this->json(
+            OrderResponse::fromEntity($order),
+            Response::HTTP_CREATED
+        );
+    }
+
+    #[Route('/{id}/cancel', name: 'api_orders_cancel', methods: ['POST'], requirements: ['id' => '\d+'])]
     public function cancel(int $id): JsonResponse
     {
         $user = $this->getUser();

@@ -222,6 +222,16 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        if (order.isParcel && order.pickupAddress != null) ...[
+                          Row(
+                            children: [
+                              const Icon(Icons.storefront_outlined, size: 18),
+                              const SizedBox(width: 8),
+                              Expanded(child: Text(order.pickupAddress!)),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                        ],
                         Row(
                           children: [
                             const Icon(Icons.place_outlined, size: 18),
@@ -229,6 +239,23 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                             Expanded(child: Text(order.deliveryAddress)),
                           ],
                         ),
+                        if (order.isParcel && order.recipientName != null) ...[
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              const Icon(Icons.person_outline, size: 18),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  order.recipientPhone != null &&
+                                          order.recipientPhone!.isNotEmpty
+                                      ? '${order.recipientName} · ${order.recipientPhone}'
+                                      : order.recipientName!,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                         const SizedBox(height: 8),
                         Row(
                           children: [
@@ -254,7 +281,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  'Articles',
+                  order.isParcel ? 'Récapitulatif' : 'Articles',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w700,
                   ),

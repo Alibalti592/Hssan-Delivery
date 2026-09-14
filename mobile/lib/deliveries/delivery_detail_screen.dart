@@ -54,10 +54,14 @@ class DeliveryDetailScreen extends StatelessWidget {
                 const SizedBox(height: 16),
                 if (order != null) ...[
                   _Section(
-                    icon: Icons.storefront_outlined,
-                    title: 'Récupérer chez',
+                    icon: order.isParcel
+                        ? Icons.inventory_2_outlined
+                        : Icons.storefront_outlined,
+                    title: order.isParcel ? 'Récupérer à' : 'Récupérer chez',
                     child: Text(
-                      order.restaurantName,
+                      order.isParcel
+                          ? (order.pickupAddress ?? '')
+                          : (order.restaurantName ?? ''),
                       style: Theme.of(context).textTheme.bodyLarge,
                     ),
                   ),
@@ -84,21 +88,39 @@ class DeliveryDetailScreen extends StatelessWidget {
                   ),
                   _Section(
                     icon: Icons.person_outline,
-                    title: 'Client',
+                    title: order.isParcel ? 'Destinataire' : 'Client',
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          order.customerName,
+                          (order.isParcel
+                                  ? order.recipientName
+                                  : order.customerName) ??
+                              '',
                           style: Theme.of(context).textTheme.bodyLarge,
                         ),
-                        if (order.customerPhone.isNotEmpty) ...[
+                        if ((order.isParcel
+                                    ? order.recipientPhone
+                                    : order.customerPhone) !=
+                                null &&
+                            (order.isParcel
+                                    ? order.recipientPhone!
+                                    : order.customerPhone)
+                                .isNotEmpty) ...[
                           const SizedBox(height: 8),
                           OutlinedButton.icon(
-                            onPressed: () =>
-                                _call(context, order.customerPhone),
+                            onPressed: () => _call(
+                              context,
+                              order.isParcel
+                                  ? order.recipientPhone!
+                                  : order.customerPhone,
+                            ),
                             icon: const Icon(Icons.phone),
-                            label: Text(order.customerPhone),
+                            label: Text(
+                              order.isParcel
+                                  ? order.recipientPhone!
+                                  : order.customerPhone,
+                            ),
                           ),
                         ],
                       ],
@@ -106,7 +128,7 @@ class DeliveryDetailScreen extends StatelessWidget {
                   ),
                   _Section(
                     icon: Icons.receipt_long_outlined,
-                    title: 'Commande',
+                    title: order.isParcel ? 'Colis' : 'Commande',
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [

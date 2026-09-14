@@ -53,7 +53,7 @@ export default function OrdersListPage() {
                       {o.userName}
                       <div className="rmeta">{o.userPhone}</div>
                     </td>
-                    <td>{o.restaurantName}</td>
+                    <td>{o.restaurantName ?? <span className="rmeta">— (Colis)</span>}</td>
                     <td>{deliveryTypeLabel(o.deliveryType)}</td>
                     <td>{money(o.totalAmount)}</td>
                     <td>

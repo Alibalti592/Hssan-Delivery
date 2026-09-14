@@ -50,8 +50,8 @@ export default function OrderDetailPage() {
                   </div>
                 </div>
                 <div className="detail-item">
-                  <div className="field-label">Restaurant</div>
-                  <div className="value">{data.restaurantName}</div>
+                  <div className="field-label">{data.restaurantName ? 'Restaurant' : 'Pickup address'}</div>
+                  <div className="value">{data.restaurantName ?? data.pickupAddress}</div>
                 </div>
                 <div className="detail-item">
                   <div className="field-label">Service</div>
@@ -61,6 +61,15 @@ export default function OrderDetailPage() {
                   <div className="field-label">Delivery address</div>
                   <div className="value">{data.deliveryAddress}</div>
                 </div>
+                {data.recipientName && (
+                  <div className="detail-item">
+                    <div className="field-label">Recipient</div>
+                    <div className="value">
+                      {data.recipientName}
+                      {data.recipientPhone ? <> &middot; {data.recipientPhone}</> : null}
+                    </div>
+                  </div>
+                )}
                 <div className="detail-item">
                   <div className="field-label">Delivery zone</div>
                   <div className="value">

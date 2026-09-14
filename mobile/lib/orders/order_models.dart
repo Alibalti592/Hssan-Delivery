@@ -51,9 +51,13 @@ class ClientOrder {
   ClientOrder({
     required this.id,
     required this.restaurantId,
+    required this.restaurantName,
     required this.items,
     required this.note,
+    required this.pickupAddress,
     required this.deliveryAddress,
+    required this.recipientName,
+    required this.recipientPhone,
     required this.deliveryZoneId,
     required this.deliveryZoneName,
     required this.deliveryFee,
@@ -67,10 +71,20 @@ class ClientOrder {
   });
 
   final int id;
-  final int restaurantId;
+
+  /// Null for a Colis (parcel) order, which has no restaurant.
+  final int? restaurantId;
+  final String? restaurantName;
   final List<OrderItemLine> items;
   final String? note;
+
+  /// Set only for a Colis order — where the courier collects the package.
+  final String? pickupAddress;
   final String deliveryAddress;
+
+  /// Set only for a Colis order — who receives it at deliveryAddress.
+  final String? recipientName;
+  final String? recipientPhone;
   final int deliveryZoneId;
   final String deliveryZoneName;
   final String deliveryFee;
@@ -79,13 +93,13 @@ class ClientOrder {
 
   /// Which of the client home screen's four services this order belongs to
   /// (see mobile HomeScreen) — 'RESTAURANT', 'BILL', 'GROCERY', or 'PARCEL'.
-  /// Only RESTAURANT is ever produced today; carried as a plain string since
-  /// there's no branching logic on it yet.
   final String deliveryType;
   final DateTime? createdAt;
   final DeliveryStatus? deliveryStatus;
   final String? courierName;
   final String? courierPhone;
+
+  bool get isParcel => deliveryType == 'PARCEL';
 
   /// A client can back out while the delivery is unclaimed or just assigned,
   /// but not once a courier has actually accepted it — mirrors the backend's
@@ -97,12 +111,16 @@ class ClientOrder {
   factory ClientOrder.fromJson(Map<String, dynamic> json) {
     return ClientOrder(
       id: json['id'] as int,
-      restaurantId: json['restaurantId'] as int? ?? 0,
+      restaurantId: json['restaurantId'] as int?,
+      restaurantName: json['restaurantName'] as String?,
       items: ((json['items'] as List<dynamic>?) ?? const [])
           .map((e) => OrderItemLine.fromJson(e as Map<String, dynamic>))
           .toList(growable: false),
       note: json['note'] as String?,
+      pickupAddress: json['pickupAddress'] as String?,
       deliveryAddress: json['deliveryAddress'] as String? ?? '',
+      recipientName: json['recipientName'] as String?,
+      recipientPhone: json['recipientPhone'] as String?,
       deliveryZoneId: json['deliveryZoneId'] as int? ?? 0,
       deliveryZoneName: json['deliveryZoneName'] as String? ?? '',
       deliveryFee: json['deliveryFee'] as String? ?? '0.000',

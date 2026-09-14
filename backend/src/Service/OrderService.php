@@ -3,11 +3,13 @@
 namespace App\Service;
 
 use App\Dto\Order\CreateOrderRequest;
+use App\Dto\Order\CreateParcelOrderRequest;
 use App\Entity\Delivery;
 use App\Entity\Order;
 use App\Entity\OrderItem;
 use App\Entity\User;
 use App\Enum\DeliveryStatus;
+use App\Enum\DeliveryType;
 use App\Enum\OrderStatus;
 use App\Exception\InvalidOperationException;
 use App\Pagination\PaginatedResult;
@@ -121,6 +123,56 @@ final class OrderService
 
         $this->entityManager->persist($delivery);
 
+        $this->entityManager->persist($order);
+        $this->entityManager->flush();
+
+        return $order;
+    }
+
+    /**
+     * A Colis order: no restaurant, no items — just carrying a package from
+     * pickupAddress to deliveryAddress. Priced the same way as every other
+     * service, off the chosen DeliveryZone's flat fee.
+     */
+    public function createParcelOrder(
+        CreateParcelOrderRequest $dto,
+        User $user,
+    ): Order {
+        $deliveryZone = $this->deliveryZoneRepository->find($dto->deliveryZoneId);
+
+        if (null === $deliveryZone) {
+            throw new InvalidOperationException('Delivery zone not found.');
+        }
+
+        $order = new Order();
+
+        $order->setUser($user);
+        $order->setPickupAddress($dto->pickupAddress);
+        $order->setDeliveryAddress($dto->deliveryAddress);
+        $order->setRecipientName($dto->recipientName);
+        $order->setRecipientPhone($dto->recipientPhone);
+        $order->setNote($dto->note);
+        $order->setDeliveryZone($deliveryZone);
+        $order->setStatus(OrderStatus::PENDING);
+        $order->setDeliveryType(DeliveryType::PARCEL);
+
+        $deliveryFeeMillimes = Money::toMillimes($deliveryZone->getFee());
+
+        $order->setDeliveryFee(
+            Money::fromMillimes($deliveryFeeMillimes)
+        );
+        $order->setTotalAmount(
+            Money::fromMillimes($deliveryFeeMillimes)
+        );
+
+        $delivery = new Delivery();
+
+        $delivery->setOrder($order);
+        $delivery->setStatus(DeliveryStatus::PENDING);
+
+        $order->setDelivery($delivery);
+
+        $this->entityManager->persist($delivery);
         $this->entityManager->persist($order);
         $this->entityManager->flush();
 
