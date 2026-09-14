@@ -139,7 +139,11 @@ class _ProposalCard extends StatelessWidget {
               children: [
                 Expanded(
                   child: Text(
-                    order?.restaurantName ?? 'Course #${delivery.id}',
+                    order == null
+                        ? 'Course #${delivery.id}'
+                        : order.isParcel
+                        ? 'Colis'
+                        : (order.restaurantName ?? 'Course #${delivery.id}'),
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w700,
                     ),
@@ -155,6 +159,23 @@ class _ProposalCard extends StatelessWidget {
               ],
             ),
             if (order != null) ...[
+              if (order.isParcel && order.pickupAddress != null) ...[
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    const Icon(Icons.inventory_2_outlined, size: 16),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        order.pickupAddress!,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
               const SizedBox(height: 6),
               Row(
                 children: [

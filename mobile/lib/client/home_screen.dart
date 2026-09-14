@@ -12,14 +12,16 @@ import '../promotions/promotion_model.dart';
 import '../promotions/promotions_repository.dart';
 import '../theme.dart';
 import 'cart_screen.dart';
+import 'parcel_form_screen.dart';
 import 'restaurant_menu_screen.dart';
 import 'restaurants_screen.dart';
 
 /// Pastel, organic-shaped service cards — the four entry points the client
-/// can currently reach from the home screen. Restaurants and Courses are
-/// wired to a real backend (a grocery store is just a Restaurant row with
-/// a different type — see RestaurantType); Factures/Colis remain UI-only
-/// placeholders since there's no bill-payment or parcel backend yet.
+/// can currently reach from the home screen. Restaurants, Courses, and Colis
+/// are wired to a real backend (a grocery store is just a Restaurant row
+/// with a different type — see RestaurantType; a Colis order is an Order
+/// with no restaurant — see ParcelFormScreen). Factures remains a UI-only
+/// placeholder since there's no bill-payment backend yet.
 class _Service {
   const _Service({
     required this.title,
@@ -27,6 +29,7 @@ class _Service {
     required this.icon,
     this.comingSoon = false,
     this.restaurantType,
+    this.isParcel = false,
   });
 
   final String title;
@@ -37,6 +40,9 @@ class _Service {
   /// Set when tapping this card should open RestaurantsScreen browsing
   /// this type — null (and comingSoon true) for a placeholder service.
   final RestaurantType? restaurantType;
+
+  /// Set when tapping this card should open ParcelFormScreen instead.
+  final bool isParcel;
 }
 
 const _services = [
@@ -62,7 +68,7 @@ const _services = [
     title: 'Colis',
     subtitle: 'Envoi rapide',
     icon: Icons.local_shipping_outlined,
-    comingSoon: true,
+    isParcel: true,
   ),
 ];
 
@@ -112,6 +118,13 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
         ),
       );
+      return;
+    }
+
+    if (service.isParcel) {
+      Navigator.of(
+        context,
+      ).push(MaterialPageRoute(builder: (_) => const ParcelFormScreen()));
       return;
     }
 

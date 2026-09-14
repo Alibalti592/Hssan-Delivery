@@ -29,14 +29,16 @@ class OrderConfirmedScreen extends StatelessWidget {
               ),
               const SizedBox(height: 24),
               Text(
-                'Commande envoyée',
+                order.isParcel ? 'Colis envoyé' : 'Commande envoyée',
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                   fontWeight: FontWeight.w800,
                 ),
               ),
               const SizedBox(height: 8),
               Text(
-                'Votre commande #${order.id} a bien été transmise au restaurant.',
+                order.isParcel
+                    ? 'Votre demande de course #${order.id} a bien été envoyée. Un livreur va la récupérer.'
+                    : 'Votre commande #${order.id} a bien été transmise au restaurant.',
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.bodyMedium,
               ),

@@ -8,10 +8,14 @@ final class OrderResponse
 {
     public function __construct(
         public readonly int $id,
-        public readonly int $restaurantId,
+        public readonly ?int $restaurantId,
+        public readonly ?string $restaurantName,
         public readonly array $items,
         public readonly ?string $note,
+        public readonly ?string $pickupAddress,
         public readonly string $deliveryAddress,
+        public readonly ?string $recipientName,
+        public readonly ?string $recipientPhone,
         public readonly int $deliveryZoneId,
         public readonly string $deliveryZoneName,
         public readonly string $deliveryFee,
@@ -45,10 +49,14 @@ final class OrderResponse
 
         return new self(
             id: $order->getId(),
-            restaurantId: $order->getRestaurant()->getId(),
+            restaurantId: $order->getRestaurant()?->getId(),
+            restaurantName: $order->getRestaurant()?->getName(),
             items: $items,
             note: $order->getNote(),
+            pickupAddress: $order->getPickupAddress(),
             deliveryAddress: $order->getDeliveryAddress(),
+            recipientName: $order->getRecipientName(),
+            recipientPhone: $order->getRecipientPhone(),
             deliveryZoneId: $order->getDeliveryZone()->getId(),
             deliveryZoneName: $order->getDeliveryZone()->getName(),
             deliveryFee: $order->getDeliveryFee(),

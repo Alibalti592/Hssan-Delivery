@@ -2,6 +2,11 @@ import { test, expect } from '@playwright/test';
 import { loginAsAdmin, mockLogin, mockStats } from './mockApi';
 
 test('redirects an unauthenticated visitor to the login page', async ({ page }) => {
+  // AuthContext always calls /me on mount now (it can't read the httpOnly
+  // auth cookie itself to short-circuit that call) — mock the "no session"
+  // response explicitly rather than relying on an unmocked request failing.
+  await page.route('**/api/auth/me', (route) => route.fulfill({ status: 401 }));
+
   await page.goto('/');
   await expect(page).toHaveURL(/\/login$/);
   await expect(page.getByRole('heading', { name: 'Delivery Hassen' })).toBeVisible();

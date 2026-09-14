@@ -41,6 +41,8 @@ export const authApi = {
   login: (phone: string, password: string) =>
     api.post<{ token: string }>('/api/auth/login', { phone, password }),
   me: () => api.get<CurrentUser>('/api/auth/me'),
+  // Clears the httpOnly auth cookie server-side — JS can't clear it itself.
+  logout: () => api.post<void>('/api/auth/logout'),
 };
 
 // Restaurants

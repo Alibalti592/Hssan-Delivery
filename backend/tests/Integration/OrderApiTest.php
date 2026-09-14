@@ -187,6 +187,126 @@ final class OrderApiTest extends WebTestCase
         );
     }
 
+    public function testCreateParcelOrderHasNoRestaurantAndPricesOffTheZoneFeeAlone(): void
+    {
+        $client = static::createClient();
+
+        $this->entityManager = self::getContainer()
+            ->get(EntityManagerInterface::class);
+
+        $user = $this->createTestUser();
+        $zone = $this->createTestDeliveryZone('5.000');
+
+        $token = $this->authenticateClient($client, $user);
+
+        $client->request(
+            'POST',
+            '/api/orders/parcels',
+            server: [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_AUTHORIZATION' => 'Bearer ' . $token,
+            ],
+            content: json_encode([
+                'pickupAddress' => '1 Rue de Marseille, Tunis',
+                'deliveryAddress' => '20 Avenue Habib Bourguiba, Tunis',
+                'recipientName' => 'Amira Ben Salah',
+                'recipientPhone' => '22334455',
+                'note' => 'Documents fragiles',
+                'deliveryZoneId' => $zone->getId(),
+            ])
+        );
+
+        self::assertResponseStatusCodeSame(201);
+
+        $responseData = json_decode(
+            $client->getResponse()->getContent(),
+            true
+        );
+
+        self::assertNull($responseData['restaurantId']);
+        self::assertNull($responseData['restaurantName']);
+        self::assertSame([], $responseData['items']);
+        self::assertSame('1 Rue de Marseille, Tunis', $responseData['pickupAddress']);
+        self::assertSame('20 Avenue Habib Bourguiba, Tunis', $responseData['deliveryAddress']);
+        self::assertSame('Amira Ben Salah', $responseData['recipientName']);
+        self::assertSame('22334455', $responseData['recipientPhone']);
+        self::assertSame('5.000', $responseData['deliveryFee']);
+        self::assertSame('5.000', $responseData['totalAmount']);
+        self::assertSame(DeliveryType::PARCEL->value, $responseData['deliveryType']);
+        self::assertSame(OrderStatus::PENDING->value, $responseData['status']);
+
+        $orderId = $responseData['id'];
+
+        $this->entityManager->clear();
+
+        $delivery = $this->entityManager
+            ->getRepository(Delivery::class)
+            ->findOneBy(['order' => $orderId]);
+
+        self::assertNotNull($delivery);
+        self::assertSame(DeliveryStatus::PENDING, $delivery->getStatus());
+        self::assertSame(DeliveryType::PARCEL, $delivery->getOrder()->getDeliveryType());
+        self::assertNull($delivery->getOrder()->getRestaurant());
+    }
+
+    public function testCreateParcelOrderFailsWhenRequiredFieldsAreMissing(): void
+    {
+        $client = static::createClient();
+
+        $this->entityManager = self::getContainer()
+            ->get(EntityManagerInterface::class);
+
+        $user = $this->createTestUser();
+        $token = $this->authenticateClient($client, $user);
+
+        $client->request(
+            'POST',
+            '/api/orders/parcels',
+            server: [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_AUTHORIZATION' => 'Bearer ' . $token,
+            ],
+            content: json_encode([
+                'pickupAddress' => '',
+                'deliveryAddress' => '20 Avenue Habib Bourguiba, Tunis',
+                'recipientName' => '',
+                'recipientPhone' => '',
+                'deliveryZoneId' => null,
+            ])
+        );
+
+        self::assertResponseStatusCodeSame(422);
+    }
+
+    public function testCreateParcelOrderFailsWhenDeliveryZoneDoesNotExist(): void
+    {
+        $client = static::createClient();
+
+        $this->entityManager = self::getContainer()
+            ->get(EntityManagerInterface::class);
+
+        $user = $this->createTestUser();
+        $token = $this->authenticateClient($client, $user);
+
+        $client->request(
+            'POST',
+            '/api/orders/parcels',
+            server: [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_AUTHORIZATION' => 'Bearer ' . $token,
+            ],
+            content: json_encode([
+                'pickupAddress' => '1 Rue de Marseille, Tunis',
+                'deliveryAddress' => '20 Avenue Habib Bourguiba, Tunis',
+                'recipientName' => 'Amira Ben Salah',
+                'recipientPhone' => '22334455',
+                'deliveryZoneId' => 999999,
+            ])
+        );
+
+        self::assertResponseStatusCodeSame(400);
+    }
+
     public function testCreateOrderFailsWhenRestaurantDoesNotExist(): void
     {
         $client = static::createClient();

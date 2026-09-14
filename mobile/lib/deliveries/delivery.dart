@@ -91,7 +91,10 @@ class DeliveryOrder {
     required this.restaurantName,
     required this.customerName,
     required this.customerPhone,
+    required this.pickupAddress,
     required this.deliveryAddress,
+    required this.recipientName,
+    required this.recipientPhone,
     required this.note,
     required this.deliveryFee,
     required this.totalAmount,
@@ -100,26 +103,40 @@ class DeliveryOrder {
   });
 
   final int id;
-  final String restaurantName;
+
+  /// Null for a Colis (parcel) job — see pickupAddress instead.
+  final String? restaurantName;
   final String customerName;
   final String customerPhone;
+
+  /// Set only for a Colis job — where the courier collects the package.
+  final String? pickupAddress;
   final String deliveryAddress;
+
+  /// Set only for a Colis job — who the courier hands the package to.
+  final String? recipientName;
+  final String? recipientPhone;
   final String? note;
   final String deliveryFee;
   final String totalAmount;
 
   /// Which of the four client services this delivery is for — see
-  /// ClientOrder.deliveryType. Only 'RESTAURANT' is ever produced today.
+  /// ClientOrder.deliveryType.
   final String deliveryType;
   final List<DeliveryItem> items;
+
+  bool get isParcel => deliveryType == 'PARCEL';
 
   factory DeliveryOrder.fromJson(Map<String, dynamic> json) {
     return DeliveryOrder(
       id: json['id'] as int,
-      restaurantName: json['restaurantName'] as String? ?? 'Restaurant',
+      restaurantName: json['restaurantName'] as String?,
       customerName: json['customerName'] as String? ?? 'Customer',
       customerPhone: json['customerPhone'] as String? ?? '',
+      pickupAddress: json['pickupAddress'] as String?,
       deliveryAddress: json['deliveryAddress'] as String? ?? '',
+      recipientName: json['recipientName'] as String?,
+      recipientPhone: json['recipientPhone'] as String?,
       note: json['note'] as String?,
       deliveryFee: json['deliveryFee'] as String? ?? '0.000',
       totalAmount: json['totalAmount'] as String? ?? '0.000',

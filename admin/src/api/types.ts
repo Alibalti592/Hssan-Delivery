@@ -69,11 +69,16 @@ export interface AdminOrder {
   userId: number;
   userName: string;
   userPhone: string;
-  restaurantId: number;
-  restaurantName: string;
+  restaurantId: number | null;
+  restaurantName: string | null;
   items: OrderItem[];
   note: string | null;
+  /** Colis (parcel) orders only — where the courier collects the package. */
+  pickupAddress: string | null;
   deliveryAddress: string;
+  /** Colis (parcel) orders only — who receives it at deliveryAddress. */
+  recipientName: string | null;
+  recipientPhone: string | null;
   deliveryZoneId: number;
   deliveryZoneName: string;
   deliveryFee: string;

@@ -24,7 +24,7 @@ class Order
     private ?User $user = null;
 
     #[ORM\ManyToOne]
-    #[ORM\JoinColumn(nullable: false)]
+    #[ORM\JoinColumn(nullable: true)]
     private ?Restaurant $restaurant = null;
 
     #[ORM\OneToMany(
@@ -40,6 +40,25 @@ class Order
 
     #[ORM\Column(type: 'text')]
     private ?string $deliveryAddress = null;
+
+    /**
+     * Set only for a Colis (parcel) order — where the courier collects the
+     * package from, as opposed to deliveryAddress (where it's dropped off).
+     * Null for every other service, which delivers from a Restaurant row.
+     */
+    #[ORM\Column(type: 'text', nullable: true)]
+    private ?string $pickupAddress = null;
+
+    /**
+     * Who receives a Colis parcel at deliveryAddress — distinct from the
+     * account holder (getUser()), who may be sending it to someone else.
+     * Null for every other service.
+     */
+    #[ORM\Column(length: 255, nullable: true)]
+    private ?string $recipientName = null;
+
+    #[ORM\Column(length: 30, nullable: true)]
+    private ?string $recipientPhone = null;
 
     #[ORM\ManyToOne]
     #[ORM\JoinColumn(nullable: false)]
@@ -166,6 +185,42 @@ class Order
     public function setDeliveryAddress(string $deliveryAddress): static
     {
         $this->deliveryAddress = $deliveryAddress;
+
+        return $this;
+    }
+
+    public function getPickupAddress(): ?string
+    {
+        return $this->pickupAddress;
+    }
+
+    public function setPickupAddress(?string $pickupAddress): static
+    {
+        $this->pickupAddress = $pickupAddress;
+
+        return $this;
+    }
+
+    public function getRecipientName(): ?string
+    {
+        return $this->recipientName;
+    }
+
+    public function setRecipientName(?string $recipientName): static
+    {
+        $this->recipientName = $recipientName;
+
+        return $this;
+    }
+
+    public function getRecipientPhone(): ?string
+    {
+        return $this->recipientPhone;
+    }
+
+    public function setRecipientPhone(?string $recipientPhone): static
+    {
+        $this->recipientPhone = $recipientPhone;
 
         return $this;
     }

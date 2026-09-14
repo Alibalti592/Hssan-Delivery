@@ -34,6 +34,25 @@ class OrdersRepository {
     return ClientOrder.fromJson(body as Map<String, dynamic>);
   }
 
+  Future<ClientOrder> createParcelOrder({
+    required String pickupAddress,
+    required String deliveryAddress,
+    required String recipientName,
+    required String recipientPhone,
+    required int deliveryZoneId,
+    String? note,
+  }) async {
+    final body = await _api.post('/api/orders/parcels', {
+      'pickupAddress': pickupAddress,
+      'deliveryAddress': deliveryAddress,
+      'recipientName': recipientName,
+      'recipientPhone': recipientPhone,
+      'deliveryZoneId': deliveryZoneId,
+      if (note != null && note.isNotEmpty) 'note': note,
+    });
+    return ClientOrder.fromJson(body as Map<String, dynamic>);
+  }
+
   Future<PagedResult<ClientOrder>> listOrders({int page = 1}) async {
     final body = await _api.get('/api/orders?page=$page');
     return PagedResult.fromJson(

@@ -29,6 +29,12 @@ export async function mockLogin(page: Page, roles: string[]) {
       isVerified: true,
     }),
   );
+
+  // AuthContext calls this when /me comes back without ROLE_ADMIN, to clear
+  // the httpOnly auth cookie the backend just set on login.
+  await page.route('**/api/auth/logout', (route) =>
+    route.fulfill({ status: 204 }),
+  );
 }
 
 export async function loginAsAdmin(page: Page) {
