@@ -2,3 +2,31 @@ lexik_jwt_authentication:
     secret_key: '%env(resolve:JWT_SECRET_KEY)%'
     public_key: '%env(resolve:JWT_PUBLIC_KEY)%'
     pass_phrase: '%env(JWT_PASSPHRASE)%'
+
+    # Mobile clients keep authenticating with "Authorization: Bearer <jwt>" —
+    # authorization_header is tried first and nothing below changes that.
+    # The admin dashboard (a browser SPA) instead receives its JWT as an
+    # httpOnly cookie: JS on the admin dashboard can no longer read the
+    # token, so an XSS there can't just lift it out of localStorage the way
+    # it could before. Both extractors run on the same "api" firewall.
+    token_extractors:
+        authorization_header:
+            enabled: true
+        cookie:
+            enabled: true
+            name: BEARER
+
+    # Without this, enabling cookies strips "token" from the JSON login
+    # response body by default. Mobile needs it there — it never reads the
+    # cookie — so keep it in the body for both clients.
+    remove_token_from_body_when_cookies_used: false
+
+    set_cookies:
+        BEARER:
+            samesite: lax
+            httpOnly: true
+            # Secure cookies are silently dropped by the browser over plain
+            # http://, so this defaults to false for local dev. It MUST be
+            # true once the admin dashboard and backend are served over
+            # HTTPS — see JWT_COOKIE_SECURE in .env.example.
+            secure: '%env(bool:JWT_COOKIE_SECURE)%'

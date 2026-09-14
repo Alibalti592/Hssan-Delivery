@@ -1,5 +1,4 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
-import { clearToken, getToken, setToken as persistToken } from '../api/client';
 import { authApi } from '../api/resources';
 import type { CurrentUser } from '../api/types';
 
@@ -21,21 +20,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!getToken()) {
-      setIsRestoringSession(false);
-      return;
-    }
-
+    // The auth cookie is httpOnly — JS can't check whether it exists, so
+    // the only way to know if a session survived a page refresh is to ask
+    // the backend. A missing/expired cookie just makes this 401, same as
+    // any other unauthenticated request.
     authApi
       .me()
       .then((me) => {
         if (me.roles.includes('ROLE_ADMIN')) {
           setUser(me);
-        } else {
-          clearToken();
         }
       })
-      .catch(() => clearToken())
+      .catch(() => {
+        // Not signed in (no cookie, or an admin account signed out
+        // elsewhere) — nothing to clear locally, there's no token in JS.
+      })
       .finally(() => setIsRestoringSession(false));
   }, []);
 
@@ -44,13 +43,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setError(null);
 
     try {
-      const { token } = await authApi.login(phone, password);
-      persistToken(token);
+      // The backend sets the auth cookie directly on this response; there's
+      // no token for us to store — see api/client.ts's `credentials: 'include'`.
+      await authApi.login(phone, password);
 
       const me = await authApi.me();
 
       if (!me.roles.includes('ROLE_ADMIN')) {
-        clearToken();
+        await authApi.logout();
         throw new Error(
           "This account isn't an administrator account.",
         );
@@ -58,7 +58,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       setUser(me);
     } catch (err) {
-      clearToken();
       setError(err instanceof Error ? err.message : 'Login failed.');
       throw err;
     } finally {
@@ -67,7 +66,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   function logout() {
-    clearToken();
+    void authApi.logout();
     setUser(null);
   }
 

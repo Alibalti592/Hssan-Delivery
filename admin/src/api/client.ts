@@ -2,20 +2,6 @@ import type { ApiErrorBody } from './types';
 
 export const API_URL = import.meta.env.VITE_API_URL ?? 'http://127.0.0.1:8000';
 
-const TOKEN_KEY = 'hssan_admin_token';
-
-export function getToken(): string | null {
-  return localStorage.getItem(TOKEN_KEY);
-}
-
-export function setToken(token: string): void {
-  localStorage.setItem(TOKEN_KEY, token);
-}
-
-export function clearToken(): void {
-  localStorage.removeItem(TOKEN_KEY);
-}
-
 export class ApiError extends Error {
   status: number;
   fieldErrors: { field: string; message: string }[];
@@ -36,8 +22,6 @@ async function request<T>(
   path: string,
   options: RequestInit = {},
 ): Promise<T> {
-  const token = getToken();
-
   // FormData bodies (photo uploads) must NOT get a Content-Type here: the
   // browser sets multipart/form-data with the correct boundary itself, and
   // only when it's the one adding the header.
@@ -45,12 +29,16 @@ async function request<T>(
 
   const headers: Record<string, string> = {
     ...(options.body && !isFormData ? { 'Content-Type': 'application/json' } : {}),
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
   };
 
+  // Auth is an httpOnly cookie the backend sets on login (see
+  // lexik_jwt_authentication.yaml) — JS never holds the token itself, so
+  // there's nothing to attach as an Authorization header here. `include`
+  // makes the browser send/store that cookie on this cross-origin request.
   const response = await fetch(`${API_URL}${path}`, {
     ...options,
     headers,
+    credentials: 'include',
   });
 
   if (response.status === 204) {

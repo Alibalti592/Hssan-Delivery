@@ -9,6 +9,7 @@ use App\Dto\Auth\UserResponse;
 use App\Entity\User;
 use App\Service\AuthService;
 use Symfony\Bundle\SecurityBundle\Security;
+use Symfony\Component\HttpFoundation\Cookie;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -27,6 +28,7 @@ class AuthController extends AbstractApiController
         private readonly AuthService $authService,
         private readonly Security $security,
         private readonly RateLimiterFactory $registerLimiter,
+        private readonly bool $jwtCookieSecure,
     ) {
         parent::__construct($serializer, $validator);
     }
@@ -64,6 +66,31 @@ class AuthController extends AbstractApiController
     public function login(): never
     {
         throw new \LogicException('This route is handled by the json_login authenticator and should never execute.');
+    }
+
+    /**
+     * Clears the admin dashboard's httpOnly auth cookie. Mobile clients
+     * never receive that cookie in the first place (they authenticate via
+     * the Authorization header), so this is a no-op for them — they just
+     * stop sending the header locally. There's nothing else to invalidate
+     * server-side for a stateless JWT: the token itself stays technically
+     * valid until it expires, this only removes the browser's copy of it.
+     */
+    #[Route('/logout', name: 'api_auth_logout', methods: ['POST'])]
+    public function logout(): JsonResponse
+    {
+        $response = new JsonResponse(null, Response::HTTP_NO_CONTENT);
+
+        $response->headers->clearCookie(
+            'BEARER',
+            '/',
+            null,
+            $this->jwtCookieSecure,
+            true,
+            'lax'
+        );
+
+        return $response;
     }
 
     #[Route('/me', name: 'api_auth_me', methods: ['GET'])]
