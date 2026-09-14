@@ -8,7 +8,7 @@
 # VITE_API_URL is a build-time value — Vite bakes it into the built JS, so
 # it must be supplied at `docker build` time, not `docker run` time.
 
-FROM node:20-alpine AS build
+FROM node:26-alpine AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
