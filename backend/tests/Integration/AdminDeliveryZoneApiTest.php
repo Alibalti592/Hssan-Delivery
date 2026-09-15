@@ -157,6 +157,44 @@ final class AdminDeliveryZoneApiTest extends WebTestCase
         );
     }
 
+    public function testDeliveryZoneFeeWithTooManyIntegerDigitsIsRejected(): void
+    {
+        $client = static::createClient();
+
+        $this->entityManager = self::getContainer()
+            ->get(EntityManagerInterface::class);
+
+        $admin = $this->createTestUser(
+            'ROLE_ADMIN',
+            'Test Admin'
+        );
+
+        $token = $this->authenticateClient(
+            $client,
+            $admin
+        );
+
+        // The `fee` column is decimal(10,3) — 7 integer digits max. This
+        // must be rejected by validation (422), not reach flush() and blow
+        // up as a raw DBAL out-of-range exception (500).
+        $client->request(
+            'POST',
+            '/api/admin/delivery-zones',
+            server: [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_AUTHORIZATION' => 'Bearer '.$token,
+            ],
+            content: json_encode([
+                'name' => 'Overpriced Zone '.random_int(100000, 999999),
+                'fee' => '99999999.999',
+            ])
+        );
+
+        self::assertResponseStatusCodeSame(
+            Response::HTTP_UNPROCESSABLE_ENTITY
+        );
+    }
+
     public function testCreatingDeliveryZoneWithDuplicateNameReturns409(): void
     {
         $client = static::createClient();

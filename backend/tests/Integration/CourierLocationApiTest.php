@@ -251,6 +251,84 @@ final class CourierLocationApiTest extends WebTestCase
         self::assertArrayNotHasKey('phone', $byId[$courierWithLocation->getId()]);
     }
 
+    /**
+     * CourierLocationService::listForAdmin() used to call
+     * findOneByCourier()/findActiveForCourier() once per courier inside
+     * array_map — for N couriers that's 1 (paginate) + 2N queries. Both
+     * are now batched into a single query each regardless of N. Counted
+     * via Doctrine's own debug middleware (doctrine.debug_data_holder)
+     * rather than mocking anything, so this fails for real if the
+     * batching regresses.
+     */
+    public function testListingCourierLocationsDoesNotIssueAQueryPerCourier(): void
+    {
+        $client = static::createClient();
+
+        $this->entityManager = self::getContainer()
+            ->get(EntityManagerInterface::class);
+
+        $admin = $this->createTestUser('ROLE_ADMIN', 'Test Admin');
+
+        $couriers = [
+            $this->createTestUser('ROLE_LIVREUR', 'Query Count Courier 1'),
+            $this->createTestUser('ROLE_LIVREUR', 'Query Count Courier 2'),
+            $this->createTestUser('ROLE_LIVREUR', 'Query Count Courier 3'),
+        ];
+
+        foreach ($couriers as $i => $courier) {
+            $courierToken = $this->authenticateClient($client, $courier);
+
+            $client->request(
+                'POST',
+                '/api/couriers/location',
+                server: [
+                    'CONTENT_TYPE' => 'application/json',
+                    'HTTP_AUTHORIZATION' => 'Bearer '.$courierToken,
+                ],
+                content: json_encode(['latitude' => 36.8 + $i, 'longitude' => 10.18 + $i])
+            );
+
+            self::assertResponseStatusCodeSame(Response::HTTP_NO_CONTENT);
+        }
+
+        $adminToken = $this->authenticateClient($client, $admin);
+
+        // Fetched fresh immediately before/after the request rather than
+        // reused across it — see OrderApiTest::testListingOrdersDoesNotIssueAQueryPerOrder
+        // for why a reference held from before the request isn't reliable.
+        self::getContainer()->get('doctrine.debug_data_holder')->reset();
+
+        $client->request(
+            'GET',
+            '/api/admin/couriers/locations',
+            server: ['HTTP_AUTHORIZATION' => 'Bearer '.$adminToken]
+        );
+
+        self::assertResponseIsSuccessful();
+
+        $response = json_decode($client->getResponse()->getContent(), true);
+        self::assertGreaterThanOrEqual(3, count($response));
+
+        $queries = self::getContainer()->get('doctrine.debug_data_holder')->getData()['default'] ?? [];
+        $queryCount = count($queries);
+
+        self::assertGreaterThan(
+            0,
+            $queryCount,
+            'Expected doctrine.debug_data_holder to have recorded this request\'s queries.'
+        );
+
+        // Flat regardless of courier count: reload the JWT's user, the
+        // paginated courier list, its COUNT, one batch query for
+        // locations, and one batch query for active deliveries — not two
+        // queries per courier.
+        self::assertLessThanOrEqual(
+            6,
+            $queryCount,
+            "Expected a small, constant number of queries regardless of courier count, got {$queryCount}."
+        );
+    }
+
     public function testNonAdminCannotListCourierLocations(): void
     {
         $client = static::createClient();

@@ -251,6 +251,40 @@ final class AdminPromotionApiTest extends WebTestCase
         self::assertArrayHasKey('errors', $response);
     }
 
+    public function testPromotionDiscountValueWithTooManyIntegerDigitsIsRejected(): void
+    {
+        $client = static::createClient();
+
+        $this->entityManager = self::getContainer()
+            ->get(EntityManagerInterface::class);
+
+        $admin = $this->createTestUser('ROLE_ADMIN', 'Test Admin');
+
+        $adminToken = $this->authenticateClient($client, $admin);
+
+        // The `discountValue` column is decimal(10,3) — 7 integer digits
+        // max. This must be rejected by validation (422), not reach
+        // flush() and blow up as a raw DBAL out-of-range exception (500).
+        $client->request(
+            'POST',
+            '/api/admin/promotions',
+            server: [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_AUTHORIZATION' => 'Bearer '.$adminToken,
+            ],
+            content: json_encode([
+                'title' => 'Absurd Discount',
+                'discountType' => 'FIXED_AMOUNT',
+                'discountValue' => '99999999.999',
+                'startAt' => (new \DateTimeImmutable('-1 day'))->format(\DateTimeInterface::ATOM),
+                'endAt' => (new \DateTimeImmutable('+1 week'))->format(\DateTimeInterface::ATOM),
+                'isActive' => true,
+            ])
+        );
+
+        self::assertResponseStatusCodeSame(Response::HTTP_UNPROCESSABLE_ENTITY);
+    }
+
     public function testNonAdminCannotCreatePromotion(): void
     {
         $client = static::createClient();

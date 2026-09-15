@@ -46,6 +46,42 @@ class DeliveryRepository extends ServiceEntityRepository
     }
 
     /**
+     * Batches findActiveForCourier() across a whole courier set — see
+     * CourierLocationService::listForAdmin(), which otherwise issues one
+     * query per courier on top of the one that lists them.
+     *
+     * @param User[] $couriers
+     *
+     * @return array<int, Delivery> keyed by courier id
+     */
+    public function findActiveForCouriers(array $couriers): array
+    {
+        if ([] === $couriers) {
+            return [];
+        }
+
+        $deliveries = $this->createQueryBuilder('d')
+            ->andWhere('d.courier IN (:couriers)')
+            ->andWhere('d.status IN (:statuses)')
+            ->setParameter('couriers', $couriers)
+            ->setParameter('statuses', self::ACTIVE_STATUSES)
+            ->orderBy('d.createdAt', 'DESC')
+            ->addOrderBy('d.id', 'DESC')
+            ->getQuery()
+            ->getResult();
+
+        $byCourierId = [];
+        foreach ($deliveries as $delivery) {
+            // A courier has at most one active delivery at a time (see
+            // findActiveForCourier's doc) — keep the first (most recent,
+            // per the ORDER BY above) if that invariant is ever violated.
+            $byCourierId[$delivery->getCourier()->getId()] ??= $delivery;
+        }
+
+        return $byCourierId;
+    }
+
+    /**
      * @return PaginatedResult<Delivery>
      */
     public function paginateByCourier(User $courier, int $page, int $limit): PaginatedResult

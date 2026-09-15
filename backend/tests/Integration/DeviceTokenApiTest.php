@@ -183,6 +183,57 @@ final class DeviceTokenApiTest extends WebTestCase
         self::assertNull($stored);
     }
 
+    public function testUnregisteringSomeoneElsesTokenIsANoop(): void
+    {
+        $client = static::createClient();
+
+        $this->entityManager = self::getContainer()
+            ->get(EntityManagerInterface::class);
+
+        $owner = $this->createTestUser('ROLE_CLIENT', 'Token Owner');
+        $ownerToken = $this->authenticateClient($client, $owner);
+        $deviceToken = $this->uniqueToken();
+
+        $client->request(
+            'POST',
+            '/api/notifications/device-token',
+            server: [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_AUTHORIZATION' => 'Bearer '.$ownerToken,
+            ],
+            content: json_encode(['token' => $deviceToken])
+        );
+
+        self::assertResponseStatusCodeSame(Response::HTTP_NO_CONTENT);
+
+        // A different account learning the owner's token value (e.g. a
+        // shared device, a support screenshot, a leaked log line) must not
+        // be able to deregister it — see DeviceTokenService::unregister.
+        $attacker = $this->createTestUser('ROLE_CLIENT', 'Other User');
+        $attackerToken = $this->authenticateClient($client, $attacker);
+
+        $client->request(
+            'DELETE',
+            '/api/notifications/device-token',
+            server: [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_AUTHORIZATION' => 'Bearer '.$attackerToken,
+            ],
+            content: json_encode(['token' => $deviceToken])
+        );
+
+        self::assertResponseStatusCodeSame(Response::HTTP_NO_CONTENT);
+
+        $this->entityManager->clear();
+
+        $stored = $this->entityManager
+            ->getRepository(DeviceToken::class)
+            ->findOneBy(['token' => $deviceToken]);
+
+        self::assertNotNull($stored, "Another user's unregister call must not delete this token.");
+        self::assertSame($owner->getId(), $stored->getUser()->getId());
+    }
+
     public function testUnregisteringAnUnknownTokenIsANoop(): void
     {
         $client = static::createClient();

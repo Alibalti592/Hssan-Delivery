@@ -457,6 +457,15 @@ constant number of queries rather than N+1 lazily-loaded ones. Covered by
 which assert the actual query count via Doctrine's own debug middleware
 rather than just checking the response shape.
 
+The admin courier-map endpoint (`GET /api/admin/couriers/locations`) has the
+same shape of fix: `CourierLocationService::listForAdmin` used to look up
+each courier's last known location and active delivery one at a time inside
+its loop. `CourierLocationRepository::findLatestByCouriers` and
+`DeliveryRepository::findActiveForCouriers` batch both across the whole
+courier page in one query each — worth calling out separately since this is
+the endpoint the admin map polls repeatedly, not a one-off list view.
+Covered by `CourierLocationApiTest::testListingCourierLocationsDoesNotIssueAQueryPerCourier`.
+
 Push notifications
 
 Delivery status changes can push a notification via Firebase Cloud
@@ -684,11 +693,18 @@ courier location reporting and the admin courier-locations endpoint
 the public GET /api/delivery-zones endpoint
 order/delivery list endpoints eager-load correctly (a small, constant query
 count per page rather than one query per row) — see "Pagination" above
+the admin courier-map endpoint batches its per-courier location/active-delivery
+lookups the same way, instead of two queries per courier on the page
 a browser (cookie-based) client's login response never carries the JWT in
 its body — see "Admin authentication" above
 order/parcel creation and password change are rate-limited per user, and
 order creation rejects oversized requests (too many line items, or too
 large a quantity on one item) — see "Rate limiting" above
+a user can only unregister their own push-notification device token, never
+one belonging to another account (DeviceTokenService::unregister)
+product price, delivery zone fee, and promotion discount value are capped
+at 7 integer digits, matching the decimal(10,3) columns they're stored in —
+an over-limit value is now a clean 422 instead of an unhandled DB exception
 
 It also contains unit tests for the pure logic that backs those workflows: the
 decimal/millimes money conversion and the delivery-to-order status mapping.
@@ -703,8 +719,8 @@ php bin/phpunit
 
 Current baseline:
 
-228 tests
-1383 assertions
+233 tests
+1412 assertions
 
 Tests share a single Postgres database rather than running each in its own
 transaction, so re-running `php bin/phpunit` without resetting the database
