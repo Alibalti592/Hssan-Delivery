@@ -334,6 +334,74 @@ final class AuthApiTest extends WebTestCase
         );
     }
 
+    /**
+     * Simulates the TOCTOU race between AuthService::register()'s
+     * findOneBy() pre-check and its flush(): a User with the same phone is
+     * persisted (not yet flushed, so invisible to the pre-check's SELECT)
+     * before the request runs. flush() inside register() then flushes both
+     * that pending User and the new one in the same transaction — hitting
+     * the DB's real unique constraint, exactly like two concurrent
+     * registrations racing each other would. This must come back as the
+     * same clean 409 testDuplicatePhoneIsRejected gets for a sequential
+     * duplicate, not a raw unhandled DBAL exception.
+     */
+    public function testConcurrentRegistrationWithSamePhoneReturns409(): void
+    {
+        $client = static::createClient();
+
+        // Only one request happens in this test, so KernelBrowser's
+        // "reboot from the second request onward" default never triggers
+        // regardless — but disable it explicitly anyway so this doesn't
+        // silently break (a fresh EntityManager would discard $racingUser's
+        // pending insert below) if a setup request is ever added before it.
+        $client->disableReboot();
+
+        $this->entityManager = self::getContainer()
+            ->get(EntityManagerInterface::class);
+
+        $phone = $this->uniquePhone();
+
+        $racingUser = new User();
+        $racingUser->setName('Racing User');
+        $racingUser->setPhone($phone);
+        $racingUser->setRoles(['ROLE_CLIENT']);
+        $racingUser->setVerifiedAt(new \DateTimeImmutable());
+
+        $passwordHasher = self::getContainer()->get(UserPasswordHasherInterface::class);
+        $racingUser->setPassword($passwordHasher->hashPassword($racingUser, 'password123'));
+
+        $this->entityManager->persist($racingUser);
+
+        $client->request(
+            'POST',
+            '/api/auth/register',
+            server: [
+                'CONTENT_TYPE' => 'application/json',
+            ],
+            content: json_encode([
+                'name' => 'Losing Request',
+                'phone' => $phone,
+                'password' => 'password456',
+            ])
+        );
+
+        self::assertResponseStatusCodeSame(
+            Response::HTTP_CONFLICT
+        );
+
+        $response = json_decode(
+            $client->getResponse()->getContent(),
+            true
+        );
+
+        self::assertIsArray($response);
+
+        self::assertSame(
+            'An account with this phone number already exists.',
+            $response['message']
+        );
+    }
+
     public function testLoginFailsWithWrongPassword(): void
     {
         $client = static::createClient();

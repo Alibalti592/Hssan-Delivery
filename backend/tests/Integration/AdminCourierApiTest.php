@@ -4,6 +4,7 @@ namespace App\Tests\Integration;
 
 use App\Entity\User;
 use Doctrine\ORM\EntityManagerInterface;
+use Lexik\Bundle\JWTAuthenticationBundle\Services\JWTTokenManagerInterface;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 use Symfony\Component\HttpFoundation\Response;
@@ -201,6 +202,80 @@ final class AdminCourierApiTest extends WebTestCase
             ],
             content: json_encode([
                 'name' => 'Duplicate Courier',
+                'phone' => $phone,
+                'password' => 'password123',
+            ])
+        );
+
+        self::assertResponseStatusCodeSame(
+            Response::HTTP_CONFLICT
+        );
+
+        $response = json_decode(
+            $client->getResponse()->getContent(),
+            true
+        );
+
+        self::assertIsArray($response);
+
+        self::assertSame(
+            'An account with this phone number already exists.',
+            $response['message']
+        );
+    }
+
+    /**
+     * Simulates the TOCTOU race between AuthService::createCourier()'s
+     * findOneBy() pre-check and its flush() — see the identical test on
+     * AuthApiTest::testConcurrentRegistrationWithSamePhoneReturns409 for
+     * the full mechanism. A User with the target phone is persisted (not
+     * yet flushed, so invisible to the pre-check) before the request runs;
+     * flush() inside createCourier() then flushes both entities together,
+     * hitting the DB's real unique constraint.
+     */
+    public function testConcurrentCourierCreationWithSamePhoneReturns409(): void
+    {
+        $client = static::createClient();
+
+        $this->entityManager = self::getContainer()
+            ->get(EntityManagerInterface::class);
+
+        $admin = $this->createTestUser('ROLE_ADMIN', 'Test Admin');
+
+        // Minted directly rather than via a POST /api/auth/login request:
+        // Symfony's test container resets kernel.reset-tagged services
+        // (including Doctrine's registry, which clears the EntityManager's
+        // unit of work) at the start of every request after the first one
+        // in a test. A second request here would silently discard
+        // $racingUser's pending insert below before it ever reaches the
+        // courier-creation request's flush() — the exact race this test
+        // exists to simulate — so this needs to be the test's only request.
+        $adminToken = self::getContainer()
+            ->get(JWTTokenManagerInterface::class)
+            ->create($admin);
+
+        $phone = $this->uniquePhone();
+
+        $racingUser = new User();
+        $racingUser->setName('Racing User');
+        $racingUser->setPhone($phone);
+        $racingUser->setRoles(['ROLE_CLIENT']);
+        $racingUser->setVerifiedAt(new \DateTimeImmutable());
+
+        $passwordHasher = self::getContainer()->get(UserPasswordHasherInterface::class);
+        $racingUser->setPassword($passwordHasher->hashPassword($racingUser, 'password123'));
+
+        $this->entityManager->persist($racingUser);
+
+        $client->request(
+            'POST',
+            '/api/admin/couriers',
+            server: [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_AUTHORIZATION' => 'Bearer '.$adminToken,
+            ],
+            content: json_encode([
+                'name' => 'Losing Request',
                 'phone' => $phone,
                 'password' => 'password123',
             ])

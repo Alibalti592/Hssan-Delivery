@@ -164,6 +164,18 @@ Exception states:
 
 CANCELLED
 FAILED
+
+Reaching CANCELLED differs by who's asking: a client cancelling their own
+order (POST /api/orders/{id}/cancel) can only do so from PENDING or
+ASSIGNED — once a courier has accepted, the client is committed. An admin
+(POST /api/deliveries/{id}/cancel) can cancel from any non-terminal status,
+including mid-flight (ACCEPTED/PICKED_UP/ON_THE_WAY). This matters because
+a deactivated account (`App\Security\ActiveUserChecker`) is rejected on
+every subsequent request, including markDelivered/failDelivery — so a
+courier deactivated mid-delivery can never finish or fail it, and only the
+admin's wider cancel gives that delivery (and its order) a way out. See
+DeliveryService::cancelDelivery vs. cancelDeliveryAsAdmin.
+
 Order / Delivery synchronization
 
 Delivery transitions synchronize the associated order status.
@@ -705,6 +717,13 @@ one belonging to another account (DeviceTokenService::unregister)
 product price, delivery zone fee, and promotion discount value are capped
 at 7 integer digits, matching the decimal(10,3) columns they're stored in —
 an over-limit value is now a clean 422 instead of an unhandled DB exception
+an admin can cancel a delivery already in progress (courier accepted/picked
+up/on the way), not just a still-pending one — the client-facing self-cancel
+stays restricted to before a courier accepts, see "Exception states" above
+an admin cannot assign a delivery to a courier who has toggled themselves
+unavailable, matching what the courier map's ONLINE/OFFLINE badge shows
+two concurrent registrations (or admin-created courier accounts) with the
+same phone number both get a clean 409, not a raw DB exception for the loser
 
 It also contains unit tests for the pure logic that backs those workflows: the
 decimal/millimes money conversion and the delivery-to-order status mapping.
@@ -719,8 +738,8 @@ php bin/phpunit
 
 Current baseline:
 
-233 tests
-1412 assertions
+237 tests
+1437 assertions
 
 Tests share a single Postgres database rather than running each in its own
 transaction, so re-running `php bin/phpunit` without resetting the database

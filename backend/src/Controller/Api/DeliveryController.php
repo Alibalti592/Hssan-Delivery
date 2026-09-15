@@ -173,7 +173,7 @@ final class DeliveryController extends AbstractController
         }
 
         $delivery = $this->deliveryService
-            ->cancelDelivery($delivery);
+            ->cancelDeliveryAsAdmin($delivery);
 
         return $this->json(
             DeliveryResponse::fromEntity($delivery)
