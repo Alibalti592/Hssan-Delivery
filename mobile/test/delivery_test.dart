@@ -102,4 +102,54 @@ void main() {
       expect(delivery.availableActions, isEmpty);
     });
   });
+
+  group('DeliveryOrder contact getters', () {
+    test('use the customer for a restaurant order', () {
+      final order = DeliveryOrder.fromJson({
+        'id': 1,
+        'deliveryType': 'RESTAURANT',
+        'restaurantName': 'Le Bon Burger',
+        'customerName': 'Sami',
+        'customerPhone': '22000001',
+        'deliveryAddress': '12 Rue de la Corniche',
+      });
+
+      expect(order.isParcel, isFalse);
+      expect(order.contactName, 'Sami');
+      expect(order.contactPhone, '22000001');
+    });
+
+    test('use the recipient for a Colis (parcel) order', () {
+      final order = DeliveryOrder.fromJson({
+        'id': 2,
+        'deliveryType': 'PARCEL',
+        'customerName': 'Sami',
+        'customerPhone': '22000001',
+        'recipientName': 'Nour',
+        'recipientPhone': '22000002',
+        'pickupAddress': '1 Avenue Habib Bourguiba',
+        'deliveryAddress': '12 Rue de la Corniche',
+      });
+
+      expect(order.isParcel, isTrue);
+      expect(order.contactName, 'Nour');
+      expect(order.contactPhone, '22000002');
+    });
+
+    test(
+      'falls back to an empty name/null phone for a parcel with no recipient on file',
+      () {
+        final order = DeliveryOrder.fromJson({
+          'id': 3,
+          'deliveryType': 'PARCEL',
+          'customerName': 'Sami',
+          'customerPhone': '22000001',
+          'deliveryAddress': '12 Rue de la Corniche',
+        });
+
+        expect(order.contactName, '');
+        expect(order.contactPhone, isNull);
+      },
+    );
+  });
 }

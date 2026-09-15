@@ -93,34 +93,17 @@ class DeliveryDetailScreen extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          (order.isParcel
-                                  ? order.recipientName
-                                  : order.customerName) ??
-                              '',
+                          order.contactName,
                           style: Theme.of(context).textTheme.bodyLarge,
                         ),
-                        if ((order.isParcel
-                                    ? order.recipientPhone
-                                    : order.customerPhone) !=
-                                null &&
-                            (order.isParcel
-                                    ? order.recipientPhone!
-                                    : order.customerPhone)
-                                .isNotEmpty) ...[
+                        if (order.contactPhone != null &&
+                            order.contactPhone!.isNotEmpty) ...[
                           const SizedBox(height: 8),
                           OutlinedButton.icon(
-                            onPressed: () => _call(
-                              context,
-                              order.isParcel
-                                  ? order.recipientPhone!
-                                  : order.customerPhone,
-                            ),
+                            onPressed: () =>
+                                _call(context, order.contactPhone!),
                             icon: const Icon(Icons.phone),
-                            label: Text(
-                              order.isParcel
-                                  ? order.recipientPhone!
-                                  : order.customerPhone,
-                            ),
+                            label: Text(order.contactPhone!),
                           ),
                         ],
                       ],
