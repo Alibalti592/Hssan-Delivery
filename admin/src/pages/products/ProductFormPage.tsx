@@ -2,7 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useParams } from 'react-router-dom';
 import { categoriesApi, productsApi, restaurantsApi } from '../../api/resources';
-import { PageHeader, Loading, ErrorBanner, Breadcrumb } from '../../components/ui';
+import { PageHeader, Loading, ErrorBanner, Breadcrumb, MONEY_PATTERN, MONEY_TITLE } from '../../components/ui';
 import { PhotoUploader } from '../../components/PhotoUploader';
 
 export default function ProductFormPage() {
@@ -178,6 +178,9 @@ export default function ProductFormPage() {
                 value={price}
                 onChange={(e) => setPrice(e.target.value)}
                 placeholder="18.500"
+                inputMode="decimal"
+                pattern={MONEY_PATTERN}
+                title={MONEY_TITLE}
                 required
               />
             </div>

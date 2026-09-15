@@ -30,3 +30,20 @@ test('rejects a non-admin account with a friendly message, without navigating', 
   await expect(page.getByText("This account isn't an administrator account.")).toBeVisible();
   await expect(page).toHaveURL(/\/login$/);
 });
+
+test('a 401 on any request mid-session sends the admin back to login', async ({ page }) => {
+  // Simulates the auth cookie expiring (or being revoked) after the admin
+  // is already signed in and navigating around — not the initial /me check
+  // on mount, which AuthContext handles separately. Any other endpoint
+  // returning 401 should clear the session and bounce to /login, instead
+  // of leaving the authenticated layout up with every request failing.
+  await mockStats(page);
+  await loginAsAdmin(page);
+  await expect(page).toHaveURL('/');
+
+  await page.route('**/api/admin/restaurants**', (route) => route.fulfill({ status: 401 }));
+
+  await page.getByRole('link', { name: 'Restaurants' }).click();
+
+  await expect(page).toHaveURL(/\/login$/);
+});

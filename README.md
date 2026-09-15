@@ -835,7 +835,9 @@ Admin dashboard
 
 The React/Vite admin dashboard (`admin/`) is implemented and covers:
 
-admin authentication (httpOnly-cookie session — see "Admin authentication" above)
+admin authentication (httpOnly-cookie session — see "Admin authentication" above),
+including a global handler that signs the admin out and redirects to
+/login on a 401 from any request, not just the initial session check
 dashboard (counts overview, backed by GET /api/admin/stats)
 order visibility (list + detail, paginated with Prev/Next) — a Colis
 order's detail shows pickup address and recipient instead of a restaurant
@@ -849,6 +851,11 @@ paginated with Prev/Next) — covers both restaurants and grocery stores
 category management
 product/menu management (including delete and photo upload/replace/remove, paginated with Prev/Next)
 delivery zone management
+client-side guards ahead of the backend's own validation: money-shaped
+fields (price/fee/discount value) reject non-numeric input via the
+browser's native form validation, a promotion's end date is checked
+against its start date before submit, and a photo upload is checked
+against the backend's 5 MB limit before it's sent rather than after
 Playwright e2e coverage (admin/e2e/)
 
 Not yet implemented in the dashboard:
