@@ -28,6 +28,7 @@ class AuthController extends AbstractApiController
         private readonly AuthService $authService,
         private readonly Security $security,
         private readonly RateLimiterFactory $registerLimiter,
+        private readonly RateLimiterFactory $passwordChangeLimiter,
         private readonly bool $jwtCookieSecure,
     ) {
         parent::__construct($serializer, $validator);
@@ -114,6 +115,15 @@ class AuthController extends AbstractApiController
     {
         /** @var User $user */
         $user = $this->security->getUser();
+
+        $limiter = $this->passwordChangeLimiter->create((string) $user->getId());
+
+        if (!$limiter->consume()->isAccepted()) {
+            return new JsonResponse(
+                ['message' => 'Trop de tentatives. Réessayez plus tard.'],
+                Response::HTTP_TOO_MANY_REQUESTS
+            );
+        }
 
         /** @var ChangePasswordRequest $dto */
         $dto = $this->deserializeAndValidate($request, ChangePasswordRequest::class);

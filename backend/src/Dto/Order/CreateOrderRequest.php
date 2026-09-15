@@ -13,7 +13,7 @@ final class CreateOrderRequest
     /**
      * @var OrderItemRequest[]
      */
-    #[Assert\Count(min: 1)]
+    #[Assert\Count(min: 1, max: 50)]
     #[Assert\All([
         new Assert\Type(type: OrderItemRequest::class),
     ])]

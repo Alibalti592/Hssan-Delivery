@@ -682,6 +682,68 @@ final class AuthApiTest extends WebTestCase
         );
     }
 
+    public function testPasswordChangeIsRateLimitedAfterTooManyAttempts(): void
+    {
+        $client = static::createClient();
+
+        $this->entityManager = self::getContainer()
+            ->get(EntityManagerInterface::class);
+
+        self::getContainer()->get('cache.rate_limiter')->clear();
+
+        $user = $this->createTestUser();
+        $token = $this->authenticateClient($client, $user);
+
+        // The configured limit is 5 attempts per 15 minutes per user id (see
+        // config/packages/rate_limiter.yaml), regardless of whether each
+        // individual attempt would otherwise succeed.
+        for ($i = 0; $i < 5; ++$i) {
+            $client->request(
+                'POST',
+                '/api/auth/change-password',
+                server: [
+                    'CONTENT_TYPE' => 'application/json',
+                    'HTTP_AUTHORIZATION' => 'Bearer '.$token,
+                ],
+                content: json_encode([
+                    'currentPassword' => 'wrong-password',
+                    'newPassword' => 'newPassword456',
+                ])
+            );
+
+            self::assertResponseStatusCodeSame(Response::HTTP_BAD_REQUEST);
+        }
+
+        $client->request(
+            'POST',
+            '/api/auth/change-password',
+            server: [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_AUTHORIZATION' => 'Bearer '.$token,
+            ],
+            content: json_encode([
+                'currentPassword' => 'password123',
+                'newPassword' => 'newPassword456',
+            ])
+        );
+
+        self::assertResponseStatusCodeSame(Response::HTTP_TOO_MANY_REQUESTS);
+
+        $response = json_decode(
+            $client->getResponse()->getContent(),
+            true
+        );
+
+        self::assertIsArray($response);
+        self::assertSame(
+            'Trop de tentatives. Réessayez plus tard.',
+            $response['message']
+        );
+
+        // Don't leak an exhausted limiter into whichever test runs next.
+        self::getContainer()->get('cache.rate_limiter')->clear();
+    }
+
     public function testUnauthenticatedUserCannotChangePassword(): void
     {
         $client = static::createClient();

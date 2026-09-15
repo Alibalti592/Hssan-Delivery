@@ -565,6 +565,82 @@ final class OrderApiTest extends WebTestCase
         );
     }
 
+    public function testOrderCreationIsRateLimitedAfterTooManyAttempts(): void
+    {
+        $client = static::createClient();
+
+        $this->entityManager = self::getContainer()
+            ->get(EntityManagerInterface::class);
+
+        self::getContainer()->get('cache.rate_limiter')->clear();
+
+        $user = $this->createTestUser();
+
+        $restaurant = $this->createTestRestaurant();
+        $category = $this->createTestCategory($restaurant);
+        $product = $this->createTestProduct(
+            $restaurant,
+            $category
+        );
+        $zone = $this->createTestDeliveryZone('4.000');
+
+        $token = $this->authenticateClient($client, $user);
+
+        $payload = json_encode([
+            'restaurantId' => $restaurant->getId(),
+            'items' => [
+                [
+                    'productId' => $product->getId(),
+                    'quantity' => 1,
+                ],
+            ],
+            'deliveryAddress' => 'Tunis, Tunisia',
+            'deliveryZoneId' => $zone->getId(),
+        ]);
+
+        // The configured limit is 20 attempts per 10 minutes per user id
+        // (see config/packages/rate_limiter.yaml).
+        for ($i = 0; $i < 20; ++$i) {
+            $client->request(
+                'POST',
+                '/api/orders',
+                server: [
+                    'CONTENT_TYPE' => 'application/json',
+                    'HTTP_AUTHORIZATION' => 'Bearer ' . $token,
+                ],
+                content: $payload
+            );
+
+            self::assertResponseStatusCodeSame(201);
+        }
+
+        $client->request(
+            'POST',
+            '/api/orders',
+            server: [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_AUTHORIZATION' => 'Bearer ' . $token,
+            ],
+            content: $payload
+        );
+
+        self::assertResponseStatusCodeSame(429);
+
+        $response = json_decode(
+            $client->getResponse()->getContent(),
+            true
+        );
+
+        self::assertIsArray($response);
+        self::assertSame(
+            'Trop de tentatives. Réessayez plus tard.',
+            $response['message']
+        );
+
+        // Don't leak an exhausted limiter into whichever test runs next.
+        self::getContainer()->get('cache.rate_limiter')->clear();
+    }
+
     public function testCreateOrderFailsWhenQuantityIsInvalid(): void
     {
         $client = static::createClient();
@@ -618,6 +694,92 @@ final class OrderApiTest extends WebTestCase
         self::assertNotEmpty(
             $response['errors']
         );
+    }
+
+    /**
+     * Guards against Money::toMillimes() * quantity overflowing into float
+     * arithmetic — see OrderItemRequest.
+     */
+    public function testCreateOrderFailsWhenQuantityExceedsTheMax(): void
+    {
+        $client = static::createClient();
+
+        $this->entityManager = self::getContainer()
+            ->get(EntityManagerInterface::class);
+
+        $user = $this->createTestUser();
+
+        $restaurant = $this->createTestRestaurant();
+        $category = $this->createTestCategory($restaurant);
+        $product = $this->createTestProduct(
+            $restaurant,
+            $category
+        );
+
+        $token = $this->authenticateClient($client, $user);
+
+        $client->request(
+            'POST',
+            '/api/orders',
+            server: [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_AUTHORIZATION' => 'Bearer ' . $token,
+            ],
+            content: json_encode([
+                'restaurantId' => $restaurant->getId(),
+                'items' => [
+                    [
+                        'productId' => $product->getId(),
+                        'quantity' => 101,
+                    ],
+                ],
+                'deliveryAddress' => 'Tunis, Tunisia',
+                'deliveryZoneId' => 1,
+            ])
+        );
+
+        self::assertResponseStatusCodeSame(422);
+    }
+
+    public function testCreateOrderFailsWhenTooManyLineItems(): void
+    {
+        $client = static::createClient();
+
+        $this->entityManager = self::getContainer()
+            ->get(EntityManagerInterface::class);
+
+        $user = $this->createTestUser();
+
+        $restaurant = $this->createTestRestaurant();
+        $category = $this->createTestCategory($restaurant);
+        $product = $this->createTestProduct(
+            $restaurant,
+            $category
+        );
+
+        $token = $this->authenticateClient($client, $user);
+
+        $items = array_fill(0, 51, [
+            'productId' => $product->getId(),
+            'quantity' => 1,
+        ]);
+
+        $client->request(
+            'POST',
+            '/api/orders',
+            server: [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_AUTHORIZATION' => 'Bearer ' . $token,
+            ],
+            content: json_encode([
+                'restaurantId' => $restaurant->getId(),
+                'items' => $items,
+                'deliveryAddress' => 'Tunis, Tunisia',
+                'deliveryZoneId' => 1,
+            ])
+        );
+
+        self::assertResponseStatusCodeSame(422);
     }
 
     public function testCreateOrderFailsWhenDeliveryZoneDoesNotExist(): void

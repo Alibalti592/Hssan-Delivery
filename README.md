@@ -385,6 +385,18 @@ POST /api/auth/login is throttled via Symfony's built-in login_throttling
 per-IP floor across all usernames), returning 429 once exceeded.
 POST /api/auth/register is limited to 5 attempts per IP per 10 minutes
 (config/packages/rate_limiter.yaml) as a basic guard against spam signups.
+POST /api/orders and POST /api/orders/parcels are limited to 20 attempts
+per authenticated user per 10 minutes, and POST /api/auth/change-password
+to 5 attempts per authenticated user per 15 minutes — both keyed by user id
+rather than IP since they require auth already, guarding against a
+compromised token being used to spam order creation or brute-force the
+current-password check.
+
+Order creation also bounds each request's shape: at most 50 line items per
+order, and at most 100 units of a single product per line item
+(App\Dto\Order\CreateOrderRequest / OrderItemRequest) — generous enough for
+any real order, and small enough to keep total-price arithmetic away from
+float overflow.
 
 Error tracking
 
@@ -652,6 +664,9 @@ order/delivery list endpoints eager-load correctly (a small, constant query
 count per page rather than one query per row) — see "Pagination" above
 a browser (cookie-based) client's login response never carries the JWT in
 its body — see "Admin authentication" above
+order/parcel creation and password change are rate-limited per user, and
+order creation rejects oversized requests (too many line items, or too
+large a quantity on one item) — see "Rate limiting" above
 
 It also contains unit tests for the pure logic that backs those workflows: the
 decimal/millimes money conversion and the delivery-to-order status mapping.
@@ -666,8 +681,8 @@ php bin/phpunit
 
 Current baseline:
 
-224 tests
-1338 assertions
+228 tests
+1383 assertions
 
 Tests share a single Postgres database rather than running each in its own
 transaction, so re-running `php bin/phpunit` without resetting the database
