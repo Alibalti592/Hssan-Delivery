@@ -151,6 +151,66 @@ final class AuthApiTest extends WebTestCase
         );
     }
 
+    /**
+     * The admin dashboard sends X-Client-Platform: web on every request
+     * (see admin/src/api/client.ts) so WebLoginResponseSanitizer knows to
+     * strip the JWT from this response — the httpOnly cookie the same
+     * response sets is all a browser client needs, and never holding the
+     * token in JS is the whole point of the cookie-based session (see that
+     * class and lexik_jwt_authentication.yaml). Mobile never sends this
+     * header — testClientCanLogin above covers that its body is unaffected.
+     */
+    public function testWebClientLoginOmitsTokenFromBodyButSetsAuthCookie(): void
+    {
+        $client = static::createClient();
+
+        $this->entityManager = self::getContainer()
+            ->get(EntityManagerInterface::class);
+
+        $user = $this->createTestUser();
+
+        $client->request(
+            'POST',
+            '/api/auth/login',
+            server: [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_X_CLIENT_PLATFORM' => 'web',
+            ],
+            content: json_encode([
+                'phone' => $user->getPhone(),
+                'password' => 'password123',
+            ])
+        );
+
+        self::assertResponseStatusCodeSame(
+            Response::HTTP_NO_CONTENT
+        );
+
+        self::assertEmpty(
+            $client->getResponse()->getContent()
+        );
+
+        $cookie = $client->getCookieJar()->get('BEARER');
+
+        self::assertNotNull($cookie);
+        self::assertTrue($cookie->isHttpOnly());
+
+        // The cookie jar sends BEARER automatically from here — no
+        // Authorization header needed, proving the cookie alone authenticates.
+        $client->request('GET', '/api/auth/me');
+
+        self::assertResponseStatusCodeSame(
+            Response::HTTP_OK
+        );
+
+        $me = json_decode(
+            $client->getResponse()->getContent(),
+            true
+        );
+
+        self::assertSame($user->getPhone(), $me['phone']);
+    }
+
     public function testAuthenticatedUserCanAccessMe(): void
     {
         $client = static::createClient();

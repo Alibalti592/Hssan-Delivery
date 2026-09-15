@@ -29,6 +29,12 @@ async function request<T>(
 
   const headers: Record<string, string> = {
     ...(options.body && !isFormData ? { 'Content-Type': 'application/json' } : {}),
+    // Tells the backend's login handler this is a browser client so it can
+    // strip the JWT from the login response body — the httpOnly cookie that
+    // same response sets is all we need, and never holding the token in JS
+    // is the whole point of the cookie migration (see WebLoginResponseSanitizer
+    // on the backend). Harmless to send on every request, not just login.
+    'X-Client-Platform': 'web',
   };
 
   // Auth is an httpOnly cookie the backend sets on login (see

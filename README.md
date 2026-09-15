@@ -103,14 +103,29 @@ The admin dashboard authenticates like every other client (`POST
 and holding it in JS, the backend also mirrors it into an httpOnly,
 `SameSite=Lax` cookie (`config/packages/lexik_jwt_authentication.yaml`) that
 the browser sends automatically and JavaScript can never read — closing off
-the obvious XSS-steals-the-token attack that plain `localStorage` storage
-had. `POST /api/auth/logout` clears that cookie (JS can't do it itself for
-an httpOnly cookie). Mobile is unaffected: it still reads the token from the
-JSON body and sends it as `Authorization: Bearer <jwt>`; both extractors run
-on the same firewall. `JWT_COOKIE_SECURE` (see `.env.example`) must be set
-to `true` once the admin dashboard is served over HTTPS — a `Secure` cookie
-is silently dropped by browsers over plain `http://`, so it defaults to
-`false` for local development.
+the obvious XSS-steals-the-token-from-storage attack that plain
+`localStorage` had. `POST /api/auth/logout` clears that cookie (JS can't do
+it itself for an httpOnly cookie). Mobile is unaffected: it still reads the
+token from the JSON body and sends it as `Authorization: Bearer <jwt>`; both
+extractors run on the same firewall. `JWT_COOKIE_SECURE` (see
+`.env.example`) must be set to `true` once the admin dashboard is served
+over HTTPS — a `Secure` cookie is silently dropped by browsers over plain
+`http://`, so it defaults to `false` for local development.
+
+Mobile needing the token in the body (`remove_token_from_body_when_cookies_used:
+false`) means `POST /api/auth/login`'s response would otherwise carry the
+plaintext JWT for the admin dashboard too, even though it never reads it —
+narrowing the original XSS risk rather than closing it (a script active in
+the page at the exact moment of login could still read the token off the
+response, even though nothing sits in storage for it to find afterward).
+The admin dashboard sends `X-Client-Platform: web` on every request (see
+`admin/src/api/client.ts`); `App\Security\WebLoginResponseSanitizer`
+(wired as `security.yaml`'s `json_login` success handler, wrapping Lexik's
+own) strips `token` from the login response body whenever that header is
+present, returning `204 No Content` instead — so the body genuinely never
+carries the JWT for the admin dashboard, matching what the cookie migration
+was meant to guarantee. Mobile never sends the header, so its body is
+unaffected.
 
 Order workflow
 
@@ -397,6 +412,17 @@ per-user over time). GET /api/admin/stats backs the admin dashboard's
 overview counts with dedicated COUNT queries rather than paging through
 every list just to count it.
 
+The order and delivery list endpoints (client/admin order history, a
+courier's delivery queue, admin delivery oversight) eager-join every to-one
+relation their response needs (restaurant, delivery zone, delivery, courier,
+user) and batch-fetch each page's order items in one follow-up query
+(`OrderRepository::hydrateItems`) — a page of N orders costs a small,
+constant number of queries rather than N+1 lazily-loaded ones. Covered by
+`OrderApiTest::testListingOrdersDoesNotIssueAQueryPerOrder` and
+`DeliveryApiTest::testListingOwnDeliveriesDoesNotIssueAQueryPerDelivery`,
+which assert the actual query count via Doctrine's own debug middleware
+rather than just checking the response shape.
+
 Push notifications
 
 Delivery status changes can push a notification via Firebase Cloud
@@ -622,6 +648,10 @@ Colis parcel order creation (no restaurant, priced off the zone fee alone) and i
 promotion CRUD, activation, and photo upload/replace/remove, including the active-only filter on the public endpoint
 courier location reporting and the admin courier-locations endpoint
 the public GET /api/delivery-zones endpoint
+order/delivery list endpoints eager-load correctly (a small, constant query
+count per page rather than one query per row) — see "Pagination" above
+a browser (cookie-based) client's login response never carries the JWT in
+its body — see "Admin authentication" above
 
 It also contains unit tests for the pure logic that backs those workflows: the
 decimal/millimes money conversion and the delivery-to-order status mapping.
@@ -636,8 +666,8 @@ php bin/phpunit
 
 Current baseline:
 
-221 tests
-1307 assertions
+224 tests
+1338 assertions
 
 Tests share a single Postgres database rather than running each in its own
 transaction, so re-running `php bin/phpunit` without resetting the database
