@@ -1,3 +1,21 @@
+import 'package:flutter/foundation.dart';
+
+/// Fails fast if a release build would talk to a plaintext endpoint — every
+/// request (bearer token included) would otherwise go out unencrypted. Pure
+/// and parameterized on `isRelease` rather than reading [kReleaseMode]
+/// directly, so it's unit-testable without actually building in release
+/// mode. Debug/profile builds are never checked: they routinely point at a
+/// local http:// backend during development, and that's fine.
+void checkSecureTransport(String apiBaseUrl, {required bool isRelease}) {
+  if (!isRelease) return;
+
+  if (!apiBaseUrl.startsWith('https://')) {
+    throw StateError(
+      'API_BASE_URL must use https:// in a release build, got: $apiBaseUrl',
+    );
+  }
+}
+
 /// Runtime configuration.
 ///
 /// Override the API host at build/run time, e.g.
@@ -12,6 +30,11 @@ class AppConfig {
     'API_BASE_URL',
     defaultValue: 'http://10.0.2.2:8000',
   );
+
+  /// Called once at startup (see main.dart) — throws before the app ever
+  /// runs if this is a release build pointed at a non-HTTPS API_BASE_URL.
+  static void assertSecureTransportInRelease() =>
+      checkSecureTransport(apiBaseUrl, isRelease: kReleaseMode);
 
   /// Photo endpoints (Restaurant/Product/Promotion) return a relative path
   /// like "/uploads/restaurants/xyz.jpg" — resolve it against the API host

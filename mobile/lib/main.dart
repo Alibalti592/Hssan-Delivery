@@ -14,6 +14,7 @@ import 'core/api_client.dart';
 import 'courier_location/courier_location_repository.dart';
 import 'courier_location/courier_location_service.dart';
 import 'core/onboarding_storage.dart';
+import 'core/sentry_scrubbing.dart';
 import 'core/token_storage.dart';
 import 'dashboard/dashboard_screen.dart';
 import 'deliveries/deliveries_controller.dart';
@@ -27,12 +28,20 @@ import 'promotions/promotions_repository.dart';
 import 'theme.dart';
 
 Future<void> main() async {
+  // Throws before the app runs if this is a release build pointed at a
+  // non-HTTPS backend — see config.dart.
+  AppConfig.assertSecureTransportInRelease();
+
   // Empty DSN (the default — see config.dart) makes the SDK a no-op: it
   // still runs the app via appRunner, just never sends anything anywhere.
-  await SentryFlutter.init(
-    (options) => options.dsn = AppConfig.sentryDsn,
-    appRunner: () => runApp(const HssanDeliveryApp()),
-  );
+  await SentryFlutter.init((options) {
+    options.dsn = AppConfig.sentryDsn;
+    // Belt-and-suspenders scrubbing — see core/sentry_scrubbing.dart for
+    // why this matters even though nothing currently feeds Sentry a
+    // request with an Authorization header.
+    options.beforeSend = scrubSensitiveEventData;
+    options.beforeBreadcrumb = scrubSensitiveBreadcrumbData;
+  }, appRunner: () => runApp(const HssanDeliveryApp()));
 }
 
 class HssanDeliveryApp extends StatefulWidget {

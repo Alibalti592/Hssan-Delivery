@@ -406,6 +406,28 @@ supplied — SENTRY_DSN in the backend's .env.local, or
 --dart-define=SENTRY_DSN=... when running/building the mobile app — so
 this is inert by default and doesn't require a Sentry account to develop.
 
+The mobile app also scrubs Authorization/cookie headers out of any event or
+breadcrumb before it would be sent (mobile/lib/core/sentry_scrubbing.dart).
+Nothing in the app currently wraps its HTTP calls with Sentry's own client
+(ApiClient uses a plain http.Client), so no event carries these today — this
+is a defensive floor against a future integration capturing the bearer
+token by accident, not a fix for a live leak.
+
+Mobile transport security
+
+main() refuses to start a release build whose API_BASE_URL isn't https://
+(AppConfig.assertSecureTransportInRelease, config.dart) — a release build
+pointed at a plaintext endpoint would otherwise send every request,
+including the bearer token, unencrypted. Debug/profile builds are exempt;
+they routinely target a local http:// backend during development.
+
+Certificate pinning is not implemented: pinning requires the production
+API's actual certificate/public key hash, which doesn't exist for this
+project's placeholder domain (api.hssan.example) — hardcoding a fake pin
+would be worse than no pin at all (the app would simply be unable to reach
+any real deployment). This is a deployment-time task for whoever stands up
+the production API, not something to fake in code.
+
 Pagination
 
 The list endpoints most likely to grow unbounded over real usage —
