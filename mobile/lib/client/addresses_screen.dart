@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../addresses/address_models.dart';
 import '../addresses/address_repository.dart';
+import '../core/api_exception.dart';
 import '../theme.dart';
 import '../widgets/dark_header.dart';
 import 'add_address_screen.dart';
@@ -32,6 +33,20 @@ class _AddressesScreenState extends State<AddressesScreen> {
     return context.read<AddressRepository>().list();
   }
 
+  // Not `setState(() => _future = _load())`: that arrow body is an
+  // assignment *expression*, which evaluates to the assigned Future — so
+  // the callback itself returns a Future, which setState's own assertion
+  // rejects at runtime (it exists to catch exactly this "did you mean to
+  // await first" mistake). Starting the load outside the callback and only
+  // assigning the already-created Future inside a block body keeps the
+  // callback's return value void.
+  void _refresh() {
+    final future = _load();
+    setState(() {
+      _future = future;
+    });
+  }
+
   Future<void> _addAddress() async {
     final created = await Navigator.of(context).push<SavedAddress>(
       MaterialPageRoute(builder: (_) => const AddAddressScreen()),
@@ -41,7 +56,47 @@ class _AddressesScreenState extends State<AddressesScreen> {
     if (widget.pickMode) {
       Navigator.of(context).pop(created);
     } else {
-      setState(() => _future = _load());
+      _refresh();
+    }
+  }
+
+  Future<void> _editAddress(SavedAddress address) async {
+    final updated = await Navigator.of(context).push<SavedAddress>(
+      MaterialPageRoute(builder: (_) => AddAddressScreen(existing: address)),
+    );
+    if (updated == null || !mounted) return;
+    _refresh();
+  }
+
+  Future<void> _deleteAddress(SavedAddress address) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Supprimer cette adresse ?'),
+        content: Text('« ${address.label} » sera définitivement supprimée.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Annuler'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Supprimer'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await context.read<AddressRepository>().delete(address.id);
+      if (!mounted) return;
+      _refresh();
+    } on ApiException catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text(e.message)));
+    } on NetworkException catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text(e.message)));
     }
   }
 
@@ -124,6 +179,26 @@ class _AddressesScreenState extends State<AddressesScreen> {
                                             ),
                                           ),
                                         ),
+                                      if (!widget.pickMode) ...[
+                                        IconButton(
+                                          icon: const Icon(
+                                            Icons.edit_outlined,
+                                            size: 18,
+                                          ),
+                                          visualDensity: VisualDensity.compact,
+                                          onPressed: () =>
+                                              _editAddress(address),
+                                        ),
+                                        IconButton(
+                                          icon: const Icon(
+                                            Icons.delete_outline,
+                                            size: 18,
+                                          ),
+                                          visualDensity: VisualDensity.compact,
+                                          onPressed: () =>
+                                              _deleteAddress(address),
+                                        ),
+                                      ],
                                     ],
                                   ),
                                   const SizedBox(height: 4),

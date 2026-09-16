@@ -18,8 +18,12 @@ use Psr\Log\LoggerInterface;
  *
  * A failed or skipped push never throws — the delivery/order status change
  * that triggered it must succeed regardless of whether anyone gets notified.
+ *
+ * Not final: DeliveryNotificationListenerTest mocks this to verify the
+ * exact title/body sent for each delivery status, since a real Firebase
+ * project is never available in tests to observe the call any other way.
  */
-final class PushNotificationService
+class PushNotificationService
 {
     private ?Messaging $messaging = null;
     private bool $triedInit = false;

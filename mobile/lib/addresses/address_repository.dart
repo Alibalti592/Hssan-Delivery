@@ -28,4 +28,23 @@ class AddressRepository {
     });
     return SavedAddress.fromJson(body as Map<String, dynamic>);
   }
+
+  Future<SavedAddress> update(
+    int id, {
+    required String label,
+    required String addressLine,
+    String? instructions,
+    bool isDefault = false,
+  }) async {
+    final body = await _api.put('/api/addresses/$id', {
+      'label': label,
+      'addressLine': addressLine,
+      if (instructions != null && instructions.isNotEmpty)
+        'instructions': instructions,
+      'isDefault': isDefault,
+    });
+    return SavedAddress.fromJson(body as Map<String, dynamic>);
+  }
+
+  Future<void> delete(int id) => _api.delete('/api/addresses/$id');
 }

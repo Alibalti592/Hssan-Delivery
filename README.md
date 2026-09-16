@@ -324,10 +324,16 @@ A user can save multiple labeled delivery addresses (e.g. "Domicile", "Bureau"),
 each with a free-text address line and optional courier instructions. Exactly one
 address can be marked as the default per user — setting isDefault on one
 automatically clears it on every other address that user owns. There is no
-geocoding or map integration yet: addressLine is plain text, not lat/lng, and
-saved addresses are not yet wired into order creation (POST /api/orders still
-takes its own deliveryAddress field directly). This is the "address" half of
-Phase 1's "Address / geolocation model" item; geolocation itself is still open.
+geocoding or map integration yet: addressLine is plain text, not lat/lng. This
+is the "address" half of Phase 1's "Address / geolocation model" item;
+geolocation itself is still open.
+
+Full CRUD (`GET/POST/PUT/DELETE /api/addresses`, ownership-checked) is
+exposed end to end in the mobile app: the checkout screen's "Choisir une
+adresse enregistrée" button picks a saved address into the free-text
+deliveryAddress field (POST /api/orders still just takes that plain
+string — nothing structured is passed through), and the "Mes adresses"
+management screen supports add, edit, and delete.
 
 Delivery pricing
 
@@ -482,9 +488,14 @@ Push notifications
 
 Delivery status changes can push a notification via Firebase Cloud
 Messaging: a courier is notified when a delivery is assigned to them, and
-a client is notified once their order is on its way and once it's
-delivered. The mobile app registers/unregisters its FCM token against the
-signed-in account via POST/DELETE /api/notifications/device-token
+a client is notified once their order is on its way, delivered, cancelled,
+or failed — see DeliveryNotificationListener. Cancelled/failed fire
+regardless of who triggered them (the client's own self-cancel included),
+since the event carries no actor and a redundant confirmation push is
+harmless, unlike silently leaving a client unnotified when an admin
+cancels their order instead. The mobile app registers/unregisters its
+FCM token against the signed-in account via POST/DELETE
+/api/notifications/device-token
 (a device can belong to at most one account at a time — registering a
 token already owned by someone else reassigns it, since that means the
 same device switched accounts). Both the backend (kreait/firebase-php)
@@ -726,7 +737,10 @@ two concurrent registrations (or admin-created courier accounts) with the
 same phone number both get a clean 409, not a raw DB exception for the loser
 
 It also contains unit tests for the pure logic that backs those workflows: the
-decimal/millimes money conversion and the delivery-to-order status mapping.
+decimal/millimes money conversion, the delivery-to-order status mapping, and
+DeliveryNotificationListener's status→push mapping (including that
+cancelled/failed now reach the client, and that courier-internal
+transitions never do).
 
 Run the complete test suite (this resets the test database first):
 
@@ -738,8 +752,8 @@ php bin/phpunit
 
 Current baseline:
 
-237 tests
-1437 assertions
+240 tests
+1448 assertions
 
 Tests share a single Postgres database rather than running each in its own
 transaction, so re-running `php bin/phpunit` without resetting the database
@@ -886,8 +900,6 @@ Not yet in the app:
 
 Factures (bill payment) — still a placeholder, no biller integration
 map / navigation integration
-saved-address picker in checkout (the backend has `/api/addresses`; checkout
-currently takes a free-text address)
 Admin dashboard
 
 The React/Vite admin dashboard (`admin/`) is implemented and covers:
