@@ -53,7 +53,10 @@ final class DeviceTokenController extends AbstractApiController
         /** @var UnregisterDeviceTokenRequest $dto */
         $dto = $this->deserializeAndValidate($request, UnregisterDeviceTokenRequest::class);
 
-        $this->deviceTokenService->unregister($dto->token);
+        /** @var User $user */
+        $user = $this->security->getUser();
+
+        $this->deviceTokenService->unregister($user, $dto->token);
 
         return new JsonResponse(null, Response::HTTP_NO_CONTENT);
     }

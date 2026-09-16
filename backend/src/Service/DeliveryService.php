@@ -36,6 +36,16 @@ final class DeliveryService
                 throw new InvalidOperationException('This courier has been deactivated.');
             }
 
+            // isAvailable is the courier's own "I'm off duty" toggle (see
+            // AuthController::availability) — distinct from admin-controlled
+            // isActive, and what the admin map's ONLINE/OFFLINE badge is
+            // based on (CourierLocationService::deriveStatus). Without this
+            // check an admin could assign a delivery to a courier who just
+            // signaled they're unavailable, contradicting what the map shows.
+            if (!$courier->isAvailable()) {
+                throw new InvalidOperationException('This courier is currently unavailable.');
+            }
+
             $delivery->setCourier($courier);
             $delivery->setStatus(DeliveryStatus::ASSIGNED);
             $delivery->setAssignedAt(new \DateTimeImmutable());
@@ -134,6 +144,12 @@ final class DeliveryService
         });
     }
 
+    /**
+     * Client self-service cancel (see OrderService::cancelOrder) — a client
+     * can back out while the delivery is still unclaimed or just assigned,
+     * but not once a courier has actually accepted it. For an admin's wider
+     * recourse on a delivery already in progress, see cancelDeliveryAsAdmin.
+     */
     public function cancelDelivery(Delivery $delivery): Delivery
     {
         return $this->transitionWithLock($delivery, function (Delivery $delivery) {
@@ -142,6 +158,40 @@ final class DeliveryService
                 [
                     DeliveryStatus::PENDING,
                     DeliveryStatus::ASSIGNED,
+                ],
+                true
+            )) {
+                throw new InvalidOperationException('This delivery cannot be cancelled at its current status.');
+            }
+
+            $delivery->setStatus(DeliveryStatus::CANCELLED);
+
+            $this->syncOrderStatus($delivery);
+        });
+    }
+
+    /**
+     * Admin-only (see DeliveryController::cancel) — deliberately allowed
+     * from any non-terminal status, unlike the client-facing cancelDelivery
+     * above. Without this, a delivery a courier can no longer act on (e.g.
+     * deactivated mid-flight — see ActiveUserChecker, which locks their
+     * account out of every request including markDelivered/failDelivery)
+     * had no way to ever leave ACCEPTED/PICKED_UP/ON_THE_WAY: an admin
+     * couldn't cancel it either, so the order sat stuck forever. CANCELLED
+     * maps to the same OrderStatus::CANCELLED regardless of the prior
+     * delivery status (see DeliveryStatus::toOrderStatus), same as
+     * failDelivery already does from these statuses — this just gives
+     * admins the same exit.
+     */
+    public function cancelDeliveryAsAdmin(Delivery $delivery): Delivery
+    {
+        return $this->transitionWithLock($delivery, function (Delivery $delivery) {
+            if (in_array(
+                $delivery->getStatus(),
+                [
+                    DeliveryStatus::DELIVERED,
+                    DeliveryStatus::CANCELLED,
+                    DeliveryStatus::FAILED,
                 ],
                 true
             )) {

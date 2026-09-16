@@ -1,5 +1,10 @@
-import { useRef, type ChangeEvent } from 'react';
+import { useRef, useState, type ChangeEvent } from 'react';
 import { API_URL } from '../api/client';
+
+// Mirrors PhotoUploader::MAX_SIZE_BYTES on the backend — checking here
+// rejects an oversized file instantly instead of uploading it in full just
+// to have the backend reject it afterwards.
+const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 
 export function PhotoUploader({
   photoUrl,
@@ -15,11 +20,21 @@ export function PhotoUploader({
   removing: boolean;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const [sizeError, setSizeError] = useState<string | null>(null);
 
   function handleFileChange(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
-    if (file) onUpload(file);
     e.target.value = '';
+
+    if (!file) return;
+
+    if (file.size > MAX_UPLOAD_BYTES) {
+      setSizeError('Image must be smaller than 5 MB.');
+      return;
+    }
+
+    setSizeError(null);
+    onUpload(file);
   }
 
   return (
@@ -52,6 +67,7 @@ export function PhotoUploader({
             {removing ? 'Removing…' : 'Remove photo'}
           </button>
         )}
+        {sizeError && <p className="field-error">{sizeError}</p>}
       </div>
     </div>
   );

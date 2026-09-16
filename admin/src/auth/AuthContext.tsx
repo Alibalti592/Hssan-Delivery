@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { setUnauthorizedHandler } from '../api/client';
 import { authApi } from '../api/resources';
 import type { CurrentUser } from '../api/types';
 
@@ -36,6 +37,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // elsewhere) — nothing to clear locally, there's no token in JS.
       })
       .finally(() => setIsRestoringSession(false));
+  }, []);
+
+  useEffect(() => {
+    // Catches a 401 from *any* authenticated request, not just the mount
+    // check above — e.g. the cookie expiring or being revoked mid-session.
+    // Clearing `user` here is what makes RequireAuth redirect to /login on
+    // the next render, instead of leaving stale UI up while every request
+    // from then on silently fails.
+    setUnauthorizedHandler(() => setUser(null));
+
+    return () => setUnauthorizedHandler(null);
   }, []);
 
   async function login(phone: string, password: string) {

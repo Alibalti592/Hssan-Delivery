@@ -11,10 +11,16 @@ use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
 /**
  * Turns delivery status changes into push notifications. A courier is
  * notified when a delivery lands on them; a client is notified once their
- * order is actually on its way and once it's delivered. Every other
- * transition (accept, pickup, decline, cancel, fail) isn't worth a push —
- * pickup/accept are courier-internal and the client already knows they
- * placed an order.
+ * order is on its way, delivered, cancelled, or failed — the transitions
+ * that actually change what the client should expect next. Accept/pickup/
+ * decline aren't worth a push: they're courier-internal steps the client
+ * has no action to take on.
+ *
+ * CANCELLED/FAILED fire this regardless of who triggered them (the client's
+ * own self-cancel included) — the event carries no actor, and a redundant
+ * confirmation push after a self-cancel is harmless, unlike silently
+ * leaving a client unnotified when an admin cancels their order instead
+ * (see DeliveryService::cancelDeliveryAsAdmin).
  */
 #[AsEventListener(event: DeliveryStatusChangedEvent::class)]
 final class DeliveryNotificationListener
@@ -39,6 +45,16 @@ final class DeliveryNotificationListener
                 $delivery,
                 'Commande livrée',
                 'Votre commande a été livrée. Bon appétit !'
+            ),
+            DeliveryStatus::CANCELLED => $this->notifyClient(
+                $delivery,
+                'Commande annulée',
+                'Votre commande a été annulée.'
+            ),
+            DeliveryStatus::FAILED => $this->notifyClient(
+                $delivery,
+                'Échec de la livraison',
+                'La livraison de votre commande a échoué.'
             ),
             default => null,
         };

@@ -9,6 +9,7 @@ use App\Service\OrderService;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\RateLimiter\RateLimiterFactory;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Serializer\SerializerInterface;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
@@ -20,6 +21,7 @@ final class OrderController extends AbstractApiController
 
     public function __construct(
         private readonly OrderService $orderService,
+        private readonly RateLimiterFactory $orderCreateLimiter,
         SerializerInterface $serializer,
         ValidatorInterface $validator,
     ) {
@@ -76,9 +78,6 @@ final class OrderController extends AbstractApiController
     #[Route('', name: 'api_orders_create', methods: ['POST'])]
     public function create(Request $request): JsonResponse
     {
-        /** @var CreateOrderRequest $dto */
-        $dto = $this->deserializeAndValidate($request, CreateOrderRequest::class);
-
         $user = $this->getUser();
 
         if (!$user instanceof \App\Entity\User) {
@@ -87,6 +86,18 @@ final class OrderController extends AbstractApiController
                 Response::HTTP_UNAUTHORIZED
             );
         }
+
+        $limiter = $this->orderCreateLimiter->create((string) $user->getId());
+
+        if (!$limiter->consume()->isAccepted()) {
+            return $this->json(
+                ['message' => 'Trop de tentatives. Réessayez plus tard.'],
+                Response::HTTP_TOO_MANY_REQUESTS
+            );
+        }
+
+        /** @var CreateOrderRequest $dto */
+        $dto = $this->deserializeAndValidate($request, CreateOrderRequest::class);
 
         $order = $this->orderService->createOrder($dto, $user);
 
@@ -99,9 +110,6 @@ final class OrderController extends AbstractApiController
     #[Route('/parcels', name: 'api_orders_create_parcel', methods: ['POST'])]
     public function createParcel(Request $request): JsonResponse
     {
-        /** @var CreateParcelOrderRequest $dto */
-        $dto = $this->deserializeAndValidate($request, CreateParcelOrderRequest::class);
-
         $user = $this->getUser();
 
         if (!$user instanceof \App\Entity\User) {
@@ -110,6 +118,18 @@ final class OrderController extends AbstractApiController
                 Response::HTTP_UNAUTHORIZED
             );
         }
+
+        $limiter = $this->orderCreateLimiter->create((string) $user->getId());
+
+        if (!$limiter->consume()->isAccepted()) {
+            return $this->json(
+                ['message' => 'Trop de tentatives. Réessayez plus tard.'],
+                Response::HTTP_TOO_MANY_REQUESTS
+            );
+        }
+
+        /** @var CreateParcelOrderRequest $dto */
+        $dto = $this->deserializeAndValidate($request, CreateParcelOrderRequest::class);
 
         $order = $this->orderService->createParcelOrder($dto, $user);
 

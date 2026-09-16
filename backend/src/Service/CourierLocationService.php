@@ -65,10 +65,18 @@ final class CourierLocationService
         $couriers = $this->userRepository->paginateCouriers(1, Paginator::MAX_LIMIT)->items;
         $now = new \DateTimeImmutable();
 
+        // Batch-fetched once for the whole page instead of once per courier
+        // — this endpoint backs the admin map's polling loop, so a
+        // per-courier query pair here is the same N+1 shape already fixed
+        // on the order/delivery list endpoints (see "Pagination" in the
+        // README), just on a different endpoint.
+        $locationsByCourierId = $this->courierLocationRepository->findLatestByCouriers($couriers);
+        $activeDeliveriesByCourierId = $this->deliveryRepository->findActiveForCouriers($couriers);
+
         return array_map(
-            function (User $courier) use ($now) {
-                $location = $this->courierLocationRepository->findOneByCourier($courier);
-                $currentDelivery = $this->deliveryRepository->findActiveForCourier($courier);
+            function (User $courier) use ($now, $locationsByCourierId, $activeDeliveriesByCourierId) {
+                $location = $locationsByCourierId[$courier->getId()] ?? null;
+                $currentDelivery = $activeDeliveriesByCourierId[$courier->getId()] ?? null;
 
                 return CourierLocationResponse::fromCourier(
                     $courier,

@@ -1,13 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../addresses/address_models.dart';
 import '../addresses/address_repository.dart';
 import '../core/api_exception.dart';
 import '../widgets/dark_header.dart';
 import '../widgets/decorative_map.dart';
 
+/// Also doubles as the edit screen: pass [existing] to pre-fill the form
+/// and update that address instead of creating a new one.
 class AddAddressScreen extends StatefulWidget {
-  const AddAddressScreen({super.key});
+  const AddAddressScreen({this.existing, super.key});
+
+  final SavedAddress? existing;
 
   @override
   State<AddAddressScreen> createState() => _AddAddressScreenState();
@@ -15,12 +20,18 @@ class AddAddressScreen extends StatefulWidget {
 
 class _AddAddressScreenState extends State<AddAddressScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _label = TextEditingController();
-  final _addressLine = TextEditingController();
-  final _instructions = TextEditingController();
-  bool _isDefault = false;
+  late final _label = TextEditingController(text: widget.existing?.label);
+  late final _addressLine = TextEditingController(
+    text: widget.existing?.addressLine,
+  );
+  late final _instructions = TextEditingController(
+    text: widget.existing?.instructions,
+  );
+  late bool _isDefault = widget.existing?.isDefault ?? false;
   bool _saving = false;
   String? _error;
+
+  bool get _isEditing => widget.existing != null;
 
   @override
   void dispose() {
@@ -36,12 +47,21 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
 
     setState(() => _saving = true);
     try {
-      final address = await context.read<AddressRepository>().create(
-        label: _label.text.trim(),
-        addressLine: _addressLine.text.trim(),
-        instructions: _instructions.text.trim(),
-        isDefault: _isDefault,
-      );
+      final repository = context.read<AddressRepository>();
+      final address = _isEditing
+          ? await repository.update(
+              widget.existing!.id,
+              label: _label.text.trim(),
+              addressLine: _addressLine.text.trim(),
+              instructions: _instructions.text.trim(),
+              isDefault: _isDefault,
+            )
+          : await repository.create(
+              label: _label.text.trim(),
+              addressLine: _addressLine.text.trim(),
+              instructions: _instructions.text.trim(),
+              isDefault: _isDefault,
+            );
       if (!mounted) return;
       Navigator.of(context).pop(address);
     } on ApiException catch (e) {
@@ -61,7 +81,7 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
         child: Column(
           children: [
             DarkHeader(
-              title: 'Ajouter une adresse',
+              title: _isEditing ? 'Modifier l\'adresse' : 'Ajouter une adresse',
               onBack: _saving ? null : () => Navigator.of(context).pop(),
             ),
             const DecorativeMap(height: 130, twoPins: false),
@@ -135,7 +155,7 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
                                   color: Colors.white,
                                 ),
                               )
-                            : const Text('ENREGISTRER'),
+                            : Text(_isEditing ? 'MODIFIER' : 'ENREGISTRER'),
                       ),
                     ],
                   ),

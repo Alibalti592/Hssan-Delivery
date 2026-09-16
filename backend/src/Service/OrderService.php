@@ -185,6 +185,14 @@ final class OrderService
     public function getUserOrders(User $user, int $page, int $limit): PaginatedResult
     {
         $qb = $this->orderRepository->createQueryBuilder('o')
+            // OrderResponse::fromEntity touches all of these per row — join
+            // them instead of leaving them to lazy-load one query each. All
+            // to-one relations, safe alongside fetchJoinCollection: false.
+            ->addSelect('r', 'dz', 'd', 'c')
+            ->leftJoin('o.restaurant', 'r')
+            ->leftJoin('o.deliveryZone', 'dz')
+            ->leftJoin('o.delivery', 'd')
+            ->leftJoin('d.courier', 'c')
             ->andWhere('o.user = :user')
             ->setParameter('user', $user)
             ->orderBy('o.createdAt', 'DESC')
@@ -192,7 +200,10 @@ final class OrderService
             // for why a tiebreaker is required for stable pagination.
             ->addOrderBy('o.id', 'DESC');
 
-        return Paginator::paginate($qb, $page, $limit);
+        $result = Paginator::paginate($qb, $page, $limit);
+        $this->orderRepository->hydrateItems($result->items);
+
+        return $result;
     }
 
     public function getUserOrder(int $orderId, User $user): ?Order

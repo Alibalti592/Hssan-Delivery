@@ -8,6 +8,7 @@ use App\Entity\User;
 use App\Exception\ConflictException;
 use App\Exception\InvalidOperationException;
 use App\Repository\UserRepository;
+use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
@@ -48,7 +49,21 @@ final class AuthService
         $user->setVerifiedAt(new \DateTimeImmutable());
 
         $this->entityManager->persist($user);
-        $this->entityManager->flush();
+
+        try {
+            $this->entityManager->flush();
+        } catch (UniqueConstraintViolationException) {
+            // The findOneBy check above is a fast path, not a lock — two
+            // concurrent registrations with the same phone (a double-tap,
+            // or a client retrying a slow request) can both pass it before
+            // either commits. The DB's own unique index is what actually
+            // prevents the duplicate; this turns the loser's raw DBAL
+            // exception into the same clean 409 the fast path already
+            // gives a sequential duplicate.
+            throw new ConflictException(
+                'An account with this phone number already exists.'
+            );
+        }
 
         return $user;
     }
@@ -82,7 +97,16 @@ final class AuthService
         $courier->setVerifiedAt(new \DateTimeImmutable());
 
         $this->entityManager->persist($courier);
-        $this->entityManager->flush();
+
+        try {
+            $this->entityManager->flush();
+        } catch (UniqueConstraintViolationException) {
+            // See the identical comment in register() — same TOCTOU gap
+            // between the check above and this flush.
+            throw new ConflictException(
+                'An account with this phone number already exists.'
+            );
+        }
 
         return $courier;
     }

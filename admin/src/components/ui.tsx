@@ -170,6 +170,14 @@ export function money(amount: string): string {
   return `${amount} DT`;
 }
 
+// Matches the backend's own regex for money-shaped fields (product price,
+// delivery zone fee, promotion discount value) — see e.g.
+// CreatePromotionRequest::$discountValue. Used as an <input pattern> so a
+// malformed value is caught by the browser's native form validation before
+// a round trip, not just by the 422 that comes back either way.
+export const MONEY_PATTERN = '^\\d+(\\.\\d{1,3})?$';
+export const MONEY_TITLE = 'A positive number with up to 3 decimal places, e.g. 12.500';
+
 export function formatDate(iso: string): string {
   return new Date(iso).toLocaleString();
 }

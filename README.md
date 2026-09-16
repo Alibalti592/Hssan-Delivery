@@ -103,14 +103,29 @@ The admin dashboard authenticates like every other client (`POST
 and holding it in JS, the backend also mirrors it into an httpOnly,
 `SameSite=Lax` cookie (`config/packages/lexik_jwt_authentication.yaml`) that
 the browser sends automatically and JavaScript can never read — closing off
-the obvious XSS-steals-the-token attack that plain `localStorage` storage
-had. `POST /api/auth/logout` clears that cookie (JS can't do it itself for
-an httpOnly cookie). Mobile is unaffected: it still reads the token from the
-JSON body and sends it as `Authorization: Bearer <jwt>`; both extractors run
-on the same firewall. `JWT_COOKIE_SECURE` (see `.env.example`) must be set
-to `true` once the admin dashboard is served over HTTPS — a `Secure` cookie
-is silently dropped by browsers over plain `http://`, so it defaults to
-`false` for local development.
+the obvious XSS-steals-the-token-from-storage attack that plain
+`localStorage` had. `POST /api/auth/logout` clears that cookie (JS can't do
+it itself for an httpOnly cookie). Mobile is unaffected: it still reads the
+token from the JSON body and sends it as `Authorization: Bearer <jwt>`; both
+extractors run on the same firewall. `JWT_COOKIE_SECURE` (see
+`.env.example`) must be set to `true` once the admin dashboard is served
+over HTTPS — a `Secure` cookie is silently dropped by browsers over plain
+`http://`, so it defaults to `false` for local development.
+
+Mobile needing the token in the body (`remove_token_from_body_when_cookies_used:
+false`) means `POST /api/auth/login`'s response would otherwise carry the
+plaintext JWT for the admin dashboard too, even though it never reads it —
+narrowing the original XSS risk rather than closing it (a script active in
+the page at the exact moment of login could still read the token off the
+response, even though nothing sits in storage for it to find afterward).
+The admin dashboard sends `X-Client-Platform: web` on every request (see
+`admin/src/api/client.ts`); `App\Security\WebLoginResponseSanitizer`
+(wired as `security.yaml`'s `json_login` success handler, wrapping Lexik's
+own) strips `token` from the login response body whenever that header is
+present, returning `204 No Content` instead — so the body genuinely never
+carries the JWT for the admin dashboard, matching what the cookie migration
+was meant to guarantee. Mobile never sends the header, so its body is
+unaffected.
 
 Order workflow
 
@@ -149,6 +164,18 @@ Exception states:
 
 CANCELLED
 FAILED
+
+Reaching CANCELLED differs by who's asking: a client cancelling their own
+order (POST /api/orders/{id}/cancel) can only do so from PENDING or
+ASSIGNED — once a courier has accepted, the client is committed. An admin
+(POST /api/deliveries/{id}/cancel) can cancel from any non-terminal status,
+including mid-flight (ACCEPTED/PICKED_UP/ON_THE_WAY). This matters because
+a deactivated account (`App\Security\ActiveUserChecker`) is rejected on
+every subsequent request, including markDelivered/failDelivery — so a
+courier deactivated mid-delivery can never finish or fail it, and only the
+admin's wider cancel gives that delivery (and its order) a way out. See
+DeliveryService::cancelDelivery vs. cancelDeliveryAsAdmin.
+
 Order / Delivery synchronization
 
 Delivery transitions synchronize the associated order status.
@@ -297,10 +324,16 @@ A user can save multiple labeled delivery addresses (e.g. "Domicile", "Bureau"),
 each with a free-text address line and optional courier instructions. Exactly one
 address can be marked as the default per user — setting isDefault on one
 automatically clears it on every other address that user owns. There is no
-geocoding or map integration yet: addressLine is plain text, not lat/lng, and
-saved addresses are not yet wired into order creation (POST /api/orders still
-takes its own deliveryAddress field directly). This is the "address" half of
-Phase 1's "Address / geolocation model" item; geolocation itself is still open.
+geocoding or map integration yet: addressLine is plain text, not lat/lng. This
+is the "address" half of Phase 1's "Address / geolocation model" item;
+geolocation itself is still open.
+
+Full CRUD (`GET/POST/PUT/DELETE /api/addresses`, ownership-checked) is
+exposed end to end in the mobile app: the checkout screen's "Choisir une
+adresse enregistrée" button picks a saved address into the free-text
+deliveryAddress field (POST /api/orders still just takes that plain
+string — nothing structured is passed through), and the "Mes adresses"
+management screen supports add, edit, and delete.
 
 Delivery pricing
 
@@ -370,6 +403,18 @@ POST /api/auth/login is throttled via Symfony's built-in login_throttling
 per-IP floor across all usernames), returning 429 once exceeded.
 POST /api/auth/register is limited to 5 attempts per IP per 10 minutes
 (config/packages/rate_limiter.yaml) as a basic guard against spam signups.
+POST /api/orders and POST /api/orders/parcels are limited to 20 attempts
+per authenticated user per 10 minutes, and POST /api/auth/change-password
+to 5 attempts per authenticated user per 15 minutes — both keyed by user id
+rather than IP since they require auth already, guarding against a
+compromised token being used to spam order creation or brute-force the
+current-password check.
+
+Order creation also bounds each request's shape: at most 50 line items per
+order, and at most 100 units of a single product per line item
+(App\Dto\Order\CreateOrderRequest / OrderItemRequest) — generous enough for
+any real order, and small enough to keep total-price arithmetic away from
+float overflow.
 
 Error tracking
 
@@ -378,6 +423,28 @@ backend, sentry_flutter on mobile). Both are no-ops until a real DSN is
 supplied — SENTRY_DSN in the backend's .env.local, or
 --dart-define=SENTRY_DSN=... when running/building the mobile app — so
 this is inert by default and doesn't require a Sentry account to develop.
+
+The mobile app also scrubs Authorization/cookie headers out of any event or
+breadcrumb before it would be sent (mobile/lib/core/sentry_scrubbing.dart).
+Nothing in the app currently wraps its HTTP calls with Sentry's own client
+(ApiClient uses a plain http.Client), so no event carries these today — this
+is a defensive floor against a future integration capturing the bearer
+token by accident, not a fix for a live leak.
+
+Mobile transport security
+
+main() refuses to start a release build whose API_BASE_URL isn't https://
+(AppConfig.assertSecureTransportInRelease, config.dart) — a release build
+pointed at a plaintext endpoint would otherwise send every request,
+including the bearer token, unencrypted. Debug/profile builds are exempt;
+they routinely target a local http:// backend during development.
+
+Certificate pinning is not implemented: pinning requires the production
+API's actual certificate/public key hash, which doesn't exist for this
+project's placeholder domain (api.hssan.example) — hardcoding a fake pin
+would be worse than no pin at all (the app would simply be unable to reach
+any real deployment). This is a deployment-time task for whoever stands up
+the production API, not something to fake in code.
 
 Pagination
 
@@ -397,13 +464,38 @@ per-user over time). GET /api/admin/stats backs the admin dashboard's
 overview counts with dedicated COUNT queries rather than paging through
 every list just to count it.
 
+The order and delivery list endpoints (client/admin order history, a
+courier's delivery queue, admin delivery oversight) eager-join every to-one
+relation their response needs (restaurant, delivery zone, delivery, courier,
+user) and batch-fetch each page's order items in one follow-up query
+(`OrderRepository::hydrateItems`) — a page of N orders costs a small,
+constant number of queries rather than N+1 lazily-loaded ones. Covered by
+`OrderApiTest::testListingOrdersDoesNotIssueAQueryPerOrder` and
+`DeliveryApiTest::testListingOwnDeliveriesDoesNotIssueAQueryPerDelivery`,
+which assert the actual query count via Doctrine's own debug middleware
+rather than just checking the response shape.
+
+The admin courier-map endpoint (`GET /api/admin/couriers/locations`) has the
+same shape of fix: `CourierLocationService::listForAdmin` used to look up
+each courier's last known location and active delivery one at a time inside
+its loop. `CourierLocationRepository::findLatestByCouriers` and
+`DeliveryRepository::findActiveForCouriers` batch both across the whole
+courier page in one query each — worth calling out separately since this is
+the endpoint the admin map polls repeatedly, not a one-off list view.
+Covered by `CourierLocationApiTest::testListingCourierLocationsDoesNotIssueAQueryPerCourier`.
+
 Push notifications
 
 Delivery status changes can push a notification via Firebase Cloud
 Messaging: a courier is notified when a delivery is assigned to them, and
-a client is notified once their order is on its way and once it's
-delivered. The mobile app registers/unregisters its FCM token against the
-signed-in account via POST/DELETE /api/notifications/device-token
+a client is notified once their order is on its way, delivered, cancelled,
+or failed — see DeliveryNotificationListener. Cancelled/failed fire
+regardless of who triggered them (the client's own self-cancel included),
+since the event carries no actor and a redundant confirmation push is
+harmless, unlike silently leaving a client unnotified when an admin
+cancels their order instead. The mobile app registers/unregisters its
+FCM token against the signed-in account via POST/DELETE
+/api/notifications/device-token
 (a device can belong to at most one account at a time — registering a
 token already owned by someone else reassigns it, since that means the
 same device switched accounts). Both the backend (kreait/firebase-php)
@@ -622,9 +714,33 @@ Colis parcel order creation (no restaurant, priced off the zone fee alone) and i
 promotion CRUD, activation, and photo upload/replace/remove, including the active-only filter on the public endpoint
 courier location reporting and the admin courier-locations endpoint
 the public GET /api/delivery-zones endpoint
+order/delivery list endpoints eager-load correctly (a small, constant query
+count per page rather than one query per row) — see "Pagination" above
+the admin courier-map endpoint batches its per-courier location/active-delivery
+lookups the same way, instead of two queries per courier on the page
+a browser (cookie-based) client's login response never carries the JWT in
+its body — see "Admin authentication" above
+order/parcel creation and password change are rate-limited per user, and
+order creation rejects oversized requests (too many line items, or too
+large a quantity on one item) — see "Rate limiting" above
+a user can only unregister their own push-notification device token, never
+one belonging to another account (DeviceTokenService::unregister)
+product price, delivery zone fee, and promotion discount value are capped
+at 7 integer digits, matching the decimal(10,3) columns they're stored in —
+an over-limit value is now a clean 422 instead of an unhandled DB exception
+an admin can cancel a delivery already in progress (courier accepted/picked
+up/on the way), not just a still-pending one — the client-facing self-cancel
+stays restricted to before a courier accepts, see "Exception states" above
+an admin cannot assign a delivery to a courier who has toggled themselves
+unavailable, matching what the courier map's ONLINE/OFFLINE badge shows
+two concurrent registrations (or admin-created courier accounts) with the
+same phone number both get a clean 409, not a raw DB exception for the loser
 
 It also contains unit tests for the pure logic that backs those workflows: the
-decimal/millimes money conversion and the delivery-to-order status mapping.
+decimal/millimes money conversion, the delivery-to-order status mapping, and
+DeliveryNotificationListener's status→push mapping (including that
+cancelled/failed now reach the client, and that courier-internal
+transitions never do).
 
 Run the complete test suite (this resets the test database first):
 
@@ -636,8 +752,8 @@ php bin/phpunit
 
 Current baseline:
 
-221 tests
-1307 assertions
+240 tests
+1448 assertions
 
 Tests share a single Postgres database rather than running each in its own
 transaction, so re-running `php bin/phpunit` without resetting the database
@@ -784,13 +900,13 @@ Not yet in the app:
 
 Factures (bill payment) — still a placeholder, no biller integration
 map / navigation integration
-saved-address picker in checkout (the backend has `/api/addresses`; checkout
-currently takes a free-text address)
 Admin dashboard
 
 The React/Vite admin dashboard (`admin/`) is implemented and covers:
 
-admin authentication (httpOnly-cookie session — see "Admin authentication" above)
+admin authentication (httpOnly-cookie session — see "Admin authentication" above),
+including a global handler that signs the admin out and redirects to
+/login on a 401 from any request, not just the initial session check
 dashboard (counts overview, backed by GET /api/admin/stats)
 order visibility (list + detail, paginated with Prev/Next) — a Colis
 order's detail shows pickup address and recipient instead of a restaurant
@@ -804,6 +920,11 @@ paginated with Prev/Next) — covers both restaurants and grocery stores
 category management
 product/menu management (including delete and photo upload/replace/remove, paginated with Prev/Next)
 delivery zone management
+client-side guards ahead of the backend's own validation: money-shaped
+fields (price/fee/discount value) reject non-numeric input via the
+browser's native form validation, a promotion's end date is checked
+against its start date before submit, and a photo upload is checked
+against the backend's 5 MB limit before it's sent rather than after
 Playwright e2e coverage (admin/e2e/)
 
 Not yet implemented in the dashboard:

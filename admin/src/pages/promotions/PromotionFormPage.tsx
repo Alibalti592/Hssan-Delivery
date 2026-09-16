@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useParams } from 'react-router-dom';
 import { promotionsApi, restaurantsApi } from '../../api/resources';
 import type { DiscountType } from '../../api/types';
-import { PageHeader, Loading, ErrorBanner, Breadcrumb } from '../../components/ui';
+import { PageHeader, Loading, ErrorBanner, Breadcrumb, MONEY_PATTERN, MONEY_TITLE } from '../../components/ui';
 import { PhotoUploader } from '../../components/PhotoUploader';
 
 function toDatetimeLocal(iso: string): string {
@@ -38,6 +38,7 @@ export default function PromotionFormPage() {
   const [endAt, setEndAt] = useState('');
   const [isActive, setIsActive] = useState(true);
   const [restaurantId, setRestaurantId] = useState<number | ''>('');
+  const [clientError, setClientError] = useState<Error | null>(null);
 
   useEffect(() => {
     if (existing.data) {
@@ -103,6 +104,21 @@ export default function PromotionFormPage() {
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
+    setClientError(null);
+
+    // Mirrors PromotionService::applyRequest's own checks — catching these
+    // here saves a round trip for the common typo, but the backend still
+    // enforces both regardless of what this form does.
+    if (new Date(endAt) <= new Date(startAt)) {
+      setClientError(new Error('End date must be after the start date.'));
+      return;
+    }
+
+    if (discountType === 'PERCENTAGE' && Number(discountValue) > 100) {
+      setClientError(new Error('A percentage discount cannot exceed 100.'));
+      return;
+    }
+
     save.mutate();
   }
 
@@ -136,7 +152,12 @@ export default function PromotionFormPage() {
         <div className="form-card">
           <ErrorBanner
             error={
-              save.error ?? existing.error ?? uploadPhoto.error ?? removePhoto.error ?? deletePromotion.error
+              clientError ??
+              save.error ??
+              existing.error ??
+              uploadPhoto.error ??
+              removePhoto.error ??
+              deletePromotion.error
             }
           />
 
@@ -199,6 +220,13 @@ export default function PromotionFormPage() {
                 value={discountValue}
                 onChange={(e) => setDiscountValue(e.target.value)}
                 placeholder={discountType === 'PERCENTAGE' ? '10' : '5.000'}
+                inputMode="decimal"
+                pattern={MONEY_PATTERN}
+                title={
+                  discountType === 'PERCENTAGE'
+                    ? 'A number from 0 to 100, up to 3 decimal places'
+                    : MONEY_TITLE
+                }
                 required
               />
             </div>

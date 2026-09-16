@@ -261,6 +261,56 @@ final class AdminProductApiTest extends WebTestCase
         );
     }
 
+    public function testProductPriceWithTooManyIntegerDigitsIsRejected(): void
+    {
+        $client = static::createClient();
+
+        $this->entityManager = self::getContainer()
+            ->get(EntityManagerInterface::class);
+
+        $admin = $this->createTestUser(
+            'ROLE_ADMIN',
+            'Test Admin'
+        );
+
+        $restaurant = $this->createRestaurant(
+            'Test Restaurant'
+        );
+
+        $category = $this->createCategory(
+            $restaurant,
+            'Burgers'
+        );
+
+        $token = $this->authenticateClient(
+            $client,
+            $admin
+        );
+
+        // The `price` column is decimal(10,3) — 7 integer digits max. This
+        // must be rejected by validation (422), not reach flush() and blow
+        // up as a raw DBAL out-of-range exception (500).
+        $client->request(
+            'POST',
+            '/api/admin/restaurants/'.$restaurant->getId().'/products',
+            server: [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_AUTHORIZATION' => 'Bearer '.$token,
+            ],
+            content: json_encode([
+                'name' => 'Overpriced Burger',
+                'description' => null,
+                'price' => '99999999.999',
+                'categoryId' => $category->getId(),
+                'isAvailable' => true,
+            ])
+        );
+
+        self::assertResponseStatusCodeSame(
+            Response::HTTP_UNPROCESSABLE_ENTITY
+        );
+    }
+
     public function testCreatingProductWithUnknownRestaurantReturns404(): void
     {
         $client = static::createClient();

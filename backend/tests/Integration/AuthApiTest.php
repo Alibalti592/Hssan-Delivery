@@ -151,6 +151,66 @@ final class AuthApiTest extends WebTestCase
         );
     }
 
+    /**
+     * The admin dashboard sends X-Client-Platform: web on every request
+     * (see admin/src/api/client.ts) so WebLoginResponseSanitizer knows to
+     * strip the JWT from this response — the httpOnly cookie the same
+     * response sets is all a browser client needs, and never holding the
+     * token in JS is the whole point of the cookie-based session (see that
+     * class and lexik_jwt_authentication.yaml). Mobile never sends this
+     * header — testClientCanLogin above covers that its body is unaffected.
+     */
+    public function testWebClientLoginOmitsTokenFromBodyButSetsAuthCookie(): void
+    {
+        $client = static::createClient();
+
+        $this->entityManager = self::getContainer()
+            ->get(EntityManagerInterface::class);
+
+        $user = $this->createTestUser();
+
+        $client->request(
+            'POST',
+            '/api/auth/login',
+            server: [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_X_CLIENT_PLATFORM' => 'web',
+            ],
+            content: json_encode([
+                'phone' => $user->getPhone(),
+                'password' => 'password123',
+            ])
+        );
+
+        self::assertResponseStatusCodeSame(
+            Response::HTTP_NO_CONTENT
+        );
+
+        self::assertEmpty(
+            $client->getResponse()->getContent()
+        );
+
+        $cookie = $client->getCookieJar()->get('BEARER');
+
+        self::assertNotNull($cookie);
+        self::assertTrue($cookie->isHttpOnly());
+
+        // The cookie jar sends BEARER automatically from here — no
+        // Authorization header needed, proving the cookie alone authenticates.
+        $client->request('GET', '/api/auth/me');
+
+        self::assertResponseStatusCodeSame(
+            Response::HTTP_OK
+        );
+
+        $me = json_decode(
+            $client->getResponse()->getContent(),
+            true
+        );
+
+        self::assertSame($user->getPhone(), $me['phone']);
+    }
+
     public function testAuthenticatedUserCanAccessMe(): void
     {
         $client = static::createClient();
@@ -252,6 +312,74 @@ final class AuthApiTest extends WebTestCase
             ],
             content: json_encode([
                 'name' => 'Second User',
+                'phone' => $phone,
+                'password' => 'password456',
+            ])
+        );
+
+        self::assertResponseStatusCodeSame(
+            Response::HTTP_CONFLICT
+        );
+
+        $response = json_decode(
+            $client->getResponse()->getContent(),
+            true
+        );
+
+        self::assertIsArray($response);
+
+        self::assertSame(
+            'An account with this phone number already exists.',
+            $response['message']
+        );
+    }
+
+    /**
+     * Simulates the TOCTOU race between AuthService::register()'s
+     * findOneBy() pre-check and its flush(): a User with the same phone is
+     * persisted (not yet flushed, so invisible to the pre-check's SELECT)
+     * before the request runs. flush() inside register() then flushes both
+     * that pending User and the new one in the same transaction — hitting
+     * the DB's real unique constraint, exactly like two concurrent
+     * registrations racing each other would. This must come back as the
+     * same clean 409 testDuplicatePhoneIsRejected gets for a sequential
+     * duplicate, not a raw unhandled DBAL exception.
+     */
+    public function testConcurrentRegistrationWithSamePhoneReturns409(): void
+    {
+        $client = static::createClient();
+
+        // Only one request happens in this test, so KernelBrowser's
+        // "reboot from the second request onward" default never triggers
+        // regardless — but disable it explicitly anyway so this doesn't
+        // silently break (a fresh EntityManager would discard $racingUser's
+        // pending insert below) if a setup request is ever added before it.
+        $client->disableReboot();
+
+        $this->entityManager = self::getContainer()
+            ->get(EntityManagerInterface::class);
+
+        $phone = $this->uniquePhone();
+
+        $racingUser = new User();
+        $racingUser->setName('Racing User');
+        $racingUser->setPhone($phone);
+        $racingUser->setRoles(['ROLE_CLIENT']);
+        $racingUser->setVerifiedAt(new \DateTimeImmutable());
+
+        $passwordHasher = self::getContainer()->get(UserPasswordHasherInterface::class);
+        $racingUser->setPassword($passwordHasher->hashPassword($racingUser, 'password123'));
+
+        $this->entityManager->persist($racingUser);
+
+        $client->request(
+            'POST',
+            '/api/auth/register',
+            server: [
+                'CONTENT_TYPE' => 'application/json',
+            ],
+            content: json_encode([
+                'name' => 'Losing Request',
                 'phone' => $phone,
                 'password' => 'password456',
             ])
@@ -620,6 +748,68 @@ final class AuthApiTest extends WebTestCase
         self::assertResponseStatusCodeSame(
             Response::HTTP_UNPROCESSABLE_ENTITY
         );
+    }
+
+    public function testPasswordChangeIsRateLimitedAfterTooManyAttempts(): void
+    {
+        $client = static::createClient();
+
+        $this->entityManager = self::getContainer()
+            ->get(EntityManagerInterface::class);
+
+        self::getContainer()->get('cache.rate_limiter')->clear();
+
+        $user = $this->createTestUser();
+        $token = $this->authenticateClient($client, $user);
+
+        // The configured limit is 5 attempts per 15 minutes per user id (see
+        // config/packages/rate_limiter.yaml), regardless of whether each
+        // individual attempt would otherwise succeed.
+        for ($i = 0; $i < 5; ++$i) {
+            $client->request(
+                'POST',
+                '/api/auth/change-password',
+                server: [
+                    'CONTENT_TYPE' => 'application/json',
+                    'HTTP_AUTHORIZATION' => 'Bearer '.$token,
+                ],
+                content: json_encode([
+                    'currentPassword' => 'wrong-password',
+                    'newPassword' => 'newPassword456',
+                ])
+            );
+
+            self::assertResponseStatusCodeSame(Response::HTTP_BAD_REQUEST);
+        }
+
+        $client->request(
+            'POST',
+            '/api/auth/change-password',
+            server: [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_AUTHORIZATION' => 'Bearer '.$token,
+            ],
+            content: json_encode([
+                'currentPassword' => 'password123',
+                'newPassword' => 'newPassword456',
+            ])
+        );
+
+        self::assertResponseStatusCodeSame(Response::HTTP_TOO_MANY_REQUESTS);
+
+        $response = json_decode(
+            $client->getResponse()->getContent(),
+            true
+        );
+
+        self::assertIsArray($response);
+        self::assertSame(
+            'Trop de tentatives. Réessayez plus tard.',
+            $response['message']
+        );
+
+        // Don't leak an exhausted limiter into whichever test runs next.
+        self::getContainer()->get('cache.rate_limiter')->clear();
     }
 
     public function testUnauthenticatedUserCannotChangePassword(): void

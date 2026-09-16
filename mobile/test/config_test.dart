@@ -10,4 +10,28 @@ void main() {
       );
     });
   });
+
+  group('checkSecureTransport', () {
+    test('allows a plaintext URL outside a release build', () {
+      expect(
+        () => checkSecureTransport('http://10.0.2.2:8000', isRelease: false),
+        returnsNormally,
+      );
+    });
+
+    test('allows an https URL in a release build', () {
+      expect(
+        () =>
+            checkSecureTransport('https://api.hssan.example', isRelease: true),
+        returnsNormally,
+      );
+    });
+
+    test('throws for a plaintext URL in a release build', () {
+      expect(
+        () => checkSecureTransport('http://10.0.2.2:8000', isRelease: true),
+        throwsStateError,
+      );
+    });
+  });
 }

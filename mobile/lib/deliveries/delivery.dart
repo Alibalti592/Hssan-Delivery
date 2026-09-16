@@ -127,6 +127,12 @@ class DeliveryOrder {
 
   bool get isParcel => deliveryType == 'PARCEL';
 
+  /// Who the courier hands the delivery to — the recipient for a Colis
+  /// job, the customer for everything else. Unifies the isParcel branch so
+  /// callers (see delivery_detail_screen.dart) don't repeat it themselves.
+  String get contactName => isParcel ? (recipientName ?? '') : customerName;
+  String? get contactPhone => isParcel ? recipientPhone : customerPhone;
+
   factory DeliveryOrder.fromJson(Map<String, dynamic> json) {
     return DeliveryOrder(
       id: json['id'] as int,

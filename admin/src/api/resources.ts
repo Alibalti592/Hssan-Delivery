@@ -38,8 +38,12 @@ function toQuery(params?: PageParams | RestaurantListParams): string {
 
 // Auth
 export const authApi = {
+  // The backend strips the token from this response for browser clients
+  // (see client.ts's X-Client-Platform header and the backend's
+  // WebLoginResponseSanitizer) — the httpOnly cookie it also sets is what
+  // actually authenticates us, not anything in this body.
   login: (phone: string, password: string) =>
-    api.post<{ token: string }>('/api/auth/login', { phone, password }),
+    api.post<void>('/api/auth/login', { phone, password }),
   me: () => api.get<CurrentUser>('/api/auth/me'),
   // Clears the httpOnly auth cookie server-side — JS can't clear it itself.
   logout: () => api.post<void>('/api/auth/logout'),

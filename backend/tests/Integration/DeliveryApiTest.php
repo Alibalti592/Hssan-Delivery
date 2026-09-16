@@ -315,6 +315,65 @@ final class DeliveryApiTest extends WebTestCase
         );
     }
 
+    public function testAdminCannotAssignDeliveryToUnavailableCourier(): void
+    {
+        $client = static::createClient();
+
+        $this->entityManager = self::getContainer()
+            ->get(EntityManagerInterface::class);
+
+        $admin = $this->createTestUser(
+            'ROLE_ADMIN',
+            'Test Admin'
+        );
+
+        $courier = $this->createTestUser(
+            'ROLE_LIVREUR',
+            'Unavailable Courier'
+        );
+
+        // The courier's own "I'm off duty" toggle (see
+        // AuthController::availability) — distinct from admin-controlled
+        // isActive, tested above.
+        $courier->setAvailable(false);
+
+        $this->entityManager->flush();
+
+        $delivery = $this->createTestDelivery();
+
+        $token = $this->authenticateClient(
+            $client,
+            $admin
+        );
+
+        $client->request(
+            'POST',
+            sprintf(
+                '/api/deliveries/%d/assign/%d',
+                $delivery->getId(),
+                $courier->getId()
+            ),
+            server: [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_AUTHORIZATION' => 'Bearer ' . $token,
+            ]
+        );
+
+        self::assertResponseStatusCodeSame(
+            Response::HTTP_BAD_REQUEST
+        );
+
+        $response = json_decode(
+            $client->getResponse()->getContent(),
+            true
+        );
+
+        self::assertSame(
+            'This courier is currently unavailable.',
+            $response['message']
+        );
+    }
+
     public function testCourierCanCompleteDeliveryLifecycle(): void
     {
         $client = static::createClient();
@@ -795,6 +854,87 @@ final class DeliveryApiTest extends WebTestCase
         );
     }
 
+    /**
+     * DeliveryResponse::fromEntity/orderSummary used to lazy-load each
+     * delivery's order, restaurant, customer and items (plus each item's
+     * product) one query at a time per row — for 3 deliveries that's 10+
+     * queries on top of the paginated SELECT itself. DeliveryRepository now
+     * eager-joins the to-one relations and batch-fetches items in a single
+     * follow-up query, so the query count stays flat regardless of how many
+     * deliveries are on the page. Counted via Doctrine's own debug
+     * middleware (doctrine.debug_data_holder) rather than mocking anything,
+     * so this fails for real if the eager-loading regresses.
+     */
+    public function testListingOwnDeliveriesDoesNotIssueAQueryPerDelivery(): void
+    {
+        $client = static::createClient();
+
+        $this->entityManager = self::getContainer()
+            ->get(EntityManagerInterface::class);
+
+        $admin = $this->createTestUser('ROLE_ADMIN', 'Test Admin');
+        $courier = $this->createTestUser('ROLE_LIVREUR', 'Test Courier');
+
+        $deliveries = [
+            $this->createTestDelivery(),
+            $this->createTestDelivery(),
+            $this->createTestDelivery(),
+        ];
+
+        $adminToken = $this->authenticateClient($client, $admin);
+
+        foreach ($deliveries as $delivery) {
+            $client->request(
+                'POST',
+                sprintf('/api/deliveries/%d/assign/%d', $delivery->getId(), $courier->getId()),
+                server: [
+                    'CONTENT_TYPE' => 'application/json',
+                    'HTTP_AUTHORIZATION' => 'Bearer ' . $adminToken,
+                ]
+            );
+
+            self::assertResponseStatusCodeSame(Response::HTTP_OK);
+        }
+
+        $courierToken = $this->authenticateClient($client, $courier);
+
+        // Fetched fresh immediately before/after the request rather than
+        // reused across it — see OrderApiTest::testListingOrdersDoesNotIssueAQueryPerOrder
+        // for why a reference held from before the request isn't reliable.
+        self::getContainer()->get('doctrine.debug_data_holder')->reset();
+
+        $client->request(
+            'GET',
+            '/api/deliveries/mine',
+            server: [
+                'HTTP_AUTHORIZATION' => 'Bearer ' . $courierToken,
+            ]
+        );
+
+        self::assertResponseStatusCodeSame(Response::HTTP_OK);
+
+        $response = json_decode($client->getResponse()->getContent(), true);
+        self::assertCount(3, $response['items']);
+
+        $queries = self::getContainer()->get('doctrine.debug_data_holder')->getData()['default'] ?? [];
+        $queryCount = count($queries);
+
+        self::assertGreaterThan(
+            0,
+            $queryCount,
+            'Expected doctrine.debug_data_holder to have recorded this request\'s queries.'
+        );
+
+        // Flat regardless of row count: reload the JWT's user, the
+        // paginator's COUNT, the joined main SELECT, and the batch item
+        // hydration — not one query per delivery.
+        self::assertLessThanOrEqual(
+            6,
+            $queryCount,
+            "Expected a small, constant number of queries regardless of delivery count, got {$queryCount}."
+        );
+    }
+
     public function testAdminCanCancelPendingDelivery(): void
     {
         $client = static::createClient();
@@ -836,6 +976,87 @@ final class DeliveryApiTest extends WebTestCase
             $client->getResponse()->getContent(),
             true
         );
+
+        self::assertSame(
+            DeliveryStatus::CANCELLED->value,
+            $response['status']
+        );
+
+        $this->assertOrderStatus(
+            $orderId,
+            OrderStatus::CANCELLED
+        );
+    }
+
+    /**
+     * A courier deactivated mid-flight (see ActiveUserChecker) is locked
+     * out of every request, including markDelivered/failDelivery — so
+     * without an admin able to cancel from ACCEPTED/PICKED_UP/ON_THE_WAY,
+     * the delivery (and its order) would be stuck forever with no way to
+     * ever leave those statuses. CANCELLED maps to the same
+     * OrderStatus::CANCELLED regardless of the prior delivery status,
+     * same as failDelivery already does from these statuses.
+     */
+    public function testAdminCanCancelDeliveryThatIsOnTheWay(): void
+    {
+        $client = static::createClient();
+
+        $this->entityManager = self::getContainer()
+            ->get(EntityManagerInterface::class);
+
+        $admin = $this->createTestUser(
+            'ROLE_ADMIN',
+            'Test Admin'
+        );
+
+        $courier = $this->createTestUser(
+            'ROLE_LIVREUR',
+            'Test Courier'
+        );
+
+        $delivery = $this->createTestDelivery();
+        $orderId = $delivery->getOrder()->getId();
+
+        $adminToken = $this->authenticateClient($client, $admin);
+
+        $client->request(
+            'POST',
+            sprintf('/api/deliveries/%d/assign/%d', $delivery->getId(), $courier->getId()),
+            server: [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_AUTHORIZATION' => 'Bearer ' . $adminToken,
+            ]
+        );
+
+        self::assertResponseStatusCodeSame(Response::HTTP_OK);
+
+        $courierToken = $this->authenticateClient($client, $courier);
+
+        foreach (['accept', 'pickup', 'on-the-way'] as $action) {
+            $client->request(
+                'POST',
+                sprintf('/api/deliveries/%d/%s', $delivery->getId(), $action),
+                server: [
+                    'CONTENT_TYPE' => 'application/json',
+                    'HTTP_AUTHORIZATION' => 'Bearer ' . $courierToken,
+                ]
+            );
+
+            self::assertResponseStatusCodeSame(Response::HTTP_OK);
+        }
+
+        $client->request(
+            'POST',
+            sprintf('/api/deliveries/%d/cancel', $delivery->getId()),
+            server: [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_AUTHORIZATION' => 'Bearer ' . $adminToken,
+            ]
+        );
+
+        self::assertResponseStatusCodeSame(Response::HTTP_OK);
+
+        $response = json_decode($client->getResponse()->getContent(), true);
 
         self::assertSame(
             DeliveryStatus::CANCELLED->value,

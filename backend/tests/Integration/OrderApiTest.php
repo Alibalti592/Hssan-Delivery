@@ -565,6 +565,82 @@ final class OrderApiTest extends WebTestCase
         );
     }
 
+    public function testOrderCreationIsRateLimitedAfterTooManyAttempts(): void
+    {
+        $client = static::createClient();
+
+        $this->entityManager = self::getContainer()
+            ->get(EntityManagerInterface::class);
+
+        self::getContainer()->get('cache.rate_limiter')->clear();
+
+        $user = $this->createTestUser();
+
+        $restaurant = $this->createTestRestaurant();
+        $category = $this->createTestCategory($restaurant);
+        $product = $this->createTestProduct(
+            $restaurant,
+            $category
+        );
+        $zone = $this->createTestDeliveryZone('4.000');
+
+        $token = $this->authenticateClient($client, $user);
+
+        $payload = json_encode([
+            'restaurantId' => $restaurant->getId(),
+            'items' => [
+                [
+                    'productId' => $product->getId(),
+                    'quantity' => 1,
+                ],
+            ],
+            'deliveryAddress' => 'Tunis, Tunisia',
+            'deliveryZoneId' => $zone->getId(),
+        ]);
+
+        // The configured limit is 20 attempts per 10 minutes per user id
+        // (see config/packages/rate_limiter.yaml).
+        for ($i = 0; $i < 20; ++$i) {
+            $client->request(
+                'POST',
+                '/api/orders',
+                server: [
+                    'CONTENT_TYPE' => 'application/json',
+                    'HTTP_AUTHORIZATION' => 'Bearer ' . $token,
+                ],
+                content: $payload
+            );
+
+            self::assertResponseStatusCodeSame(201);
+        }
+
+        $client->request(
+            'POST',
+            '/api/orders',
+            server: [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_AUTHORIZATION' => 'Bearer ' . $token,
+            ],
+            content: $payload
+        );
+
+        self::assertResponseStatusCodeSame(429);
+
+        $response = json_decode(
+            $client->getResponse()->getContent(),
+            true
+        );
+
+        self::assertIsArray($response);
+        self::assertSame(
+            'Trop de tentatives. Réessayez plus tard.',
+            $response['message']
+        );
+
+        // Don't leak an exhausted limiter into whichever test runs next.
+        self::getContainer()->get('cache.rate_limiter')->clear();
+    }
+
     public function testCreateOrderFailsWhenQuantityIsInvalid(): void
     {
         $client = static::createClient();
@@ -618,6 +694,92 @@ final class OrderApiTest extends WebTestCase
         self::assertNotEmpty(
             $response['errors']
         );
+    }
+
+    /**
+     * Guards against Money::toMillimes() * quantity overflowing into float
+     * arithmetic — see OrderItemRequest.
+     */
+    public function testCreateOrderFailsWhenQuantityExceedsTheMax(): void
+    {
+        $client = static::createClient();
+
+        $this->entityManager = self::getContainer()
+            ->get(EntityManagerInterface::class);
+
+        $user = $this->createTestUser();
+
+        $restaurant = $this->createTestRestaurant();
+        $category = $this->createTestCategory($restaurant);
+        $product = $this->createTestProduct(
+            $restaurant,
+            $category
+        );
+
+        $token = $this->authenticateClient($client, $user);
+
+        $client->request(
+            'POST',
+            '/api/orders',
+            server: [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_AUTHORIZATION' => 'Bearer ' . $token,
+            ],
+            content: json_encode([
+                'restaurantId' => $restaurant->getId(),
+                'items' => [
+                    [
+                        'productId' => $product->getId(),
+                        'quantity' => 101,
+                    ],
+                ],
+                'deliveryAddress' => 'Tunis, Tunisia',
+                'deliveryZoneId' => 1,
+            ])
+        );
+
+        self::assertResponseStatusCodeSame(422);
+    }
+
+    public function testCreateOrderFailsWhenTooManyLineItems(): void
+    {
+        $client = static::createClient();
+
+        $this->entityManager = self::getContainer()
+            ->get(EntityManagerInterface::class);
+
+        $user = $this->createTestUser();
+
+        $restaurant = $this->createTestRestaurant();
+        $category = $this->createTestCategory($restaurant);
+        $product = $this->createTestProduct(
+            $restaurant,
+            $category
+        );
+
+        $token = $this->authenticateClient($client, $user);
+
+        $items = array_fill(0, 51, [
+            'productId' => $product->getId(),
+            'quantity' => 1,
+        ]);
+
+        $client->request(
+            'POST',
+            '/api/orders',
+            server: [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_AUTHORIZATION' => 'Bearer ' . $token,
+            ],
+            content: json_encode([
+                'restaurantId' => $restaurant->getId(),
+                'items' => $items,
+                'deliveryAddress' => 'Tunis, Tunisia',
+                'deliveryZoneId' => 1,
+            ])
+        );
+
+        self::assertResponseStatusCodeSame(422);
     }
 
     public function testCreateOrderFailsWhenDeliveryZoneDoesNotExist(): void
@@ -773,6 +935,82 @@ final class OrderApiTest extends WebTestCase
 
         self::assertCount(1, $response['items']);
         self::assertSame(2, $response['meta']['page']);
+    }
+
+    /**
+     * OrderService::getUserOrders used to lazy-load restaurant, deliveryZone,
+     * delivery and items (plus each item's product) one query at a time per
+     * row — for 3 orders that's ~15+ queries on top of the paginated SELECT
+     * itself. It now eager-joins the to-one relations and batch-fetches
+     * items in a single follow-up query (see OrderRepository::hydrateItems),
+     * so the query count for this endpoint stays flat regardless of how many
+     * orders are on the page. Counted via Doctrine's own debug middleware
+     * (doctrine.debug_data_holder) rather than mocking anything, so this
+     * fails for real if the eager-loading regresses.
+     */
+    public function testListingOrdersDoesNotIssueAQueryPerOrder(): void
+    {
+        $client = static::createClient();
+
+        $this->entityManager = self::getContainer()
+            ->get(EntityManagerInterface::class);
+
+        $user = $this->createTestUser();
+        $restaurant = $this->createTestRestaurant();
+        $category = $this->createTestCategory($restaurant);
+        $product = $this->createTestProduct($restaurant, $category);
+        $zone = $this->createTestDeliveryZone('4.000');
+
+        $token = $this->authenticateClient($client, $user);
+
+        for ($i = 0; $i < 3; ++$i) {
+            $this->placeOrder($client, $token, $restaurant, $product, $zone);
+        }
+
+        // Fetched fresh immediately before/after the request rather than
+        // reused across it: the service is reset per-request (kernel.reset),
+        // so a reference held from before the request can end up reading a
+        // stale/replaced instance instead of the one that actually recorded
+        // this request's queries.
+        self::getContainer()->get('doctrine.debug_data_holder')->reset();
+
+        $client->request(
+            'GET',
+            '/api/orders',
+            server: [
+                'HTTP_AUTHORIZATION' => 'Bearer ' . $token,
+            ]
+        );
+
+        self::assertResponseIsSuccessful();
+
+        $response = json_decode(
+            $client->getResponse()->getContent(),
+            true
+        );
+
+        self::assertCount(3, $response['items']);
+
+        $queries = self::getContainer()->get('doctrine.debug_data_holder')->getData()['default'] ?? [];
+        $queryCount = count($queries);
+
+        // Sanity check first: a passing assertLessThanOrEqual below is
+        // meaningless if the debug middleware silently recorded nothing.
+        self::assertGreaterThan(
+            0,
+            $queryCount,
+            'Expected doctrine.debug_data_holder to have recorded this request\'s queries.'
+        );
+
+        // Flat regardless of row count: reload the JWT's user, the
+        // paginator's COUNT, the joined main SELECT, and the batch item
+        // hydration — not one query per order. The unfixed version issued
+        // 15+ queries for these same 3 orders.
+        self::assertLessThanOrEqual(
+            6,
+            $queryCount,
+            "Expected a small, constant number of queries regardless of order count, got {$queryCount}."
+        );
     }
 
     public function testClientCanCancelAPendingOrder(): void

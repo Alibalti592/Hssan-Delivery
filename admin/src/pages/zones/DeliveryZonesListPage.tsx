@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { deliveryZonesApi } from '../../api/resources';
-import { PageHeader, Loading, ErrorBanner, EmptyState, money } from '../../components/ui';
+import { PageHeader, Loading, ErrorBanner, EmptyState, money, MONEY_PATTERN, MONEY_TITLE } from '../../components/ui';
 import type { DeliveryZoneAdmin } from '../../api/types';
 
 export default function DeliveryZonesListPage() {
@@ -83,6 +83,9 @@ export default function DeliveryZonesListPage() {
                   value={newFee}
                   onChange={(e) => setNewFee(e.target.value)}
                   placeholder="5.000"
+                  inputMode="decimal"
+                  pattern={MONEY_PATTERN}
+                  title={MONEY_TITLE}
                   required
                 />
               </div>
@@ -130,6 +133,10 @@ export default function DeliveryZonesListPage() {
                             style={{ width: 100 }}
                             value={editingFee}
                             onChange={(e) => setEditingFee(e.target.value)}
+                            inputMode="decimal"
+                            pattern={MONEY_PATTERN}
+                            title={MONEY_TITLE}
+                            required
                           />
                           <button type="submit" className="btn sm" disabled={update.isPending}>
                             Save

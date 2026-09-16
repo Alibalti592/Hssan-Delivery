@@ -147,3 +147,40 @@ test('creates a new promotion and returns to its edit page', async ({ page }) =>
   await expect(page).toHaveURL(/\/promotions\/9\/edit$/);
   await expect.poll(() => createdBody?.title).toBe('New Launch Promo');
 });
+
+test('rejects an end date before the start date without calling the API', async ({ page }) => {
+  await mockStats(page);
+
+  await page.route('**/api/admin/restaurants**', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ items: [], meta: { page: 1, limit: 100, total: 0, pages: 1 } }),
+    }),
+  );
+
+  let createCalled = false;
+
+  await page.route('**/api/admin/promotions**', (route) => {
+    if (route.request().method() === 'POST') {
+      createCalled = true;
+    }
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ items: [], meta: { page: 1, limit: 20, total: 0, pages: 1 } }),
+    });
+  });
+
+  await loginAsAdmin(page);
+  await page.goto('/promotions/new');
+
+  await page.getByLabel('Title').fill('Backwards Promo');
+  await page.getByLabel(/Discount value/).fill('10');
+  await page.getByLabel('Starts at').fill('2026-12-31T00:00');
+  await page.getByLabel('Ends at').fill('2026-01-01T00:00');
+  await page.getByRole('button', { name: 'Create promotion' }).click();
+
+  await expect(page.getByText('End date must be after the start date.')).toBeVisible();
+  expect(createCalled).toBe(false);
+});

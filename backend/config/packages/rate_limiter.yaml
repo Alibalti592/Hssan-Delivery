@@ -12,3 +12,20 @@ framework:
             policy: sliding_window
             limit: 5
             interval: '10 minutes'
+
+        # Guards against an authenticated account (or a stolen/compromised
+        # token) spamming order/parcel creation — see OrderController.
+        # Keyed by user id, not IP, since these endpoints already require
+        # auth. Generous enough that no real customer hits it.
+        order_create:
+            policy: sliding_window
+            limit: 20
+            interval: '10 minutes'
+
+        # Guards against brute-forcing the "current password" check on an
+        # authenticated session — see AuthController::changePassword.
+        # Keyed by user id.
+        password_change:
+            policy: sliding_window
+            limit: 5
+            interval: '15 minutes'
