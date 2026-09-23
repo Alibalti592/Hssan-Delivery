@@ -176,6 +176,16 @@ courier deactivated mid-delivery can never finish or fail it, and only the
 admin's wider cancel gives that delivery (and its order) a way out. See
 DeliveryService::cancelDelivery vs. cancelDeliveryAsAdmin.
 
+An admin also has POST /api/deliveries/{id}/reassign/{courierId} for the
+same unresponsive-courier scenario without cancelling the order outright:
+it works from ASSIGNED/ACCEPTED/PICKED_UP/ON_THE_WAY (not PENDING — use
+assign for that), hands the delivery to a different courier, and resets it
+to ASSIGNED so the new courier goes through their own accept/pick-up/on
+the way flow rather than inheriting state from whoever had it before. Both
+assign and reassign refuse a courier who already has another active
+delivery (PENDING/ASSIGNED/ACCEPTED/PICKED_UP/ON_THE_WAY) — see
+DeliveryService::assertCourierAvailableForAssignment.
+
 Order / Delivery synchronization
 
 Delivery transitions synchronize the associated order status.
@@ -267,6 +277,7 @@ Delivery management
 GET  /api/deliveries/mine
 
 POST /api/deliveries/{id}/assign/{courierId}
+POST /api/deliveries/{id}/reassign/{courierId}
 POST /api/deliveries/{id}/accept
 POST /api/deliveries/{id}/decline
 POST /api/deliveries/{id}/pickup
@@ -503,7 +514,23 @@ and the mobile app are inert without a real Firebase project — see
 FIREBASE_CREDENTIALS in backend/.env.example and the FIREBASE_* dart-defines
 documented in mobile/lib/config.dart — so this doesn't require a Firebase
 account to develop, and a failed or skipped push never blocks the
-delivery/order action that triggered it.
+delivery/order action that triggered it. Tokens FCM reports as
+unknown/invalid after a send (app uninstalled, token rotated, etc.) are
+pruned via DeviceTokenRepository::deleteByTokens right after that send —
+without this they'd sit in device_token forever and get retried on every
+future notification.
+
+Tapping a push navigates to the relevant screen — an order-status push
+opens OrderDetailScreen(orderId), a new-delivery push opens
+DeliveryDetailScreen(deliveryId), refreshing DeliveriesController first so
+a courier deep-linking in cold (app fully terminated) can find it in the
+list. This is wired for all three ways a tap can reach the app: already in
+the foreground (a "VOIR" SnackBarAction), resumed from the background
+(FirebaseMessaging.onMessageOpenedApp), and a cold start where the tap is
+what launched the app (FirebaseMessaging.instance.getInitialMessage(),
+checked once during PushNotificationService.initialize()). See
+PushNotificationService.handleTap, routed off the `orderId`/`deliveryId`
+already present in each notification's data payload above.
 
 Client order cancellation
 
@@ -735,6 +762,29 @@ an admin cannot assign a delivery to a courier who has toggled themselves
 unavailable, matching what the courier map's ONLINE/OFFLINE badge shows
 two concurrent registrations (or admin-created courier accounts) with the
 same phone number both get a clean 409, not a raw DB exception for the loser
+a courier can't be assigned a second active delivery while already working
+one — assign/reassign both check for an existing active delivery, with the
+courier row locked so two concurrent assignments to the same courier can't
+both slip past the check before either commits
+an admin can reassign an in-progress delivery (assigned/accepted/picked
+up/on the way) to a different courier without cancelling the customer's
+order — for when the original courier goes unresponsive; the new courier
+starts fresh from "assigned" and goes through their own accept/pick-up flow
+phone numbers (RegisterUserRequest, CreateCourierRequest, and
+CreateParcelOrderRequest's recipientPhone) are now checked against
+App\Validator\PhoneFormat instead of just non-blank — "abc" is no longer a
+valid phone number; the mobile app enforces the same pattern client-side
+(mobile/lib/core/phone_format.dart) on the login, register, and parcel
+recipient-phone fields
+on a reassignment, the courier who lost the delivery is notified ("Course
+réassignée"), not just the one who gained it — DeliveryStatusChangedEvent
+now carries the pre-transition courier (App\Event\DeliveryStatusChangedEvent::$previousCourier)
+so DeliveryNotificationListener can tell a reassignment apart from a fresh
+assignment; without this a displaced courier only found out via a
+confusing 400 on their next action
+a courier still working a delivery (accepted/picked up/on the way) is
+notified when an admin cancels it out from under them, not just the
+client — same event, same listener
 
 It also contains unit tests for the pure logic that backs those workflows: the
 decimal/millimes money conversion, the delivery-to-order status mapping, and
@@ -752,8 +802,8 @@ php bin/phpunit
 
 Current baseline:
 
-240 tests
-1448 assertions
+264 tests
+1521 assertions
 
 Tests share a single Postgres database rather than running each in its own
 transaction, so re-running `php bin/phpunit` without resetting the database

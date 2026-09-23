@@ -2,6 +2,7 @@
 
 namespace App\Dto\Order;
 
+use App\Validator\PhoneFormat;
 use Symfony\Component\Validator\Constraints as Assert;
 
 final class CreateParcelOrderRequest
@@ -20,6 +21,7 @@ final class CreateParcelOrderRequest
 
     #[Assert\NotBlank]
     #[Assert\Length(max: 30)]
+    #[Assert\Regex(pattern: PhoneFormat::PATTERN, message: PhoneFormat::MESSAGE)]
     public string $recipientPhone = '';
 
     #[Assert\Length(max: 2000)]
