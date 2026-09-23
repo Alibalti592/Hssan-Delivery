@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/testing.dart';
@@ -621,6 +622,58 @@ void main() {
         expect(auth.status, AuthStatus.signedOut);
       },
     );
+
+    test('handleTap routes a client push to onOrderTap', () {
+      int? tappedOrderId;
+      int? tappedDeliveryId;
+
+      final service = PushNotificationService(
+        NotificationsRepository(
+          ApiClient(tokenProvider: () => 'jwt', onUnauthorized: () {}),
+        ),
+        onOrderTap: (id) => tappedOrderId = id,
+        onDeliveryTap: (id) => tappedDeliveryId = id,
+      );
+
+      service.handleTap(const RemoteMessage(data: {'orderId': '42'}));
+
+      expect(tappedOrderId, 42);
+      expect(tappedDeliveryId, isNull);
+    });
+
+    test('handleTap routes a courier push to onDeliveryTap', () {
+      int? tappedOrderId;
+      int? tappedDeliveryId;
+
+      final service = PushNotificationService(
+        NotificationsRepository(
+          ApiClient(tokenProvider: () => 'jwt', onUnauthorized: () {}),
+        ),
+        onOrderTap: (id) => tappedOrderId = id,
+        onDeliveryTap: (id) => tappedDeliveryId = id,
+      );
+
+      service.handleTap(const RemoteMessage(data: {'deliveryId': '7'}));
+
+      expect(tappedDeliveryId, 7);
+      expect(tappedOrderId, isNull);
+    });
+
+    test('handleTap is a no-op for a push with neither id', () {
+      var tapped = false;
+
+      final service = PushNotificationService(
+        NotificationsRepository(
+          ApiClient(tokenProvider: () => 'jwt', onUnauthorized: () {}),
+        ),
+        onOrderTap: (_) => tapped = true,
+        onDeliveryTap: (_) => tapped = true,
+      );
+
+      service.handleTap(const RemoteMessage());
+
+      expect(tapped, isFalse);
+    });
   });
 
   group('CourierLocationService', () {
