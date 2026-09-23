@@ -5,6 +5,10 @@
          app never reports a courier's location once it's backgrounded. -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+    <!-- Required on Android 13+ (API 33) for any notification to display;
+         without it, FirebaseMessaging's requestPermission() cannot obtain
+         POST_NOTIFICATIONS and pushes are silently dropped by the OS. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <application
         android:label="mobile"
         android:name="${applicationName}"
