@@ -105,6 +105,45 @@ final class AuthApiTest extends WebTestCase
         );
     }
 
+    /**
+     * Registration previously only checked phone was non-blank — see
+     * App\Validator\PhoneFormat, now enforced on RegisterUserRequest.
+     */
+    public function testRegisterRejectsAMalformedPhoneNumber(): void
+    {
+        $client = static::createClient();
+
+        $this->entityManager = self::getContainer()
+            ->get(EntityManagerInterface::class);
+
+        $client->request(
+            'POST',
+            '/api/auth/register',
+            server: [
+                'CONTENT_TYPE' => 'application/json',
+            ],
+            content: json_encode([
+                'name' => 'Test Client',
+                'phone' => 'abcdefgh',
+                'password' => 'password123',
+            ])
+        );
+
+        self::assertResponseStatusCodeSame(
+            Response::HTTP_UNPROCESSABLE_ENTITY
+        );
+
+        $response = json_decode(
+            $client->getResponse()->getContent(),
+            true
+        );
+
+        self::assertSame(
+            'phone',
+            $response['errors'][0]['field']
+        );
+    }
+
     public function testClientCanLogin(): void
     {
         $client = static::createClient();
@@ -1011,9 +1050,8 @@ final class AuthApiTest extends WebTestCase
 
     private function uniquePhone(): string
     {
-        return '2' . random_int(
-            10000000,
-            99999999
-        );
+        // 8 digits starting 2-9, matching PhoneFormat::PATTERN — anything
+        // else now fails RegisterUserRequest's format validation.
+        return (string) random_int(20000000, 99999999);
     }
 }

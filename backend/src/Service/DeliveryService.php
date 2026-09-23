@@ -7,15 +7,24 @@ use App\Entity\User;
 use App\Enum\DeliveryStatus;
 use App\Event\DeliveryStatusChangedEvent;
 use App\Exception\InvalidOperationException;
+use App\Repository\DeliveryRepository;
 use Doctrine\DBAL\LockMode;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
 
 final class DeliveryService
 {
+    private const REASSIGNABLE_STATUSES = [
+        DeliveryStatus::ASSIGNED,
+        DeliveryStatus::ACCEPTED,
+        DeliveryStatus::PICKED_UP,
+        DeliveryStatus::ON_THE_WAY,
+    ];
+
     public function __construct(
         private readonly EntityManagerInterface $entityManager,
         private readonly EventDispatcherInterface $eventDispatcher,
+        private readonly DeliveryRepository $deliveryRepository,
     ) {
     }
 
@@ -28,23 +37,7 @@ final class DeliveryService
                 throw new InvalidOperationException('Only pending deliveries can be assigned.');
             }
 
-            if (!in_array('ROLE_LIVREUR', $courier->getRoles(), true)) {
-                throw new InvalidOperationException('The selected user is not a courier.');
-            }
-
-            if (!$courier->isActive()) {
-                throw new InvalidOperationException('This courier has been deactivated.');
-            }
-
-            // isAvailable is the courier's own "I'm off duty" toggle (see
-            // AuthController::availability) — distinct from admin-controlled
-            // isActive, and what the admin map's ONLINE/OFFLINE badge is
-            // based on (CourierLocationService::deriveStatus). Without this
-            // check an admin could assign a delivery to a courier who just
-            // signaled they're unavailable, contradicting what the map shows.
-            if (!$courier->isAvailable()) {
-                throw new InvalidOperationException('This courier is currently unavailable.');
-            }
+            $this->assertCourierAvailableForAssignment($courier, $delivery);
 
             $delivery->setCourier($courier);
             $delivery->setStatus(DeliveryStatus::ASSIGNED);
@@ -52,6 +45,82 @@ final class DeliveryService
 
             $this->syncOrderStatus($delivery);
         });
+    }
+
+    /**
+     * Admin-only (see DeliveryController::reassign) — hands an already
+     * in-progress delivery to a different courier, for when the original one
+     * has gone unresponsive. Unlike assignCourier, this works on a delivery
+     * that already has a courier and isn't PENDING; unlike
+     * cancelDeliveryAsAdmin, it keeps the customer's order alive instead of
+     * killing it. Resets to ASSIGNED and clears the accepted/picked-up
+     * timestamps: the new courier hasn't accepted or touched the order yet,
+     * so their app should walk them through the same accept → pick up → on
+     * the way flow as any other assignment, not start them mid-flight on
+     * state a different person reached.
+     */
+    public function reassignCourier(
+        Delivery $delivery,
+        User $courier,
+    ): Delivery {
+        return $this->transitionWithLock($delivery, function (Delivery $delivery) use ($courier) {
+            if (!in_array($delivery->getStatus(), self::REASSIGNABLE_STATUSES, true)) {
+                throw new InvalidOperationException('This delivery cannot be reassigned at its current status.');
+            }
+
+            $this->assertCourierAvailableForAssignment($courier, $delivery);
+
+            $delivery->setCourier($courier);
+            $delivery->setStatus(DeliveryStatus::ASSIGNED);
+            $delivery->setAssignedAt(new \DateTimeImmutable());
+            $delivery->setAcceptedAt(null);
+            $delivery->setPickedUpAt(null);
+
+            $this->syncOrderStatus($delivery);
+        });
+    }
+
+    /**
+     * Shared by assignCourier and reassignCourier. Locking the courier row
+     * (not just the delivery row the caller already locked) closes a race
+     * two concurrent assignments to the *same* courier but *different*
+     * deliveries would otherwise have: both could pass the capacity check
+     * below before either commits, since neither delivery's row lock
+     * protects the other delivery's insert. Serializing on the courier row
+     * makes the second request see the first one's delivery once it commits.
+     */
+    private function assertCourierAvailableForAssignment(
+        User $courier,
+        Delivery $excludingDelivery,
+    ): void {
+        if (!in_array('ROLE_LIVREUR', $courier->getRoles(), true)) {
+            throw new InvalidOperationException('The selected user is not a courier.');
+        }
+
+        if (!$courier->isActive()) {
+            throw new InvalidOperationException('This courier has been deactivated.');
+        }
+
+        // isAvailable is the courier's own "I'm off duty" toggle (see
+        // AuthController::availability) — distinct from admin-controlled
+        // isActive, and what the admin map's ONLINE/OFFLINE badge is based
+        // on (CourierLocationService::deriveStatus). Without this check an
+        // admin could assign a delivery to a courier who just signaled
+        // they're unavailable, contradicting what the map shows.
+        if (!$courier->isAvailable()) {
+            throw new InvalidOperationException('This courier is currently unavailable.');
+        }
+
+        $this->entityManager->lock($courier, LockMode::PESSIMISTIC_WRITE);
+
+        $activeDelivery = $this->deliveryRepository->findActiveForCourier($courier);
+
+        // Excluding the delivery being (re)assigned matters for reassignCourier:
+        // it's already this courier's "active" delivery when reassigning it
+        // back to the same courier, which must not read as "already busy".
+        if (null !== $activeDelivery && $activeDelivery->getId() !== $excludingDelivery->getId()) {
+            throw new InvalidOperationException('This courier already has an active delivery.');
+        }
     }
 
     public function acceptDelivery(
@@ -242,6 +311,7 @@ final class DeliveryService
     private function transitionWithLock(Delivery $delivery, callable $transition): Delivery
     {
         $previousStatus = $delivery->getStatus();
+        $previousCourier = $delivery->getCourier();
 
         $delivery = $this->entityManager->wrapInTransaction(function () use ($delivery, $transition) {
             $this->entityManager->lock($delivery, LockMode::PESSIMISTIC_WRITE);
@@ -255,7 +325,9 @@ final class DeliveryService
         });
 
         if ($delivery->getStatus() !== $previousStatus) {
-            $this->eventDispatcher->dispatch(new DeliveryStatusChangedEvent($delivery, $previousStatus));
+            $this->eventDispatcher->dispatch(
+                new DeliveryStatusChangedEvent($delivery, $previousStatus, $previousCourier)
+            );
         }
 
         return $delivery;

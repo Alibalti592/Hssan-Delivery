@@ -16,9 +16,22 @@ import 'notifications_repository.dart';
 /// broken or unreachable push setup must never block sign-in, sign-out, or
 /// any other app flow that happens to touch it.
 class PushNotificationService {
-  PushNotificationService(this._repository);
+  PushNotificationService(
+    this._repository, {
+    this.onOrderTap,
+    this.onDeliveryTap,
+  });
 
   final NotificationsRepository _repository;
+
+  /// Called when the user taps a client-facing push (order on the way,
+  /// delivered, cancelled, or failed — see DeliveryNotificationListener on
+  /// the backend, which sends `data: {orderId: ...}` on all of these).
+  final void Function(int orderId)? onOrderTap;
+
+  /// Called when the user taps a courier-facing push (a new delivery just
+  /// got assigned to them — sent with `data: {deliveryId: ...}`).
+  final void Function(int deliveryId)? onDeliveryTap;
 
   /// Attach to MaterialApp(scaffoldMessengerKey: ...) so a foreground push
   /// can surface as a SnackBar regardless of which screen is on top.
@@ -42,6 +55,19 @@ class PushNotificationService {
       );
       await FirebaseMessaging.instance.requestPermission();
       FirebaseMessaging.onMessage.listen(_showForegroundMessage);
+      // App was backgrounded (not terminated) and the user tapped the push
+      // to bring it back to the foreground.
+      FirebaseMessaging.onMessageOpenedApp.listen(handleTap);
+
+      // Cold start: the app was launched *by* tapping a push while fully
+      // terminated, so there's no onMessageOpenedApp event for it — the
+      // message that caused the launch has to be fetched explicitly.
+      final initialMessage = await FirebaseMessaging.instance
+          .getInitialMessage();
+      if (initialMessage != null) {
+        handleTap(initialMessage);
+      }
+
       _initialized = true;
     } catch (_) {
       // Bad/incomplete config, unsupported platform, missing native setup
@@ -95,6 +121,35 @@ class PushNotificationService {
 
     if (text.isEmpty) return;
 
-    messengerKey.currentState?.showSnackBar(SnackBar(content: Text(text)));
+    messengerKey.currentState?.showSnackBar(
+      SnackBar(
+        content: Text(text),
+        action:
+            (message.data['orderId'] != null ||
+                message.data['deliveryId'] != null)
+            ? SnackBarAction(label: 'VOIR', onPressed: () => handleTap(message))
+            : null,
+      ),
+    );
+  }
+
+  /// Routes a tapped push to onOrderTap/onDeliveryTap based on which id its
+  /// data payload carries (see DeliveryNotificationListener on the backend
+  /// for what each status sends). Public (not just a plain private method)
+  /// so a test can simulate a tap directly — real taps only ever reach here
+  /// via onMessageOpenedApp/getInitialMessage, neither of which fires in a
+  /// plain `flutter test` run (no platform channel to answer them).
+  @visibleForTesting
+  void handleTap(RemoteMessage message) {
+    final orderId = int.tryParse(message.data['orderId'] ?? '');
+    if (orderId != null) {
+      onOrderTap?.call(orderId);
+      return;
+    }
+
+    final deliveryId = int.tryParse(message.data['deliveryId'] ?? '');
+    if (deliveryId != null) {
+      onDeliveryTap?.call(deliveryId);
+    }
   }
 }

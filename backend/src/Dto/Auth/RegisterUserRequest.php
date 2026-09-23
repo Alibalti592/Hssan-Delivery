@@ -2,6 +2,7 @@
 
 namespace App\Dto\Auth;
 
+use App\Validator\PhoneFormat;
 use Symfony\Component\Validator\Constraints as Assert;
 
 final class RegisterUserRequest
@@ -12,6 +13,7 @@ final class RegisterUserRequest
 
     #[Assert\NotBlank]
     #[Assert\Length(max: 255)]
+    #[Assert\Regex(pattern: PhoneFormat::PATTERN, message: PhoneFormat::MESSAGE)]
     public string $phone = '';
 
     #[Assert\NotBlank]
