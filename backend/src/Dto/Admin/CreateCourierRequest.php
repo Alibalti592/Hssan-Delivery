@@ -2,6 +2,7 @@
 
 namespace App\Dto\Admin;
 
+use App\Validator\PhoneFormat;
 use Symfony\Component\Validator\Constraints as Assert;
 
 final class CreateCourierRequest
@@ -12,6 +13,7 @@ final class CreateCourierRequest
 
     #[Assert\NotBlank]
     #[Assert\Length(max: 255)]
+    #[Assert\Regex(pattern: PhoneFormat::PATTERN, message: PhoneFormat::MESSAGE)]
     public string $phone = '';
 
     #[Assert\NotBlank]

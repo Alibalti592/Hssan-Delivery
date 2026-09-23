@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../core/phone_format.dart';
 import '../theme.dart';
 import 'auth_controller.dart';
 import 'register_screen.dart';
@@ -104,9 +105,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             labelText: 'Téléphone',
                             hintText: '+216 22 000 000',
                           ),
-                          validator: (v) => (v == null || v.trim().isEmpty)
-                              ? 'Numéro requis'
-                              : null,
+                          validator: validatePhone,
                         ),
                         const SizedBox(height: 16),
                         TextFormField(
