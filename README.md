@@ -766,6 +766,12 @@ an admin can reassign an in-progress delivery (assigned/accepted/picked
 up/on the way) to a different courier without cancelling the customer's
 order — for when the original courier goes unresponsive; the new courier
 starts fresh from "assigned" and goes through their own accept/pick-up flow
+phone numbers (RegisterUserRequest, CreateCourierRequest, and
+CreateParcelOrderRequest's recipientPhone) are now checked against
+App\Validator\PhoneFormat instead of just non-blank — "abc" is no longer a
+valid phone number; the mobile app enforces the same pattern client-side
+(mobile/lib/core/phone_format.dart) on the login, register, and parcel
+recipient-phone fields
 
 It also contains unit tests for the pure logic that backs those workflows: the
 decimal/millimes money conversion, the delivery-to-order status mapping, and
@@ -783,8 +789,8 @@ php bin/phpunit
 
 Current baseline:
 
-245 tests
-1492 assertions
+258 tests
+1506 assertions
 
 Tests share a single Postgres database rather than running each in its own
 transaction, so re-running `php bin/phpunit` without resetting the database
