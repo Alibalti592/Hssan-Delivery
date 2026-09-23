@@ -315,6 +315,68 @@ final class DeliveryApiTest extends WebTestCase
         );
     }
 
+    /**
+     * A courier admin-*created* isn't the same as one admin-*approved* —
+     * see User::$verifiedAt's docblock and AuthService::createCourier,
+     * which leaves a new courier unverified until a separate
+     * PATCH /api/admin/couriers/{id}/verify call (see AdminCourierApiTest).
+     */
+    public function testAdminCannotAssignDeliveryToAnUnverifiedCourier(): void
+    {
+        $client = static::createClient();
+
+        $this->entityManager = self::getContainer()
+            ->get(EntityManagerInterface::class);
+
+        $admin = $this->createTestUser(
+            'ROLE_ADMIN',
+            'Test Admin'
+        );
+
+        $courier = $this->createTestUser(
+            'ROLE_LIVREUR',
+            'Unverified Courier'
+        );
+
+        $courier->setVerifiedAt(null);
+
+        $this->entityManager->flush();
+
+        $delivery = $this->createTestDelivery();
+
+        $token = $this->authenticateClient(
+            $client,
+            $admin
+        );
+
+        $client->request(
+            'POST',
+            sprintf(
+                '/api/deliveries/%d/assign/%d',
+                $delivery->getId(),
+                $courier->getId()
+            ),
+            server: [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_AUTHORIZATION' => 'Bearer ' . $token,
+            ]
+        );
+
+        self::assertResponseStatusCodeSame(
+            Response::HTTP_BAD_REQUEST
+        );
+
+        $response = json_decode(
+            $client->getResponse()->getContent(),
+            true
+        );
+
+        self::assertSame(
+            'This courier has not been verified yet.',
+            $response['message']
+        );
+    }
+
     public function testAdminCannotAssignDeliveryToUnavailableCourier(): void
     {
         $client = static::createClient();

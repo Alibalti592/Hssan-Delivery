@@ -80,7 +80,9 @@ final class AdminCourierApiTest extends WebTestCase
             $response['roles']
         );
 
-        self::assertTrue(
+        // Unverified on creation — see AuthService::createCourier and
+        // CourierService::verify, the separate admin-approval step.
+        self::assertFalse(
             $response['verified']
         );
 
@@ -112,7 +114,7 @@ final class AdminCourierApiTest extends WebTestCase
             $courier->getRoles()
         );
 
-        self::assertTrue(
+        self::assertFalse(
             $courier->isVerified()
         );
 
@@ -773,6 +775,140 @@ final class AdminCourierApiTest extends WebTestCase
         );
 
         self::assertTrue($response['isActive']);
+    }
+
+    public function testAdminCanVerifyAnUnverifiedCourier(): void
+    {
+        $client = static::createClient();
+
+        $this->entityManager = self::getContainer()
+            ->get(EntityManagerInterface::class);
+
+        $admin = $this->createTestUser(
+            'ROLE_ADMIN',
+            'Test Admin'
+        );
+
+        $courier = $this->createTestUser(
+            'ROLE_LIVREUR',
+            'Pending Courier'
+        );
+
+        // createTestUser verifies by default (see its docblock-free
+        // implementation above) — this test is specifically about the
+        // real-world unverified case AuthService::createCourier now leaves
+        // couriers in, so undo that here rather than adding a parameter
+        // every other test in this file would have to pass through.
+        $courier->setVerifiedAt(null);
+        $this->entityManager->flush();
+
+        $adminToken = $this->authenticateClient(
+            $client,
+            $admin
+        );
+
+        $client->request(
+            'PATCH',
+            '/api/admin/couriers/'.$courier->getId().'/verify',
+            server: [
+                'HTTP_AUTHORIZATION' => 'Bearer '.$adminToken,
+            ]
+        );
+
+        self::assertResponseStatusCodeSame(
+            Response::HTTP_OK
+        );
+
+        $response = json_decode(
+            $client->getResponse()->getContent(),
+            true
+        );
+
+        self::assertTrue($response['verified']);
+
+        $this->entityManager->clear();
+
+        $verified = $this->entityManager
+            ->getRepository(User::class)
+            ->find($courier->getId());
+
+        self::assertTrue($verified->isVerified());
+    }
+
+    public function testNonAdminCannotVerifyCourier(): void
+    {
+        $client = static::createClient();
+
+        $this->entityManager = self::getContainer()
+            ->get(EntityManagerInterface::class);
+
+        $user = $this->createTestUser(
+            'ROLE_USER',
+            'Test Client'
+        );
+
+        $courier = $this->createTestUser(
+            'ROLE_LIVREUR',
+            'Pending Courier'
+        );
+
+        $courier->setVerifiedAt(null);
+        $this->entityManager->flush();
+
+        $token = $this->authenticateClient(
+            $client,
+            $user
+        );
+
+        $client->request(
+            'PATCH',
+            '/api/admin/couriers/'.$courier->getId().'/verify',
+            server: [
+                'HTTP_AUTHORIZATION' => 'Bearer '.$token,
+            ]
+        );
+
+        self::assertResponseStatusCodeSame(
+            Response::HTTP_FORBIDDEN
+        );
+
+        $this->entityManager->clear();
+
+        $unchanged = $this->entityManager
+            ->getRepository(User::class)
+            ->find($courier->getId());
+
+        self::assertFalse($unchanged->isVerified());
+    }
+
+    public function testVerifyingAnUnknownCourierReturns404(): void
+    {
+        $client = static::createClient();
+
+        $this->entityManager = self::getContainer()
+            ->get(EntityManagerInterface::class);
+
+        $admin = $this->createTestUser(
+            'ROLE_ADMIN',
+            'Test Admin'
+        );
+
+        $adminToken = $this->authenticateClient(
+            $client,
+            $admin
+        );
+
+        $client->request(
+            'PATCH',
+            '/api/admin/couriers/999999/verify',
+            server: [
+                'HTTP_AUTHORIZATION' => 'Bearer '.$adminToken,
+            ]
+        );
+
+        self::assertResponseStatusCodeSame(
+            Response::HTTP_NOT_FOUND
+        );
     }
 
     public function testNonAdminCannotDeactivateCourier(): void

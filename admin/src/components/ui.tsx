@@ -79,6 +79,14 @@ export function ActiveBadge({ isActive }: { isActive: boolean }) {
   );
 }
 
+export function VerifiedBadge({ verified }: { verified: boolean }) {
+  return (
+    <span className={`badge${verified ? '' : ' warn'}`}>
+      {verified ? 'Verified' : 'Pending approval'}
+    </span>
+  );
+}
+
 const ORDER_STATUS_TONE: Record<string, 'default' | 'warn' | 'closed' | 'muted'> = {
   PENDING: 'muted',
   CONFIRMED: 'warn',

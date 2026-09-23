@@ -70,6 +70,14 @@ An admin can deactivate a courier account (e.g. one who has left) without deleti
 it. A deactivated account can no longer log in, and can no longer be assigned new
 deliveries — attempting either returns an explicit error rather than failing silently.
 
+A courier account starts unverified when created and needs a separate admin
+approval step (PATCH /api/admin/couriers/{id}/verify, or the "Verify courier"
+button in the admin dashboard) before DeliveryService will let it be assigned
+a delivery — creating the account and approving it to actually work are two
+different admin actions, not one. The courier can still log in while
+unverified; only assignment/reassignment is blocked, with the same explicit
+error as the deactivated case above rather than a silent no-op.
+
 A courier can:
 
 view assigned deliveries
@@ -219,6 +227,7 @@ POST  /api/admin/couriers
 GET   /api/admin/couriers
 GET   /api/admin/couriers/{id}
 GET   /api/admin/couriers/locations
+PATCH /api/admin/couriers/{id}/verify
 PATCH /api/admin/couriers/{id}/active
 PATCH /api/admin/couriers/{id}/password
 Admin promotion management
@@ -796,6 +805,10 @@ confusing 400 on their next action
 a courier still working a delivery (accepted/picked up/on the way) is
 notified when an admin cancels it out from under them, not just the
 client — same event, same listener
+a newly created courier account starts unverified and cannot be assigned
+or reassigned a delivery until an admin separately approves it via PATCH
+/api/admin/couriers/{id}/verify — being admin-created was never the same
+as being admin-approved, even though both previously happened at once
 
 It also contains unit tests for the pure logic that backs those workflows: the
 decimal/millimes money conversion, the delivery-to-order status mapping, and
@@ -813,8 +826,8 @@ php bin/phpunit
 
 Current baseline:
 
-264 tests
-1521 assertions
+268 tests
+1541 assertions
 
 Tests share a single Postgres database rather than running each in its own
 transaction, so re-running `php bin/phpunit` without resetting the database
