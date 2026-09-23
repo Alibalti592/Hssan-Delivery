@@ -87,7 +87,9 @@ class _HssanDeliveryAppState extends State<HssanDeliveryApp> {
       NotificationsRepository(_api),
       onOrderTap: (orderId) {
         _navigatorKey.currentState?.push(
-          MaterialPageRoute(builder: (_) => OrderDetailScreen(orderId: orderId)),
+          MaterialPageRoute(
+            builder: (_) => OrderDetailScreen(orderId: orderId),
+          ),
         );
       },
       onDeliveryTap: (deliveryId) async {

@@ -16,7 +16,11 @@ import 'notifications_repository.dart';
 /// broken or unreachable push setup must never block sign-in, sign-out, or
 /// any other app flow that happens to touch it.
 class PushNotificationService {
-  PushNotificationService(this._repository, {this.onOrderTap, this.onDeliveryTap});
+  PushNotificationService(
+    this._repository, {
+    this.onOrderTap,
+    this.onDeliveryTap,
+  });
 
   final NotificationsRepository _repository;
 
@@ -120,7 +124,8 @@ class PushNotificationService {
     messengerKey.currentState?.showSnackBar(
       SnackBar(
         content: Text(text),
-        action: (message.data['orderId'] != null ||
+        action:
+            (message.data['orderId'] != null ||
                 message.data['deliveryId'] != null)
             ? SnackBarAction(label: 'VOIR', onPressed: () => handleTap(message))
             : null,
