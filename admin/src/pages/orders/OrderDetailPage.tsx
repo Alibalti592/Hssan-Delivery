@@ -32,7 +32,10 @@ export default function OrderDetailPage() {
   const cancel = useMutation({
     mutationFn: () => deliveriesApi.cancel(data!.deliveryId!),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['orders', orderId] });
+      // Bare ['orders'] (not ['orders', orderId]) so this also covers
+      // OrdersListPage's ['orders', page] key — a narrower invalidation
+      // left the list showing the pre-cancel status until a hard refresh.
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
       queryClient.invalidateQueries({ queryKey: ['deliveries'] });
     },
   });

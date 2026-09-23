@@ -311,6 +311,7 @@ final class DeliveryService
     private function transitionWithLock(Delivery $delivery, callable $transition): Delivery
     {
         $previousStatus = $delivery->getStatus();
+        $previousCourier = $delivery->getCourier();
 
         $delivery = $this->entityManager->wrapInTransaction(function () use ($delivery, $transition) {
             $this->entityManager->lock($delivery, LockMode::PESSIMISTIC_WRITE);
@@ -324,7 +325,9 @@ final class DeliveryService
         });
 
         if ($delivery->getStatus() !== $previousStatus) {
-            $this->eventDispatcher->dispatch(new DeliveryStatusChangedEvent($delivery, $previousStatus));
+            $this->eventDispatcher->dispatch(
+                new DeliveryStatusChangedEvent($delivery, $previousStatus, $previousCourier)
+            );
         }
 
         return $delivery;

@@ -776,6 +776,15 @@ App\Validator\PhoneFormat instead of just non-blank — "abc" is no longer a
 valid phone number; the mobile app enforces the same pattern client-side
 (mobile/lib/core/phone_format.dart) on the login, register, and parcel
 recipient-phone fields
+on a reassignment, the courier who lost the delivery is notified ("Course
+réassignée"), not just the one who gained it — DeliveryStatusChangedEvent
+now carries the pre-transition courier (App\Event\DeliveryStatusChangedEvent::$previousCourier)
+so DeliveryNotificationListener can tell a reassignment apart from a fresh
+assignment; without this a displaced courier only found out via a
+confusing 400 on their next action
+a courier still working a delivery (accepted/picked up/on the way) is
+notified when an admin cancels it out from under them, not just the
+client — same event, same listener
 
 It also contains unit tests for the pure logic that backs those workflows: the
 decimal/millimes money conversion, the delivery-to-order status mapping, and
@@ -793,8 +802,8 @@ php bin/phpunit
 
 Current baseline:
 
-260 tests
-1509 assertions
+264 tests
+1521 assertions
 
 Tests share a single Postgres database rather than running each in its own
 transaction, so re-running `php bin/phpunit` without resetting the database

@@ -33,29 +33,33 @@ export default function DeliveryDetailPage() {
   const couriers = useQuery({ queryKey: ['couriers', 'all'], queryFn: () => couriersApi.list({ limit: 100 }) });
   const activeCouriers = couriers.data?.items.filter((c) => c.isActive) ?? [];
 
+  // Shared by assign/reassign/cancel below: all three run
+  // DeliveryService::syncOrderStatus on the backend, so the parent order's
+  // status changes too (see DeliveryStatus::toOrderStatus) — without
+  // invalidating the orders queries as well, OrderDetailPage/OrdersListPage
+  // would keep showing the pre-action status until a hard refresh.
+  const invalidateAfterDeliveryAction = () => {
+    queryClient.invalidateQueries({ queryKey: ['deliveries', deliveryId] });
+    queryClient.invalidateQueries({ queryKey: ['deliveries'] });
+    queryClient.invalidateQueries({ queryKey: ['orders'] });
+  };
+
   const assign = useMutation({
     mutationFn: () => deliveriesApi.assign(deliveryId, Number(courierId)),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['deliveries', deliveryId] });
-      queryClient.invalidateQueries({ queryKey: ['deliveries'] });
-    },
+    onSuccess: invalidateAfterDeliveryAction,
   });
 
   const reassign = useMutation({
     mutationFn: () => deliveriesApi.reassign(deliveryId, Number(courierId)),
     onSuccess: () => {
       setCourierId('');
-      queryClient.invalidateQueries({ queryKey: ['deliveries', deliveryId] });
-      queryClient.invalidateQueries({ queryKey: ['deliveries'] });
+      invalidateAfterDeliveryAction();
     },
   });
 
   const cancel = useMutation({
     mutationFn: () => deliveriesApi.cancel(deliveryId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['deliveries', deliveryId] });
-      queryClient.invalidateQueries({ queryKey: ['deliveries'] });
-    },
+    onSuccess: invalidateAfterDeliveryAction,
   });
 
   const courierName = (id: number | null) =>
