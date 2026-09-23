@@ -516,6 +516,18 @@ documented in mobile/lib/config.dart — so this doesn't require a Firebase
 account to develop, and a failed or skipped push never blocks the
 delivery/order action that triggered it.
 
+Tapping a push navigates to the relevant screen — an order-status push
+opens OrderDetailScreen(orderId), a new-delivery push opens
+DeliveryDetailScreen(deliveryId), refreshing DeliveriesController first so
+a courier deep-linking in cold (app fully terminated) can find it in the
+list. This is wired for all three ways a tap can reach the app: already in
+the foreground (a "VOIR" SnackBarAction), resumed from the background
+(FirebaseMessaging.onMessageOpenedApp), and a cold start where the tap is
+what launched the app (FirebaseMessaging.instance.getInitialMessage(),
+checked once during PushNotificationService.initialize()). See
+PushNotificationService.handleTap, routed off the `orderId`/`deliveryId`
+already present in each notification's data payload above.
+
 Client order cancellation
 
 A client can cancel their own order via POST /api/orders/{id}/cancel while

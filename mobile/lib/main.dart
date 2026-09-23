@@ -9,6 +9,7 @@ import 'auth/login_screen.dart';
 import 'cart/cart.dart';
 import 'catalogue/catalogue_repository.dart';
 import 'client/client_home_screen.dart';
+import 'client/order_detail_screen.dart';
 import 'config.dart';
 import 'core/api_client.dart';
 import 'courier_location/courier_location_repository.dart';
@@ -18,6 +19,7 @@ import 'core/sentry_scrubbing.dart';
 import 'core/token_storage.dart';
 import 'dashboard/dashboard_screen.dart';
 import 'deliveries/deliveries_controller.dart';
+import 'deliveries/delivery_detail_screen.dart';
 import 'deliveries/delivery_repository.dart';
 import 'notifications/notifications_repository.dart';
 import 'notifications/push_notification_service.dart';
@@ -52,6 +54,8 @@ class HssanDeliveryApp extends StatefulWidget {
 }
 
 class _HssanDeliveryAppState extends State<HssanDeliveryApp> {
+  final _navigatorKey = GlobalKey<NavigatorState>();
+
   late final AuthController _auth;
   late final ApiClient _api;
   late final PushNotificationService _pushNotifications;
@@ -73,7 +77,31 @@ class _HssanDeliveryAppState extends State<HssanDeliveryApp> {
       tokenProvider: () => _auth.token,
       onUnauthorized: () => _auth.onUnauthorized(),
     );
-    _pushNotifications = PushNotificationService(NotificationsRepository(_api));
+    // Both callbacks close over fields assigned later in this initState
+    // (_deliveries below) or never during it (_navigatorKey's Navigator only
+    // exists once MaterialApp has built) — safe here the same way the
+    // tokenProvider/onUnauthorized closures above close over _auth, since
+    // neither callback actually runs until a push arrives well after this
+    // method returns.
+    _pushNotifications = PushNotificationService(
+      NotificationsRepository(_api),
+      onOrderTap: (orderId) {
+        _navigatorKey.currentState?.push(
+          MaterialPageRoute(builder: (_) => OrderDetailScreen(orderId: orderId)),
+        );
+      },
+      onDeliveryTap: (deliveryId) async {
+        // Refreshed first so DeliveryDetailScreen's controller.byId lookup
+        // (see deliveries_controller.dart) can find it even on a cold start,
+        // before anything else has loaded the courier's delivery list.
+        await _deliveries.refresh();
+        _navigatorKey.currentState?.push(
+          MaterialPageRoute(
+            builder: (_) => DeliveryDetailScreen(deliveryId: deliveryId),
+          ),
+        );
+      },
+    );
     _auth = AuthController(
       repository: AuthRepository(_api),
       storage: TokenStorage(),
@@ -119,6 +147,7 @@ class _HssanDeliveryAppState extends State<HssanDeliveryApp> {
       child: MaterialApp(
         title: 'Delivery Hassen',
         debugShowCheckedModeBanner: false,
+        navigatorKey: _navigatorKey,
         scaffoldMessengerKey: _pushNotifications.messengerKey,
         theme: buildTheme(Brightness.light),
         darkTheme: buildTheme(Brightness.dark),
