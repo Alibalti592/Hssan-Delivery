@@ -4,7 +4,16 @@ import { Link, useParams } from 'react-router-dom';
 import { couriersApi, deliveriesApi } from '../../api/resources';
 import { PageHeader, Loading, ErrorBanner, Breadcrumb, StatusBadge, formatDate } from '../../components/ui';
 
-const CANCELLABLE = ['PENDING', 'ASSIGNED'];
+// Matches the backend's actual latitude (see DeliveryService::cancelDeliveryAsAdmin):
+// admin can cancel from any non-terminal status, not just before a courier
+// has accepted — otherwise a delivery stuck with an unresponsive courier
+// (ACCEPTED/PICKED_UP/ON_THE_WAY) would have no way out except reassigning.
+const CANCELLABLE = ['PENDING', 'ASSIGNED', 'ACCEPTED', 'PICKED_UP', 'ON_THE_WAY'];
+
+// Statuses where a *different* courier can be handed the delivery (see
+// DeliveryService::reassignCourier) — PENDING uses the plain assign flow
+// below instead, since there's no current courier to replace.
+const REASSIGNABLE = ['ASSIGNED', 'ACCEPTED', 'PICKED_UP', 'ON_THE_WAY'];
 
 export default function DeliveryDetailPage() {
   const { id } = useParams();
@@ -32,6 +41,15 @@ export default function DeliveryDetailPage() {
     },
   });
 
+  const reassign = useMutation({
+    mutationFn: () => deliveriesApi.reassign(deliveryId, Number(courierId)),
+    onSuccess: () => {
+      setCourierId('');
+      queryClient.invalidateQueries({ queryKey: ['deliveries', deliveryId] });
+      queryClient.invalidateQueries({ queryKey: ['deliveries'] });
+    },
+  });
+
   const cancel = useMutation({
     mutationFn: () => deliveriesApi.cancel(deliveryId),
     onSuccess: () => {
@@ -50,7 +68,7 @@ export default function DeliveryDetailPage() {
         <Breadcrumb
           items={[{ label: 'Deliveries', to: '/deliveries' }, { label: delivery.data ? `#${delivery.data.id}` : '…' }]}
         />
-        <ErrorBanner error={delivery.error || assign.error || cancel.error} />
+        <ErrorBanner error={delivery.error || assign.error || reassign.error || cancel.error} />
         {delivery.isLoading ? (
           <Loading />
         ) : delivery.data ? (
@@ -103,31 +121,46 @@ export default function DeliveryDetailPage() {
                 )}
               </div>
 
-              {delivery.data.status === 'PENDING' && (
+              {(delivery.data.status === 'PENDING' || REASSIGNABLE.includes(delivery.data.status)) && (
                 <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', marginBottom: 14 }}>
                   <div className="field-group" style={{ flex: 1, marginBottom: 0 }}>
-                    <label className="field-label">Assign to courier</label>
+                    <label className="field-label">
+                      {delivery.data.status === 'PENDING' ? 'Assign to courier' : 'Reassign to a different courier'}
+                    </label>
                     <select
                       className="field-select"
                       value={courierId}
                       onChange={(e) => setCourierId(Number(e.target.value))}
                     >
                       <option value="">Select a courier…</option>
-                      {activeCouriers.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.name} ({c.phone})
-                        </option>
-                      ))}
+                      {activeCouriers
+                        .filter((c) => delivery.data.status === 'PENDING' || c.id !== delivery.data.courierId)
+                        .map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.name} ({c.phone})
+                          </option>
+                        ))}
                     </select>
                   </div>
-                  <button
-                    type="button"
-                    className="btn"
-                    disabled={!courierId || assign.isPending}
-                    onClick={() => assign.mutate()}
-                  >
-                    {assign.isPending ? 'Assigning…' : 'Assign'}
-                  </button>
+                  {delivery.data.status === 'PENDING' ? (
+                    <button
+                      type="button"
+                      className="btn"
+                      disabled={!courierId || assign.isPending}
+                      onClick={() => assign.mutate()}
+                    >
+                      {assign.isPending ? 'Assigning…' : 'Assign'}
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className="btn"
+                      disabled={!courierId || reassign.isPending}
+                      onClick={() => reassign.mutate()}
+                    >
+                      {reassign.isPending ? 'Reassigning…' : 'Reassign'}
+                    </button>
+                  )}
                 </div>
               )}
 

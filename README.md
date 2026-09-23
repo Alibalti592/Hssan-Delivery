@@ -176,6 +176,16 @@ courier deactivated mid-delivery can never finish or fail it, and only the
 admin's wider cancel gives that delivery (and its order) a way out. See
 DeliveryService::cancelDelivery vs. cancelDeliveryAsAdmin.
 
+An admin also has POST /api/deliveries/{id}/reassign/{courierId} for the
+same unresponsive-courier scenario without cancelling the order outright:
+it works from ASSIGNED/ACCEPTED/PICKED_UP/ON_THE_WAY (not PENDING — use
+assign for that), hands the delivery to a different courier, and resets it
+to ASSIGNED so the new courier goes through their own accept/pick-up/on
+the way flow rather than inheriting state from whoever had it before. Both
+assign and reassign refuse a courier who already has another active
+delivery (PENDING/ASSIGNED/ACCEPTED/PICKED_UP/ON_THE_WAY) — see
+DeliveryService::assertCourierAvailableForAssignment.
+
 Order / Delivery synchronization
 
 Delivery transitions synchronize the associated order status.
@@ -267,6 +277,7 @@ Delivery management
 GET  /api/deliveries/mine
 
 POST /api/deliveries/{id}/assign/{courierId}
+POST /api/deliveries/{id}/reassign/{courierId}
 POST /api/deliveries/{id}/accept
 POST /api/deliveries/{id}/decline
 POST /api/deliveries/{id}/pickup
@@ -735,6 +746,14 @@ an admin cannot assign a delivery to a courier who has toggled themselves
 unavailable, matching what the courier map's ONLINE/OFFLINE badge shows
 two concurrent registrations (or admin-created courier accounts) with the
 same phone number both get a clean 409, not a raw DB exception for the loser
+a courier can't be assigned a second active delivery while already working
+one — assign/reassign both check for an existing active delivery, with the
+courier row locked so two concurrent assignments to the same courier can't
+both slip past the check before either commits
+an admin can reassign an in-progress delivery (assigned/accepted/picked
+up/on the way) to a different courier without cancelling the customer's
+order — for when the original courier goes unresponsive; the new courier
+starts fresh from "assigned" and goes through their own accept/pick-up flow
 
 It also contains unit tests for the pure logic that backs those workflows: the
 decimal/millimes money conversion, the delivery-to-order status mapping, and
@@ -752,8 +771,8 @@ php bin/phpunit
 
 Current baseline:
 
-240 tests
-1448 assertions
+245 tests
+1492 assertions
 
 Tests share a single Postgres database rather than running each in its own
 transaction, so re-running `php bin/phpunit` without resetting the database
