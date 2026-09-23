@@ -286,6 +286,82 @@ void main() {
 
       expect(error, 'Mot de passe actuel incorrect.');
     });
+
+    test('onUnauthorized ends the session and calls onSessionEnded', () async {
+      final storage = _MemoryTokenStorage();
+      var sessionEndedCalls = 0;
+      final mock = MockClient((request) async {
+        if (request.url.path == '/api/auth/login') {
+          return _json({'token': 'jwt-1'});
+        }
+        if (request.url.path == '/api/auth/me') {
+          return _json({
+            'id': 1,
+            'name': 'Test',
+            'phone': '21000002',
+            'roles': ['ROLE_CLIENT'],
+            'isVerified': true,
+          });
+        }
+        return _json({'message': 'unexpected'}, 404);
+      });
+
+      final auth = AuthController(
+        repository: AuthRepository(
+          ApiClient(
+            tokenProvider: () => 'jwt-1',
+            onUnauthorized: () {},
+            httpClient: mock,
+          ),
+        ),
+        storage: storage,
+        onSessionEnded: () => sessionEndedCalls++,
+      );
+
+      await auth.signIn('21000002', 'password123');
+      expect(auth.status, AuthStatus.signedIn);
+      expect(sessionEndedCalls, 0);
+
+      // Fire-and-forget in AuthController (not awaited by the ApiClient's
+      // own onUnauthorized callback either) — give the underlying
+      // _discard() a beat to actually finish before asserting.
+      auth.onUnauthorized();
+      await Future<void>.delayed(Duration.zero);
+
+      expect(auth.status, AuthStatus.signedOut);
+      expect(sessionEndedCalls, 1);
+    });
+
+    test('onUnauthorized is a no-op when not signed in', () async {
+      var sessionEndedCalls = 0;
+      final auth = AuthController(
+        repository: AuthRepository(
+          ApiClient(tokenProvider: () => null, onUnauthorized: () {}),
+        ),
+        storage: _MemoryTokenStorage(),
+        onSessionEnded: () => sessionEndedCalls++,
+      );
+
+      auth.onUnauthorized();
+      await Future<void>.delayed(Duration.zero);
+
+      expect(sessionEndedCalls, 0);
+    });
+
+    test('signOut calls onSessionEnded', () async {
+      var sessionEndedCalls = 0;
+      final auth = AuthController(
+        repository: AuthRepository(
+          ApiClient(tokenProvider: () => null, onUnauthorized: () {}),
+        ),
+        storage: _MemoryTokenStorage(),
+        onSessionEnded: () => sessionEndedCalls++,
+      );
+
+      await auth.signOut();
+
+      expect(sessionEndedCalls, 1);
+    });
   });
 
   group('DeliveriesController', () {

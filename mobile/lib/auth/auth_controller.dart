@@ -15,6 +15,7 @@ class AuthController extends ChangeNotifier {
     required AuthRepository repository,
     required TokenStorage storage,
     PushNotificationService? pushNotifications,
+    this.onSessionEnded,
   }) : _repository = repository,
        _storage = storage,
        _pushNotifications = pushNotifications;
@@ -22,6 +23,16 @@ class AuthController extends ChangeNotifier {
   final AuthRepository _repository;
   final TokenStorage _storage;
   final PushNotificationService? _pushNotifications;
+
+  /// Called whenever the session ends, whether from a 401
+  /// (onUnauthorized) or a manual signOut(). _Root (main.dart) swapping
+  /// what MaterialApp.home renders only replaces the bottom-most route —
+  /// anything the user had Navigator.push'ed on top (an order detail
+  /// screen, say) stays on top of it, stranding them on a now-broken
+  /// screen instead of showing LoginScreen. This callback is the caller's
+  /// chance to pop back to that bottom route so the swap is actually
+  /// visible; a no-op if there was nothing pushed to pop.
+  final VoidCallback? onSessionEnded;
 
   AuthStatus _status = AuthStatus.unknown;
   Account? _account;
@@ -174,6 +185,7 @@ class AuthController extends ChangeNotifier {
     _token = null;
     _account = null;
     _set(AuthStatus.signedOut);
+    onSessionEnded?.call();
   }
 
   void _set(AuthStatus status) {

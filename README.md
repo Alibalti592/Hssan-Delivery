@@ -532,6 +532,17 @@ checked once during PushNotificationService.initialize()). See
 PushNotificationService.handleTap, routed off the `orderId`/`deliveryId`
 already present in each notification's data payload above.
 
+A 401 mid-session (an expired/invalid token on any request) signs the user
+out and pops back to the app's root route
+(AuthController.onSessionEnded, wired in main.dart to the same
+navigatorKey the push-tap routing above uses). Without this, a screen
+reached via Navigator.push — an order detail, say, opened from a list or
+from tapping a push notification — stayed on top of the stack after
+_Root swapped to LoginScreen underneath it, stranding the user on a now-
+broken screen instead of showing them the login screen. The same callback
+fires on a manual sign-out too, which was already always at the
+navigation root, so it's a no-op there.
+
 Client order cancellation
 
 A client can cancel their own order via POST /api/orders/{id}/cancel while
