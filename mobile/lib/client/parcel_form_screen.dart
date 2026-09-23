@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../addresses/address_models.dart';
 import '../core/api_exception.dart';
+import '../core/phone_format.dart';
 import '../orders/order_models.dart';
 import '../orders/orders_repository.dart';
 import '../widgets/dark_header.dart';
@@ -171,9 +172,7 @@ class _ParcelFormScreenState extends State<ParcelFormScreen> {
                         decoration: const InputDecoration(
                           labelText: 'Téléphone du destinataire',
                         ),
-                        validator: (v) => (v == null || v.trim().isEmpty)
-                            ? 'Téléphone requis'
-                            : null,
+                        validator: validatePhone,
                       ),
                       const SizedBox(height: 16),
                       FutureBuilder<List<DeliveryZoneOption>>(

@@ -132,7 +132,7 @@ void main() {
 
     expect(find.text('Adresse requise'), findsNWidgets(2));
     expect(find.text('Nom requis'), findsOneWidget);
-    expect(find.text('Téléphone requis'), findsOneWidget);
+    expect(find.text('Numéro requis'), findsOneWidget);
     expect(find.byType(OrderConfirmedScreen), findsNothing);
   });
 }

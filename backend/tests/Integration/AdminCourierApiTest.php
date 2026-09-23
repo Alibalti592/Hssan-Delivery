@@ -1108,9 +1108,8 @@ final class AdminCourierApiTest extends WebTestCase
 
     private function uniquePhone(): string
     {
-        return '2'.random_int(
-            10000000,
-            99999999
-        );
+        // 8 digits starting 2-9, matching PhoneFormat::PATTERN — anything
+        // else now fails CreateCourierRequest's format validation.
+        return (string) random_int(20000000, 99999999);
     }
 }

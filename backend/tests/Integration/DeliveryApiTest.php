@@ -374,6 +374,66 @@ final class DeliveryApiTest extends WebTestCase
         );
     }
 
+    /**
+     * Closes the double-booking gap: assignCourier previously only checked
+     * role/isActive/isAvailable, never whether the courier already had an
+     * in-progress delivery — so an admin could pile several concurrent
+     * deliveries onto one courier.
+     */
+    public function testAdminCannotAssignDeliveryToCourierWithAnActiveDelivery(): void
+    {
+        $client = static::createClient();
+
+        $this->entityManager = self::getContainer()
+            ->get(EntityManagerInterface::class);
+
+        $admin = $this->createTestUser('ROLE_ADMIN', 'Test Admin');
+        $courier = $this->createTestUser('ROLE_LIVREUR', 'Busy Courier');
+
+        $firstDelivery = $this->createTestDelivery();
+        $secondDelivery = $this->createTestDelivery();
+
+        $token = $this->authenticateClient($client, $admin);
+
+        $client->request(
+            'POST',
+            sprintf('/api/deliveries/%d/assign/%d', $firstDelivery->getId(), $courier->getId()),
+            server: [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_AUTHORIZATION' => 'Bearer ' . $token,
+            ]
+        );
+
+        self::assertResponseStatusCodeSame(Response::HTTP_OK);
+
+        $client->request(
+            'POST',
+            sprintf('/api/deliveries/%d/assign/%d', $secondDelivery->getId(), $courier->getId()),
+            server: [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_AUTHORIZATION' => 'Bearer ' . $token,
+            ]
+        );
+
+        self::assertResponseStatusCodeSame(Response::HTTP_BAD_REQUEST);
+
+        $response = json_decode($client->getResponse()->getContent(), true);
+
+        self::assertSame(
+            'This courier already has an active delivery.',
+            $response['message']
+        );
+
+        $this->entityManager->clear();
+
+        $savedSecondDelivery = $this->entityManager
+            ->getRepository(Delivery::class)
+            ->find($secondDelivery->getId());
+
+        self::assertSame(DeliveryStatus::PENDING, $savedSecondDelivery->getStatus());
+        self::assertNull($savedSecondDelivery->getCourier());
+    }
+
     public function testCourierCanCompleteDeliveryLifecycle(): void
     {
         $client = static::createClient();
@@ -883,7 +943,7 @@ final class DeliveryApiTest extends WebTestCase
 
         $adminToken = $this->authenticateClient($client, $admin);
 
-        foreach ($deliveries as $delivery) {
+        foreach ($deliveries as $index => $delivery) {
             $client->request(
                 'POST',
                 sprintf('/api/deliveries/%d/assign/%d', $delivery->getId(), $courier->getId()),
@@ -894,6 +954,25 @@ final class DeliveryApiTest extends WebTestCase
             );
 
             self::assertResponseStatusCodeSame(Response::HTTP_OK);
+
+            // A courier can only have one active delivery at a time (see
+            // testAdminCannotAssignDeliveryToCourierWithAnActiveDelivery) —
+            // cancel each one before assigning the next so this test can
+            // still put 3 delivery rows under the same courier. Cancelling
+            // doesn't clear the courier reference, so all 3 still show up
+            // in /deliveries/mine below, which is all this test cares about.
+            if ($index < count($deliveries) - 1) {
+                $client->request(
+                    'POST',
+                    sprintf('/api/deliveries/%d/cancel', $delivery->getId()),
+                    server: [
+                        'CONTENT_TYPE' => 'application/json',
+                        'HTTP_AUTHORIZATION' => 'Bearer ' . $adminToken,
+                    ]
+                );
+
+                self::assertResponseStatusCodeSame(Response::HTTP_OK);
+            }
         }
 
         $courierToken = $this->authenticateClient($client, $courier);
@@ -1067,6 +1146,201 @@ final class DeliveryApiTest extends WebTestCase
             $orderId,
             OrderStatus::CANCELLED
         );
+    }
+
+    /**
+     * The reassign counterpart to admin-cancel above: when a courier goes
+     * unresponsive mid-delivery, an admin needs a way to hand the delivery
+     * to someone else without killing the customer's order. Resets to
+     * ASSIGNED and clears accepted/picked-up timestamps — the new courier
+     * hasn't touched this delivery yet and needs to accept it themselves.
+     */
+    public function testAdminCanReassignInProgressDeliveryToAnotherCourier(): void
+    {
+        $client = static::createClient();
+
+        $this->entityManager = self::getContainer()
+            ->get(EntityManagerInterface::class);
+
+        $admin = $this->createTestUser('ROLE_ADMIN', 'Test Admin');
+        $courier = $this->createTestUser('ROLE_LIVREUR', 'Unresponsive Courier');
+        $otherCourier = $this->createTestUser('ROLE_LIVREUR', 'Rescue Courier');
+
+        $delivery = $this->createTestDelivery();
+        $orderId = $delivery->getOrder()->getId();
+
+        $adminToken = $this->authenticateClient($client, $admin);
+
+        $client->request(
+            'POST',
+            sprintf('/api/deliveries/%d/assign/%d', $delivery->getId(), $courier->getId()),
+            server: [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_AUTHORIZATION' => 'Bearer ' . $adminToken,
+            ]
+        );
+
+        self::assertResponseStatusCodeSame(Response::HTTP_OK);
+
+        $courierToken = $this->authenticateClient($client, $courier);
+
+        foreach (['accept', 'pickup'] as $action) {
+            $client->request(
+                'POST',
+                sprintf('/api/deliveries/%d/%s', $delivery->getId(), $action),
+                server: [
+                    'CONTENT_TYPE' => 'application/json',
+                    'HTTP_AUTHORIZATION' => 'Bearer ' . $courierToken,
+                ]
+            );
+
+            self::assertResponseStatusCodeSame(Response::HTTP_OK);
+        }
+
+        $client->request(
+            'POST',
+            sprintf('/api/deliveries/%d/reassign/%d', $delivery->getId(), $otherCourier->getId()),
+            server: [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_AUTHORIZATION' => 'Bearer ' . $adminToken,
+            ]
+        );
+
+        self::assertResponseStatusCodeSame(Response::HTTP_OK);
+
+        $response = json_decode($client->getResponse()->getContent(), true);
+
+        self::assertSame(DeliveryStatus::ASSIGNED->value, $response['status']);
+        self::assertSame($otherCourier->getId(), $response['courierId']);
+        self::assertNotNull($response['assignedAt']);
+        self::assertNull($response['acceptedAt']);
+        self::assertNull($response['pickedUpAt']);
+
+        $this->assertOrderStatus($orderId, OrderStatus::CONFIRMED);
+
+        // The original courier is freed up — no longer blocked from taking
+        // on a new delivery by the capacity check.
+        $this->entityManager->clear();
+
+        $freedCourier = $this->entityManager->getRepository(User::class)->find($courier->getId());
+
+        self::assertNotNull($freedCourier);
+    }
+
+    public function testAdminCannotReassignPendingDelivery(): void
+    {
+        $client = static::createClient();
+
+        $this->entityManager = self::getContainer()
+            ->get(EntityManagerInterface::class);
+
+        $admin = $this->createTestUser('ROLE_ADMIN', 'Test Admin');
+        $courier = $this->createTestUser('ROLE_LIVREUR', 'Test Courier');
+
+        $delivery = $this->createTestDelivery();
+
+        $token = $this->authenticateClient($client, $admin);
+
+        $client->request(
+            'POST',
+            sprintf('/api/deliveries/%d/reassign/%d', $delivery->getId(), $courier->getId()),
+            server: [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_AUTHORIZATION' => 'Bearer ' . $token,
+            ]
+        );
+
+        self::assertResponseStatusCodeSame(Response::HTTP_BAD_REQUEST);
+
+        $response = json_decode($client->getResponse()->getContent(), true);
+
+        self::assertSame(
+            'This delivery cannot be reassigned at its current status.',
+            $response['message']
+        );
+    }
+
+    public function testAdminCannotReassignToCourierWithAnActiveDelivery(): void
+    {
+        $client = static::createClient();
+
+        $this->entityManager = self::getContainer()
+            ->get(EntityManagerInterface::class);
+
+        $admin = $this->createTestUser('ROLE_ADMIN', 'Test Admin');
+        $courier = $this->createTestUser('ROLE_LIVREUR', 'Stuck Courier');
+        $busyCourier = $this->createTestUser('ROLE_LIVREUR', 'Already Busy Courier');
+
+        $delivery = $this->createTestDelivery();
+        $otherDelivery = $this->createTestDelivery();
+
+        $adminToken = $this->authenticateClient($client, $admin);
+
+        $client->request(
+            'POST',
+            sprintf('/api/deliveries/%d/assign/%d', $delivery->getId(), $courier->getId()),
+            server: [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_AUTHORIZATION' => 'Bearer ' . $adminToken,
+            ]
+        );
+
+        self::assertResponseStatusCodeSame(Response::HTTP_OK);
+
+        $client->request(
+            'POST',
+            sprintf('/api/deliveries/%d/assign/%d', $otherDelivery->getId(), $busyCourier->getId()),
+            server: [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_AUTHORIZATION' => 'Bearer ' . $adminToken,
+            ]
+        );
+
+        self::assertResponseStatusCodeSame(Response::HTTP_OK);
+
+        $client->request(
+            'POST',
+            sprintf('/api/deliveries/%d/reassign/%d', $delivery->getId(), $busyCourier->getId()),
+            server: [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_AUTHORIZATION' => 'Bearer ' . $adminToken,
+            ]
+        );
+
+        self::assertResponseStatusCodeSame(Response::HTTP_BAD_REQUEST);
+
+        $response = json_decode($client->getResponse()->getContent(), true);
+
+        self::assertSame(
+            'This courier already has an active delivery.',
+            $response['message']
+        );
+    }
+
+    public function testNonAdminCannotReassignDelivery(): void
+    {
+        $client = static::createClient();
+
+        $this->entityManager = self::getContainer()
+            ->get(EntityManagerInterface::class);
+
+        $user = $this->createTestUser('ROLE_USER', 'Test Client');
+        $courier = $this->createTestUser('ROLE_LIVREUR', 'Test Courier');
+
+        $delivery = $this->createTestDelivery();
+
+        $token = $this->authenticateClient($client, $user);
+
+        $client->request(
+            'POST',
+            sprintf('/api/deliveries/%d/reassign/%d', $delivery->getId(), $courier->getId()),
+            server: [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_AUTHORIZATION' => 'Bearer ' . $token,
+            ]
+        );
+
+        self::assertResponseStatusCodeSame(Response::HTTP_FORBIDDEN);
     }
 
     public function testCourierCanDeclineAssignedDelivery(): void

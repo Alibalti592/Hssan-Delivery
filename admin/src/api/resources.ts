@@ -185,6 +185,8 @@ export const deliveriesApi = {
   get: (id: number) => api.get<AdminDelivery>(`/api/admin/deliveries/${id}`),
   assign: (deliveryId: number, courierId: number) =>
     api.post<AdminDelivery>(`/api/deliveries/${deliveryId}/assign/${courierId}`),
+  reassign: (deliveryId: number, courierId: number) =>
+    api.post<AdminDelivery>(`/api/deliveries/${deliveryId}/reassign/${courierId}`),
   cancel: (deliveryId: number) =>
     api.post<AdminDelivery>(`/api/deliveries/${deliveryId}/cancel`),
 };
