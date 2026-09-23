@@ -514,7 +514,11 @@ and the mobile app are inert without a real Firebase project — see
 FIREBASE_CREDENTIALS in backend/.env.example and the FIREBASE_* dart-defines
 documented in mobile/lib/config.dart — so this doesn't require a Firebase
 account to develop, and a failed or skipped push never blocks the
-delivery/order action that triggered it.
+delivery/order action that triggered it. Tokens FCM reports as
+unknown/invalid after a send (app uninstalled, token rotated, etc.) are
+pruned via DeviceTokenRepository::deleteByTokens right after that send —
+without this they'd sit in device_token forever and get retried on every
+future notification.
 
 Tapping a push navigates to the relevant screen — an order-status push
 opens OrderDetailScreen(orderId), a new-delivery push opens
@@ -789,8 +793,8 @@ php bin/phpunit
 
 Current baseline:
 
-258 tests
-1506 assertions
+260 tests
+1509 assertions
 
 Tests share a single Postgres database rather than running each in its own
 transaction, so re-running `php bin/phpunit` without resetting the database

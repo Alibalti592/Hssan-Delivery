@@ -57,7 +57,17 @@ class PushNotificationService
             ->withData($data);
 
         try {
-            $messaging->sendMulticast($message, $tokens);
+            $report = $messaging->sendMulticast($message, $tokens);
+
+            // Tokens FCM reports as unknown/invalid are permanently dead
+            // (app uninstalled, token rotated, etc.) — without pruning them
+            // here they'd sit in device_token forever and get retried on
+            // every future notification to this user.
+            $staleTokens = [...$report->unknownTokens(), ...$report->invalidTokens()];
+
+            if ([] !== $staleTokens) {
+                $this->deviceTokenRepository->deleteByTokens($staleTokens);
+            }
         } catch (\Throwable $e) {
             $this->logger->warning('Push notification failed.', ['exception' => $e]);
         }
