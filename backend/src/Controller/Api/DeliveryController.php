@@ -86,6 +86,44 @@ final class DeliveryController extends AbstractController
     }
 
     #[Route(
+        '/{id}/reassign/{courierId}',
+        name: 'api_delivery_reassign',
+        methods: ['POST']
+    )]
+    #[IsGranted('ROLE_ADMIN')]
+    public function reassign(
+        int $id,
+        int $courierId,
+    ): JsonResponse {
+        $delivery = $this->deliveryRepository->find($id);
+
+        if (null === $delivery) {
+            return $this->json(
+                ['message' => 'Delivery not found.'],
+                Response::HTTP_NOT_FOUND
+            );
+        }
+
+        $courier = $this->userRepository->find($courierId);
+
+        if (null === $courier) {
+            return $this->json(
+                ['message' => 'Courier not found.'],
+                Response::HTTP_NOT_FOUND
+            );
+        }
+
+        $delivery = $this->deliveryService->reassignCourier(
+            $delivery,
+            $courier
+        );
+
+        return $this->json(
+            DeliveryResponse::fromEntity($delivery)
+        );
+    }
+
+    #[Route(
         '/{id}/accept',
         name: 'api_delivery_accept',
         methods: ['POST']

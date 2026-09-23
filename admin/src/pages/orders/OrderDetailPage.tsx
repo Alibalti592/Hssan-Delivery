@@ -1,6 +1,6 @@
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useParams } from 'react-router-dom';
-import { ordersApi } from '../../api/resources';
+import { deliveriesApi, ordersApi } from '../../api/resources';
 import {
   PageHeader,
   Loading,
@@ -12,21 +12,46 @@ import {
   deliveryTypeLabel,
 } from '../../components/ui';
 
+// Mirrors DeliveryDetailPage's CANCELLABLE: an order can be called off any
+// time before it's actually completed or already cancelled. Cancelling goes
+// through the order's 1:1 delivery (see DeliveryService::cancelDeliveryAsAdmin),
+// which every order has from creation — including one still PENDING, before
+// a courier has ever been assigned.
+const ORDER_CANCELLABLE = ['PENDING', 'CONFIRMED', 'PREPARING', 'READY_FOR_PICKUP'];
+
 export default function OrderDetailPage() {
   const { id } = useParams();
   const orderId = Number(id);
+  const queryClient = useQueryClient();
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['orders', orderId],
     queryFn: () => ordersApi.get(orderId),
   });
 
+  const cancel = useMutation({
+    mutationFn: () => deliveriesApi.cancel(data!.deliveryId!),
+    onSuccess: () => {
+      // Bare ['orders'] (not ['orders', orderId]) so this also covers
+      // OrdersListPage's ['orders', page] key — a narrower invalidation
+      // left the list showing the pre-cancel status until a hard refresh.
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      queryClient.invalidateQueries({ queryKey: ['deliveries'] });
+    },
+  });
+
+  const handleCancel = () => {
+    if (window.confirm(`Cancel order #${orderId}? This cannot be undone.`)) {
+      cancel.mutate();
+    }
+  };
+
   return (
     <>
       <PageHeader title={data ? `Order #${data.id}` : 'Order'} />
       <div className="content">
         <Breadcrumb items={[{ label: 'Orders', to: '/orders' }, { label: data ? `#${data.id}` : '…' }]} />
-        <ErrorBanner error={error} />
+        <ErrorBanner error={error || cancel.error} />
         {isLoading ? (
           <Loading />
         ) : data ? (
@@ -84,11 +109,23 @@ export default function OrderDetailPage() {
                 )}
               </div>
 
-              {data.deliveryId && (
-                <Link to={`/deliveries/${data.deliveryId}`} className="btn ghost sm">
-                  View delivery #{data.deliveryId}
-                </Link>
-              )}
+              <div style={{ display: 'flex', gap: 10 }}>
+                {data.deliveryId && (
+                  <Link to={`/deliveries/${data.deliveryId}`} className="btn ghost sm">
+                    View delivery #{data.deliveryId}
+                  </Link>
+                )}
+                {ORDER_CANCELLABLE.includes(data.status) && (
+                  <button
+                    type="button"
+                    className="btn danger sm"
+                    disabled={cancel.isPending || !data.deliveryId}
+                    onClick={handleCancel}
+                  >
+                    {cancel.isPending ? 'Cancelling…' : 'Cancel order'}
+                  </button>
+                )}
+              </div>
             </div>
 
             <div className="card">
