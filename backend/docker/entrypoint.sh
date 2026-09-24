@@ -26,4 +26,17 @@ php bin/console doctrine:migrations:migrate --no-interaction --allow-no-migratio
 # whatever existed then.
 chown -R www-data:www-data var config/jwt
 
+# TEMPORARY diagnostic: this exact image booted cleanly (only mpm_prefork
+# enabled) both in its own build log and independently via GitHub Actions
+# CI actually running it, yet it crash-loops with "More than one MPM
+# loaded" specifically on Railway. Dumping the real mods-enabled state
+# right before Apache starts, in the actual failing environment, to see
+# what's really there instead of continuing to guess. Remove once
+# resolved.
+echo "--- DIAGNOSTIC: /etc/apache2/mods-enabled (mpm*) ---"
+ls -la /etc/apache2/mods-enabled/ | grep -i mpm || echo "(no mpm files found)"
+echo "--- DIAGNOSTIC: grep -ri mpm across apache2 config tree ---"
+grep -ril mpm /etc/apache2/ 2>/dev/null || echo "(no matches)"
+echo "--- DIAGNOSTIC: end ---"
+
 exec "$@"
