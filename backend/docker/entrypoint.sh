@@ -14,6 +14,16 @@ fi
 # failing the very first deploy before any migration exists.
 php bin/console doctrine:migrations:migrate --no-interaction --allow-no-migration
 
+# Opt-in, off by default: some hosts (Railway) give no shell/exec access
+# into a running container, so there's otherwise no way to run a one-off
+# console command to bootstrap the first admin account. AppFixtures itself
+# is idempotent (it checks for the admin phone before creating anything),
+# so this is safe to leave set across multiple boots — but the intent is
+# to set SEED_FIXTURES=true once, confirm it worked, then unset it.
+if [ "${SEED_FIXTURES:-}" = "true" ]; then
+    php bin/console doctrine:fixtures:load --append --no-interaction
+fi
+
 # This script (and the two commands above) run as root — Apache's master
 # process needs root to bind port 80 — but the workers that actually serve
 # requests drop to www-data. Booting the Symfony kernel for those commands
