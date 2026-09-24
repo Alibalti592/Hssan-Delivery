@@ -108,6 +108,12 @@ class _HssanDeliveryAppState extends State<HssanDeliveryApp> {
       repository: AuthRepository(_api),
       storage: TokenStorage(),
       pushNotifications: _pushNotifications,
+      // Pops any pushed screen (an order/delivery detail opened via
+      // Navigator.push, including from a push-notification tap) back to
+      // the root route on sign-out, so _Root's home swap to LoginScreen is
+      // actually what the user sees instead of a stranded pushed screen.
+      onSessionEnded: () =>
+          _navigatorKey.currentState?.popUntil((route) => route.isFirst),
     );
     _deliveries = DeliveriesController(DeliveryRepository(_api));
     _catalogue = CatalogueRepository(_api);

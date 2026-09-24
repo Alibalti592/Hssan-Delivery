@@ -31,6 +31,32 @@ class _MemoryTokenStorage extends TokenStorage {
   Future<void> clear() async => _token = null;
 }
 
+/// Simulates flutter_secure_storage throwing on read, e.g. a corrupted or
+/// reset Android keystore after a device restore.
+class _ThrowingReadTokenStorage extends TokenStorage {
+  @override
+  Future<String?> read() => throw Exception('keystore unavailable');
+
+  @override
+  Future<void> write(String token) async {}
+
+  @override
+  Future<void> clear() async {}
+}
+
+/// Simulates flutter_secure_storage throwing on write, same underlying
+/// cause as _ThrowingReadTokenStorage but hit during signIn() instead.
+class _ThrowingWriteTokenStorage extends TokenStorage {
+  @override
+  Future<String?> read() async => null;
+
+  @override
+  Future<void> write(String token) => throw Exception('keystore unavailable');
+
+  @override
+  Future<void> clear() async {}
+}
+
 http.Response _json(Object body, [int status = 200]) => http.Response(
   jsonEncode(body),
   status,
@@ -286,6 +312,136 @@ void main() {
 
       expect(error, 'Mot de passe actuel incorrect.');
     });
+
+    test('onUnauthorized ends the session and calls onSessionEnded', () async {
+      final storage = _MemoryTokenStorage();
+      var sessionEndedCalls = 0;
+      final mock = MockClient((request) async {
+        if (request.url.path == '/api/auth/login') {
+          return _json({'token': 'jwt-1'});
+        }
+        if (request.url.path == '/api/auth/me') {
+          return _json({
+            'id': 1,
+            'name': 'Test',
+            'phone': '21000002',
+            'roles': ['ROLE_CLIENT'],
+            'isVerified': true,
+          });
+        }
+        return _json({'message': 'unexpected'}, 404);
+      });
+
+      final auth = AuthController(
+        repository: AuthRepository(
+          ApiClient(
+            tokenProvider: () => 'jwt-1',
+            onUnauthorized: () {},
+            httpClient: mock,
+          ),
+        ),
+        storage: storage,
+        onSessionEnded: () => sessionEndedCalls++,
+      );
+
+      await auth.signIn('21000002', 'password123');
+      expect(auth.status, AuthStatus.signedIn);
+      expect(sessionEndedCalls, 0);
+
+      // Fire-and-forget in AuthController (not awaited by the ApiClient's
+      // own onUnauthorized callback either) — give the underlying
+      // _discard() a beat to actually finish before asserting.
+      auth.onUnauthorized();
+      await Future<void>.delayed(Duration.zero);
+
+      expect(auth.status, AuthStatus.signedOut);
+      expect(sessionEndedCalls, 1);
+    });
+
+    test('onUnauthorized is a no-op when not signed in', () async {
+      var sessionEndedCalls = 0;
+      final auth = AuthController(
+        repository: AuthRepository(
+          ApiClient(tokenProvider: () => null, onUnauthorized: () {}),
+        ),
+        storage: _MemoryTokenStorage(),
+        onSessionEnded: () => sessionEndedCalls++,
+      );
+
+      auth.onUnauthorized();
+      await Future<void>.delayed(Duration.zero);
+
+      expect(sessionEndedCalls, 0);
+    });
+
+    test('signOut calls onSessionEnded', () async {
+      var sessionEndedCalls = 0;
+      final auth = AuthController(
+        repository: AuthRepository(
+          ApiClient(tokenProvider: () => null, onUnauthorized: () {}),
+        ),
+        storage: _MemoryTokenStorage(),
+        onSessionEnded: () => sessionEndedCalls++,
+      );
+
+      await auth.signOut();
+
+      expect(sessionEndedCalls, 1);
+    });
+
+    test(
+      'bootstrap ends up signedOut, not stuck, when storage.read() throws',
+      () async {
+        final auth = AuthController(
+          repository: AuthRepository(
+            ApiClient(tokenProvider: () => null, onUnauthorized: () {}),
+          ),
+          storage: _ThrowingReadTokenStorage(),
+        );
+
+        await auth.bootstrap();
+
+        expect(auth.status, AuthStatus.signedOut);
+      },
+    );
+
+    test(
+      'signIn surfaces an error instead of throwing when storage.write() fails',
+      () async {
+        final mock = MockClient((request) async {
+          if (request.url.path == '/api/auth/login') {
+            return _json({'token': 'jwt-789'});
+          }
+          if (request.url.path == '/api/auth/me') {
+            return _json({
+              'id': 5,
+              'name': 'Nadia',
+              'phone': '21000003',
+              'roles': ['ROLE_CLIENT', 'ROLE_USER'],
+              'isVerified': true,
+            });
+          }
+          return _json({'message': 'unexpected'}, 404);
+        });
+
+        final auth = AuthController(
+          repository: AuthRepository(
+            ApiClient(
+              tokenProvider: () => null,
+              onUnauthorized: () {},
+              httpClient: mock,
+            ),
+          ),
+          storage: _ThrowingWriteTokenStorage(),
+        );
+
+        final error = await auth.signIn('21000003', 'password123');
+
+        expect(error, "Impossible d'enregistrer la session sur cet appareil.");
+        expect(auth.status, isNot(AuthStatus.signedIn));
+        expect(auth.busy, isFalse);
+      },
+    );
   });
 
   group('DeliveriesController', () {

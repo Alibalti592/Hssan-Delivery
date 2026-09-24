@@ -87,6 +87,30 @@ final class AdminCourierController extends AbstractApiController
         );
     }
 
+    /**
+     * Admin approval step — see CourierService::verify and
+     * User::$verifiedAt's docblock. A courier created via create() above
+     * starts unverified and can't be assigned a delivery until this runs.
+     */
+    #[Route('/{id}/verify', name: 'api_admin_courier_verify', methods: ['PATCH'])]
+    public function verify(int $id): JsonResponse
+    {
+        $courier = $this->courierService->get($id);
+
+        if (null === $courier) {
+            return $this->json(
+                ['message' => 'Courier not found.'],
+                Response::HTTP_NOT_FOUND
+            );
+        }
+
+        $courier = $this->courierService->verify($courier);
+
+        return $this->json(
+            CourierResponse::fromEntity($courier)
+        );
+    }
+
     #[Route('/{id}/active', name: 'api_admin_courier_active', methods: ['PATCH'])]
     public function active(
         int $id,

@@ -101,6 +101,14 @@ final class DeliveryService
             throw new InvalidOperationException('This courier has been deactivated.');
         }
 
+        // See User::$verifiedAt's docblock — a courier account being
+        // created by an admin isn't the same as being admin-*approved*.
+        // AuthService::createCourier leaves new couriers unverified;
+        // CourierService::verify is the separate approval step.
+        if (!$courier->isVerified()) {
+            throw new InvalidOperationException('This courier has not been verified yet.');
+        }
+
         // isAvailable is the courier's own "I'm off duty" toggle (see
         // AuthController::availability) — distinct from admin-controlled
         // isActive, and what the admin map's ONLINE/OFFLINE badge is based

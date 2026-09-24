@@ -40,6 +40,24 @@ final class CourierService
     }
 
     /**
+     * Admin approval step for a courier account — separate from creating
+     * it (AuthService::createCourier leaves a new courier unverified). See
+     * User::$verifiedAt's docblock: DeliveryService won't let an unverified
+     * courier be assigned a delivery. Idempotent: verifying an
+     * already-verified courier just leaves their original verifiedAt in
+     * place.
+     */
+    public function verify(User $courier): User
+    {
+        if (!$courier->isVerified()) {
+            $courier->setVerifiedAt(new \DateTimeImmutable());
+            $this->entityManager->flush();
+        }
+
+        return $courier;
+    }
+
+    /**
      * Admin-initiated password reset, for a courier locked out of their
      * account. Mirrors AuthService::createCourier(): the admin picks the new
      * password and relays it to the courier out-of-band (phone call, in

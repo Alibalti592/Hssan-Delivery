@@ -2,7 +2,15 @@ import { useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'react-router-dom';
 import { couriersApi } from '../../api/resources';
-import { PageHeader, Loading, ErrorBanner, Breadcrumb, ActiveBadge, formatDate } from '../../components/ui';
+import {
+  PageHeader,
+  Loading,
+  ErrorBanner,
+  Breadcrumb,
+  ActiveBadge,
+  VerifiedBadge,
+  formatDate,
+} from '../../components/ui';
 
 export default function CourierDetailPage() {
   const { id } = useParams();
@@ -18,6 +26,14 @@ export default function CourierDetailPage() {
 
   const toggleActive = useMutation({
     mutationFn: (isActive: boolean) => couriersApi.setActive(courierId, isActive),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['couriers', courierId] });
+      queryClient.invalidateQueries({ queryKey: ['couriers'] });
+    },
+  });
+
+  const verify = useMutation({
+    mutationFn: () => couriersApi.verify(courierId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['couriers', courierId] });
       queryClient.invalidateQueries({ queryKey: ['couriers'] });
@@ -42,7 +58,7 @@ export default function CourierDetailPage() {
       <PageHeader title={data?.name ?? 'Courier'} subtitle={data ? `Courier #${data.id}` : undefined} />
       <div className="content">
         <Breadcrumb items={[{ label: 'Couriers', to: '/couriers' }, { label: data?.name ?? '…' }]} />
-        <ErrorBanner error={error || toggleActive.error || resetPassword.error} />
+        <ErrorBanner error={error || toggleActive.error || verify.error || resetPassword.error} />
         {isLoading ? (
           <Loading />
         ) : data ? (
@@ -59,6 +75,12 @@ export default function CourierDetailPage() {
                 </div>
               </div>
               <div className="detail-item">
+                <div className="field-label">Approval</div>
+                <div className="value">
+                  <VerifiedBadge verified={data.verified} />
+                </div>
+              </div>
+              <div className="detail-item">
                 <div className="field-label">Roles</div>
                 <div className="value">{data.roles.join(', ')}</div>
               </div>
@@ -68,6 +90,16 @@ export default function CourierDetailPage() {
               </div>
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
+              {!data.verified && (
+                <button
+                  type="button"
+                  className="btn green"
+                  disabled={verify.isPending}
+                  onClick={() => verify.mutate()}
+                >
+                  {verify.isPending ? 'Verifying…' : 'Verify courier'}
+                </button>
+              )}
               <button
                 type="button"
                 className={`btn ${data.isActive ? 'danger' : 'green'}`}

@@ -8,6 +8,7 @@ import {
   ErrorBanner,
   EmptyState,
   ActiveBadge,
+  VerifiedBadge,
   Pagination,
   formatDate,
 } from '../../components/ui';
@@ -36,6 +37,11 @@ export default function CouriersListPage() {
   const toggleActive = useMutation({
     mutationFn: ({ id, isActive }: { id: number; isActive: boolean }) =>
       couriersApi.setActive(id, isActive),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['couriers'] }),
+  });
+
+  const verify = useMutation({
+    mutationFn: (id: number) => couriersApi.verify(id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['couriers'] }),
   });
 
@@ -91,7 +97,7 @@ export default function CouriersListPage() {
           </div>
         )}
 
-        <ErrorBanner error={couriers.error} />
+        <ErrorBanner error={couriers.error || toggleActive.error || verify.error} />
 
         {couriers.isLoading ? (
           <Loading />
@@ -105,6 +111,7 @@ export default function CouriersListPage() {
                   <th>Name</th>
                   <th>Phone</th>
                   <th>Status</th>
+                  <th>Approval</th>
                   <th>Created</th>
                   <th></th>
                 </tr>
@@ -117,8 +124,21 @@ export default function CouriersListPage() {
                     <td>
                       <ActiveBadge isActive={c.isActive} />
                     </td>
+                    <td>
+                      <VerifiedBadge verified={c.verified} />
+                    </td>
                     <td>{formatDate(c.createdAt)}</td>
                     <td style={{ display: 'flex', gap: 8 }}>
+                      {!c.verified && (
+                        <button
+                          type="button"
+                          className="btn green sm"
+                          disabled={verify.isPending}
+                          onClick={() => verify.mutate(c.id)}
+                        >
+                          Verify
+                        </button>
+                      )}
                       <button
                         type="button"
                         className="btn ghost sm"

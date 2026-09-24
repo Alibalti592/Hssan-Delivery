@@ -92,9 +92,12 @@ final class AuthService
             )
         );
 
-        // Courier accounts are created and approved by an admin.
+        // Unlike register() above, a courier account is NOT verified on
+        // creation — being admin-*created* isn't the same as being
+        // admin-*approved* (see User::$verifiedAt's docblock). An admin
+        // still has to separately verify them (CourierService::verify)
+        // before DeliveryService will let one be assigned a delivery.
         $courier->setRoles(['ROLE_LIVREUR']);
-        $courier->setVerifiedAt(new \DateTimeImmutable());
 
         $this->entityManager->persist($courier);
 
