@@ -31,6 +31,19 @@ class _MemoryTokenStorage extends TokenStorage {
   Future<void> clear() async => _token = null;
 }
 
+/// Simulates flutter_secure_storage throwing on read, e.g. a corrupted or
+/// reset Android keystore after a device restore.
+class _ThrowingReadTokenStorage extends TokenStorage {
+  @override
+  Future<String?> read() => throw Exception('keystore unavailable');
+
+  @override
+  Future<void> write(String token) async {}
+
+  @override
+  Future<void> clear() async {}
+}
+
 http.Response _json(Object body, [int status = 200]) => http.Response(
   jsonEncode(body),
   status,
@@ -361,6 +374,19 @@ void main() {
       await auth.signOut();
 
       expect(sessionEndedCalls, 1);
+    });
+
+    test('bootstrap ends up signedOut, not stuck, when storage.read() throws', () async {
+      final auth = AuthController(
+        repository: AuthRepository(
+          ApiClient(tokenProvider: () => null, onUnauthorized: () {}),
+        ),
+        storage: _ThrowingReadTokenStorage(),
+      );
+
+      await auth.bootstrap();
+
+      expect(auth.status, AuthStatus.signedOut);
     });
   });
 

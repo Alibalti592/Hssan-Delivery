@@ -46,7 +46,18 @@ class AuthController extends ChangeNotifier {
 
   /// Restores a session from stored credentials on app start.
   Future<void> bootstrap() async {
-    final stored = await _storage.read();
+    String? stored;
+    try {
+      stored = await _storage.read();
+    } catch (_) {
+      // flutter_secure_storage can throw (e.g. a corrupted/reset Android
+      // keystore after a device restore). Without this, the exception
+      // would escape this unawaited call from main.dart and _status would
+      // stay AuthStatus.unknown forever, stranding the user on the splash
+      // screen with no way to reach the login screen short of reinstalling.
+      _set(AuthStatus.signedOut);
+      return;
+    }
     if (stored == null) {
       _set(AuthStatus.signedOut);
       return;
