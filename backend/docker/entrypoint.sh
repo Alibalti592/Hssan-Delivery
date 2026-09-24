@@ -14,4 +14,16 @@ fi
 # failing the very first deploy before any migration exists.
 php bin/console doctrine:migrations:migrate --no-interaction --allow-no-migration
 
+# This script (and the two commands above) run as root — Apache's master
+# process needs root to bind port 80 — but the workers that actually serve
+# requests drop to www-data. Booting the Symfony kernel for those commands
+# warms var/cache/prod/ as a side effect, as root, creating directories
+# Apache's www-data workers can't write into afterwards (root-owned dirs
+# from mkdir default to 755, not group/other-writable) — the first real
+# request then fails with a 500 trying to rewrite the routes cache.
+# Re-chown before handing off to Apache so www-data owns whatever root
+# just created, same as the Dockerfile already does at build time for
+# whatever existed then.
+chown -R www-data:www-data var config/jwt
+
 exec "$@"
