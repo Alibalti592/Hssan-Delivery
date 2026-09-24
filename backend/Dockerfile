@@ -60,6 +60,15 @@ RUN sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/sites-av
 # index.php, for every HTTP method.
 RUN sed -ri -e '/DocumentRoot/a\    FallbackResource /index.php' /etc/apache2/sites-available/*.conf
 
+# Same missing-.htaccess gap as above: Apache strips any Authorization header
+# that isn't HTTP Basic before handing the request to PHP, so the mobile
+# app's "Authorization: Bearer <jwt>" never reached Symfony -- login
+# succeeded, then every authenticated request 401'd. (The admin dashboard
+# was unaffected only because it authenticates via the BEARER cookie.)
+# LexikJWTAuthenticationBundle's docs prescribe exactly this rule for Apache.
+RUN echo 'SetEnvIf Authorization "(.*)" HTTP_AUTHORIZATION=$1' > /etc/apache2/conf-available/pass-authorization.conf \
+    && a2enconf pass-authorization
+
 WORKDIR /var/www/html
 COPY --from=vendor /app ./
 COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
