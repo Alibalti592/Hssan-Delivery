@@ -44,6 +44,19 @@ class _ThrowingReadTokenStorage extends TokenStorage {
   Future<void> clear() async {}
 }
 
+/// Simulates flutter_secure_storage throwing on write, same underlying
+/// cause as _ThrowingReadTokenStorage but hit during signIn() instead.
+class _ThrowingWriteTokenStorage extends TokenStorage {
+  @override
+  Future<String?> read() async => null;
+
+  @override
+  Future<void> write(String token) => throw Exception('keystore unavailable');
+
+  @override
+  Future<void> clear() async {}
+}
+
 http.Response _json(Object body, [int status = 200]) => http.Response(
   jsonEncode(body),
   status,
@@ -389,6 +402,44 @@ void main() {
         await auth.bootstrap();
 
         expect(auth.status, AuthStatus.signedOut);
+      },
+    );
+
+    test(
+      'signIn surfaces an error instead of throwing when storage.write() fails',
+      () async {
+        final mock = MockClient((request) async {
+          if (request.url.path == '/api/auth/login') {
+            return _json({'token': 'jwt-789'});
+          }
+          if (request.url.path == '/api/auth/me') {
+            return _json({
+              'id': 5,
+              'name': 'Nadia',
+              'phone': '21000003',
+              'roles': ['ROLE_CLIENT', 'ROLE_USER'],
+              'isVerified': true,
+            });
+          }
+          return _json({'message': 'unexpected'}, 404);
+        });
+
+        final auth = AuthController(
+          repository: AuthRepository(
+            ApiClient(
+              tokenProvider: () => null,
+              onUnauthorized: () {},
+              httpClient: mock,
+            ),
+          ),
+          storage: _ThrowingWriteTokenStorage(),
+        );
+
+        final error = await auth.signIn('21000003', 'password123');
+
+        expect(error, "Impossible d'enregistrer la session sur cet appareil.");
+        expect(auth.status, isNot(AuthStatus.signedIn));
+        expect(auth.busy, isFalse);
       },
     );
   });

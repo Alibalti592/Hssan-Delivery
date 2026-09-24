@@ -108,6 +108,14 @@ class AuthController extends ChangeNotifier {
     } on NetworkException catch (e) {
       _token = null;
       return e.message;
+    } catch (_) {
+      // _storage.write() isn't an ApiException/NetworkException source but
+      // can still throw (e.g. a corrupted/reset Android keystore) — without
+      // this, the exception would escape signIn() uncaught and the caller
+      // (login_screen.dart) would show nothing at all: the busy spinner
+      // clears via `finally` below with no error message ever set.
+      _token = null;
+      return "Impossible d'enregistrer la session sur cet appareil.";
     } finally {
       _busy = false;
       notifyListeners();
