@@ -40,9 +40,20 @@ RUN sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/sites-av
 WORKDIR /var/www/html
 COPY --from=vendor /app ./
 COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
+# Symfony's Dotenv::bootEnv() requires a ".env" file to exist on disk, even
+# when every var it'd load (APP_SECRET, DATABASE_URL, etc.) is already set
+# as a real environment variable by the host (Railway, Render, docker run
+# -e, ...). ".env" itself is gitignored — it never reaches a clean
+# checkout — so a fresh image build has nothing at this path unless we put
+# something there. ".env.example"'s placeholder values are harmless:
+# Dotenv only fills in vars that aren't already set, so real host-provided
+# vars always win over whatever's in this file (the same reasoning the
+# backend CI workflow already documents for its own "cp .env.example .env"
+# step).
 RUN chmod +x /usr/local/bin/entrypoint.sh \
     && mkdir -p var/cache var/log public/uploads config/jwt \
-    && chown -R www-data:www-data var public/uploads config/jwt
+    && chown -R www-data:www-data var public/uploads config/jwt \
+    && cp .env.example .env
 
 ENV APP_ENV=prod
 EXPOSE 80
