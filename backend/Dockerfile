@@ -69,6 +69,19 @@ RUN sed -ri -e '/DocumentRoot/a\    FallbackResource /index.php' /etc/apache2/si
 RUN echo 'SetEnvIf Authorization "(.*)" HTTP_AUTHORIZATION=$1' > /etc/apache2/conf-available/pass-authorization.conf \
     && a2enconf pass-authorization
 
+# Uploaded photos are static files Apache serves directly, so Nelmio's CORS
+# listener (PHP, /api only) never touches them. The admin dashboard renders
+# them with plain <img> tags, which don't need CORS -- but the Flutter web
+# client's Image.network fetches the bytes and decodes them itself, which is
+# a cross-origin fetch the browser blocks without this header, leaving every
+# photo blank. They're public, non-credentialed images, so a wildcard is fine.
+RUN a2enmod headers \
+    && printf '%s\n' \
+        '<Directory /var/www/html/public/uploads>' \
+        '    Header set Access-Control-Allow-Origin "*"' \
+        '</Directory>' > /etc/apache2/conf-available/uploads-cors.conf \
+    && a2enconf uploads-cors
+
 WORKDIR /var/www/html
 COPY --from=vendor /app ./
 COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh

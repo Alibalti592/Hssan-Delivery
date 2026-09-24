@@ -165,6 +165,18 @@ jobs:
             fi
           fi
 
+          # Uploaded photos are served by Apache directly, outside Symfony, so
+          # they need their own CORS header or the Flutter web client (which
+          # fetches image bytes cross-origin) renders them blank.
+          uploads_cors_ok=""
+          if [ -n "$status" ]; then
+            docker exec backend-smoke sh -c 'mkdir -p public/uploads && echo probe > public/uploads/ci-probe.txt'
+            acao=$(curl -sS -D - -o /dev/null http://127.0.0.1/uploads/ci-probe.txt \
+              -H 'Origin: https://example.vercel.app' | tr -d '\r' | grep -i '^access-control-allow-origin:' || true)
+            echo "GET /uploads/ci-probe.txt -> ${acao:-no Access-Control-Allow-Origin header}"
+            [ -n "$acao" ] && uploads_cors_ok="yes"
+          fi
+
           echo "--- container logs ---"
           docker logs backend-smoke
           docker rm -f backend-smoke >/dev/null
@@ -184,5 +196,9 @@ jobs:
           esac
           if [ -z "$auth_ok" ]; then
             echo "Login + Bearer-authenticated request failed -- see logs above."
+            exit 1
+          fi
+          if [ -z "$uploads_cors_ok" ]; then
+            echo "Uploaded files are served without a CORS header -- see above."
             exit 1
           fi
