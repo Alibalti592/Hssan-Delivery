@@ -376,18 +376,21 @@ void main() {
       expect(sessionEndedCalls, 1);
     });
 
-    test('bootstrap ends up signedOut, not stuck, when storage.read() throws', () async {
-      final auth = AuthController(
-        repository: AuthRepository(
-          ApiClient(tokenProvider: () => null, onUnauthorized: () {}),
-        ),
-        storage: _ThrowingReadTokenStorage(),
-      );
+    test(
+      'bootstrap ends up signedOut, not stuck, when storage.read() throws',
+      () async {
+        final auth = AuthController(
+          repository: AuthRepository(
+            ApiClient(tokenProvider: () => null, onUnauthorized: () {}),
+          ),
+          storage: _ThrowingReadTokenStorage(),
+        );
 
-      await auth.bootstrap();
+        await auth.bootstrap();
 
-      expect(auth.status, AuthStatus.signedOut);
-    });
+        expect(auth.status, AuthStatus.signedOut);
+      },
+    );
   });
 
   group('DeliveriesController', () {
