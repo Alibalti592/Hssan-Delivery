@@ -123,17 +123,21 @@ jobs:
 
           # Not -f: security.yaml's access_control requires auth on every
           # /api/* route except login/register, so an unauthenticated hit
-          # is expected to come back 401/404, not 2xx. Any HTTP response at
-          # all (curl's own exit code 0) proves Apache/PHP/Symfony actually
-          # booted, which is everything this smoke test is checking for —
-          # only a connection failure (curl exit != 0, e.g. connection
-          # refused because Apache never started) counts as a failure here.
-          success=false
+          # is expected to come back 401/404, not 2xx — that still proves
+          # Apache/PHP/Symfony booted and is what this test is checking
+          # for. A 5xx is a real application failure (e.g. a permissions
+          # bug writing to var/cache/prod), not just "not authenticated",
+          # so it's treated as a hard failure rather than retried away. A
+          # connection failure (curl exit != 0, e.g. connection refused
+          # because Apache never started) keeps retrying — the container
+          # may just not be up yet.
+          status=""
           for _ in $(seq 1 15); do
-            if curl -sS -o /dev/null http://127.0.0.1/; then
-              success=true
+            status=$(curl -sS -o /dev/null -w '%{http_code}' http://127.0.0.1/ || true)
+            if [ -n "$status" ] && [ "$status" != "000" ]; then
               break
             fi
+            status=""
             sleep 2
           done
 
@@ -141,7 +145,16 @@ jobs:
           docker logs backend-smoke
           docker rm -f backend-smoke >/dev/null
 
-          if [ "$success" != "true" ]; then
+          if [ -z "$status" ]; then
             echo "Backend never responded — see logs above."
             exit 1
           fi
+          case "$status" in
+            5??)
+              echo "Backend responded with $status (server error) — see logs above."
+              exit 1
+              ;;
+            *)
+              echo "Backend responded with $status."
+              ;;
+          esac
