@@ -64,6 +64,25 @@ RUN chmod +x /usr/local/bin/entrypoint.sh \
     && chown -R www-data:www-data var public/uploads config/jwt \
     && cp .env.example .env
 
+# Belt-and-suspenders on top of the a2dismod/a2enmod calls above: a
+# deployed instance of this image (Railway) has been observed booting with
+# BOTH mpm_event.load AND mpm_prefork.load present in mods-enabled, even
+# though the build log for the apt-get step above confirms only prefork
+# ends up enabled, and even though Debian's own a2enmod refuses to enable
+# a second MPM while one is already active (verified directly — it errors
+# out rather than allowing this state to exist). Since that combination
+# shouldn't be reachable through the normal module-management tooling at
+# all, something in the build pipeline appears to be merging in a stale
+# mpm_event.load from an earlier layer that a2dismod never actually
+# touched. rm -f + a direct symlink recreation, as its own distinct layer,
+# leaves no ambiguity: it removes exactly these paths (a unionfs delete
+# here masks any earlier layer's file at the same path, unlike a2dismod's
+# conditional detection) and puts back only what should exist.
+RUN rm -f /etc/apache2/mods-enabled/mpm_event.load /etc/apache2/mods-enabled/mpm_event.conf \
+        /etc/apache2/mods-enabled/mpm_worker.load /etc/apache2/mods-enabled/mpm_worker.conf \
+    && ln -sf ../mods-available/mpm_prefork.load /etc/apache2/mods-enabled/mpm_prefork.load \
+    && ln -sf ../mods-available/mpm_prefork.conf /etc/apache2/mods-enabled/mpm_prefork.conf
+
 ENV APP_ENV=prod
 EXPOSE 80
 
