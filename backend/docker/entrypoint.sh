@@ -33,8 +33,13 @@ fi
 # request then fails with a 500 trying to rewrite the routes cache.
 # Re-chown before handing off to Apache so www-data owns whatever root
 # just created, same as the Dockerfile already does at build time for
-# whatever existed then.
-chown -R www-data:www-data var config/jwt
+# whatever existed then. public/uploads is included here (not just at build
+# time) because on hosts that mount a persistent volume there (Railway, so
+# uploaded photos survive a redeploy instead of vanishing with the
+# container's ephemeral filesystem), the volume is mounted fresh on every
+# boot and typically comes back owned by root, not www-data — without this,
+# PhotoUploader's write on the next upload fails.
+chown -R www-data:www-data var config/jwt public/uploads
 
 # The exact same rm -f done at build time (Dockerfile) doesn't stick on
 # Railway: diagnostic logging confirmed mpm_prefork.load gets a fresh
