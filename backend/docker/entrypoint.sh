@@ -1,14 +1,6 @@
 #!/bin/sh
 set -e
 
-# TEMPORARY DIAGNOSTIC: dump the exact bytes of CORS_ALLOW_ORIGIN as Railway
-# actually delivers it to the container. Railway's variable-read APIs redact
-# values, so this is the only way to see whether escaping survived intact
-# between the tool that set it and the running process. Remove once the CORS
-# mismatch is root-caused.
-echo "DIAGNOSTIC CORS_ALLOW_ORIGIN=[${CORS_ALLOW_ORIGIN:-<unset>}]"
-printf '%s' "${CORS_ALLOW_ORIGIN:-}" | od -c | head -5
-
 # JWT keys are gitignored (see .gitignore) and never baked into the image —
 # generate them on first boot from JWT_PASSPHRASE so a deploy only needs to
 # supply that one secret, not a key file. Skipped if a keypair was already
@@ -58,5 +50,40 @@ rm -f /etc/apache2/mods-enabled/mpm_event.load /etc/apache2/mods-enabled/mpm_eve
       /etc/apache2/mods-enabled/mpm_worker.load /etc/apache2/mods-enabled/mpm_worker.conf
 ln -sf ../mods-available/mpm_prefork.load /etc/apache2/mods-enabled/mpm_prefork.load
 ln -sf ../mods-available/mpm_prefork.conf /etc/apache2/mods-enabled/mpm_prefork.conf
+
+# TEMPORARY DIAGNOSTIC: the app-level CORS logic was verified correct by
+# booting the kernel directly (a simulated OPTIONS request produced the
+# exact expected Access-Control-Allow-* headers) and CORS_ALLOW_ORIGIN was
+# confirmed to reach the container byte-for-byte correct — yet the browser
+# still reports a CORS error, with no actual POST ever recorded in Railway's
+# traffic logs, only OPTIONS. That means whatever is wrong sits between
+# Apache and PHP, or in how Railway's edge forwards the request — neither of
+# which the kernel simulation exercises. This starts Apache, fires the exact
+# same preflight over a raw socket to Apache on its own container (bypassing
+# Railway's edge and any external network entirely), and dumps the full raw
+# HTTP response Apache/PHP actually produces, before handing off to the real
+# foreground process. Remove once the mismatch is root-caused.
+apache2ctl start
+sleep 2
+php -r '
+$fp = @fsockopen("127.0.0.1", 80, $errno, $errstr, 5);
+if (!$fp) {
+    echo "DIAG: connect failed: $errstr ($errno)\n";
+} else {
+    $req = "OPTIONS /api/auth/login HTTP/1.1\r\n"
+         . "Host: hssan-delivery-production.up.railway.app\r\n"
+         . "Origin: https://admin-puce-xi-35.vercel.app\r\n"
+         . "Access-Control-Request-Method: POST\r\n"
+         . "Access-Control-Request-Headers: content-type,x-client-platform\r\n"
+         . "Connection: close\r\n\r\n";
+    fwrite($fp, $req);
+    $resp = "";
+    while (!feof($fp)) { $resp .= fread($fp, 8192); }
+    fclose($fp);
+    echo "DIAG RAW RESPONSE START\n" . $resp . "DIAG RAW RESPONSE END\n";
+}
+'
+apache2ctl stop
+sleep 1
 
 exec "$@"
