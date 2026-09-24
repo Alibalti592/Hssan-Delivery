@@ -75,10 +75,19 @@ RUN echo 'SetEnvIf Authorization "(.*)" HTTP_AUTHORIZATION=$1' > /etc/apache2/co
 # client's Image.network fetches the bytes and decodes them itself, which is
 # a cross-origin fetch the browser blocks without this header, leaving every
 # photo blank. They're public, non-credentialed images, so a wildcard is fine.
+#
+# Matched by URL rather than directory: public/uploads is a symlink into
+# var/storage (the persistent volume -- see docker/entrypoint.sh), so the
+# filesystem path Apache ends up at isn't under public/. The explicit
+# Require grant covers that symlink target.
 RUN a2enmod headers \
     && printf '%s\n' \
-        '<Directory /var/www/html/public/uploads>' \
+        '<LocationMatch "^/uploads/">' \
         '    Header set Access-Control-Allow-Origin "*"' \
+        '</LocationMatch>' \
+        '<Directory /var/www/html/var/storage/uploads>' \
+        '    Options FollowSymLinks' \
+        '    Require all granted' \
         '</Directory>' > /etc/apache2/conf-available/uploads-cors.conf \
     && a2enconf uploads-cors
 
