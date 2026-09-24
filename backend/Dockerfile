@@ -64,20 +64,20 @@ RUN chmod +x /usr/local/bin/entrypoint.sh \
     && chown -R www-data:www-data var public/uploads config/jwt \
     && cp .env.example .env
 
-# Belt-and-suspenders on top of the a2dismod/a2enmod calls above: a
-# deployed instance of this image (Railway) has been observed booting with
-# BOTH mpm_event.load AND mpm_prefork.load present in mods-enabled, even
-# though the build log for the apt-get step above confirms only prefork
-# ends up enabled, and even though Debian's own a2enmod refuses to enable
-# a second MPM while one is already active (verified directly — it errors
-# out rather than allowing this state to exist). Since that combination
-# shouldn't be reachable through the normal module-management tooling at
-# all, something in the build pipeline appears to be merging in a stale
-# mpm_event.load from an earlier layer that a2dismod never actually
-# touched. rm -f + a direct symlink recreation, as its own distinct layer,
-# leaves no ambiguity: it removes exactly these paths (a unionfs delete
-# here masks any earlier layer's file at the same path, unlike a2dismod's
-# conditional detection) and puts back only what should exist.
+# Belt-and-suspenders on top of the a2dismod/a2enmod calls above: makes
+# sure only mpm_prefork's symlinks exist, as its own distinct build layer.
+# On most hosts this alone would be redundant with the earlier a2dismod
+# call — but a deployed instance of this image on Railway was observed
+# booting with mpm_event.load's original base-image timestamp completely
+# unchanged, as if this exact rm -f (in this exact layer) never took
+# effect there, while everything else in the same layer (the prefork
+# symlinks below) got a fresh build-time timestamp as expected. Whatever
+# that platform's build pipeline is doing to materialize the final
+# container filesystem, it isn't reliably preserving this deletion. The
+# fix that actually holds regardless is in docker/entrypoint.sh, which
+# repeats this same rm -f + relink at container *runtime* instead —
+# there's no build/export/snapshot step for that to get lost in. Kept
+# here too since it's correct and harmless on every other host.
 RUN rm -f /etc/apache2/mods-enabled/mpm_event.load /etc/apache2/mods-enabled/mpm_event.conf \
         /etc/apache2/mods-enabled/mpm_worker.load /etc/apache2/mods-enabled/mpm_worker.conf \
     && ln -sf ../mods-available/mpm_prefork.load /etc/apache2/mods-enabled/mpm_prefork.load \

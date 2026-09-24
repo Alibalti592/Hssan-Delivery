@@ -26,17 +26,19 @@ php bin/console doctrine:migrations:migrate --no-interaction --allow-no-migratio
 # whatever existed then.
 chown -R www-data:www-data var config/jwt
 
-# TEMPORARY diagnostic: this exact image booted cleanly (only mpm_prefork
-# enabled) both in its own build log and independently via GitHub Actions
-# CI actually running it, yet it crash-loops with "More than one MPM
-# loaded" specifically on Railway. Dumping the real mods-enabled state
-# right before Apache starts, in the actual failing environment, to see
-# what's really there instead of continuing to guess. Remove once
-# resolved.
-echo "--- DIAGNOSTIC: /etc/apache2/mods-enabled (mpm*) ---"
-ls -la /etc/apache2/mods-enabled/ | grep -i mpm || echo "(no mpm files found)"
-echo "--- DIAGNOSTIC: grep -ri mpm across apache2 config tree ---"
-grep -ril mpm /etc/apache2/ 2>/dev/null || echo "(no matches)"
-echo "--- DIAGNOSTIC: end ---"
+# The exact same rm -f done at build time (Dockerfile) doesn't stick on
+# Railway: diagnostic logging confirmed mpm_prefork.load gets a fresh
+# build-time timestamp there, but mpm_event.load — deleted in that same
+# build layer — still shows the *original base-image* timestamp at
+# runtime, unchanged, as if the deletion never happened. Something about
+# how that platform materializes the final container filesystem from the
+# built image isn't preserving this specific deletion. Doing it here
+# instead sidesteps that entirely: this runs on the container's own live
+# writable filesystem at the moment it's actually booting, not through
+# any build/export/snapshot pipeline, so there's no layer to lose it.
+rm -f /etc/apache2/mods-enabled/mpm_event.load /etc/apache2/mods-enabled/mpm_event.conf \
+      /etc/apache2/mods-enabled/mpm_worker.load /etc/apache2/mods-enabled/mpm_worker.conf
+ln -sf ../mods-available/mpm_prefork.load /etc/apache2/mods-enabled/mpm_prefork.load
+ln -sf ../mods-available/mpm_prefork.conf /etc/apache2/mods-enabled/mpm_prefork.conf
 
 exec "$@"
