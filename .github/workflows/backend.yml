@@ -92,3 +92,56 @@ jobs:
           JWT_PASSPHRASE: ci-test-passphrase
           DATABASE_URL: postgresql://hssan:hssan_test_password@127.0.0.1:5432/hssan_delivery?serverVersion=16&charset=utf8
         run: php bin/phpunit
+
+      # None of the steps above ever actually boot the production Docker
+      # image (they run PHPUnit directly via the PHP CLI) — a bug that only
+      # manifests when Apache itself starts (e.g. a module/MPM conflict in
+      # the image) can build successfully and pass every test above, then
+      # crash-loop the moment a real host actually runs it. Building and
+      # booting the real image here, in prod mode, against this job's own
+      # Postgres service, catches that whole class of bug before it ever
+      # reaches a deploy.
+      - name: Build the production Docker image
+        run: docker build -t hssan-delivery-backend:smoke-test .
+
+      - name: Smoke-test the Docker image actually boots
+        env:
+          # A fresh, never-migrated database — prod mode applies no
+          # dbname_suffix (that's test-only, see doctrine.yaml), so this
+          # points straight at the Postgres service's own default database.
+          DATABASE_URL: postgresql://hssan:hssan_test_password@127.0.0.1:5432/hssan_delivery?serverVersion=16&charset=utf8
+        run: |
+          docker run -d --name backend-smoke --network host \
+            -e APP_ENV=prod \
+            -e APP_SECRET="$(openssl rand -hex 32)" \
+            -e JWT_PASSPHRASE=ci-test-passphrase \
+            -e DATABASE_URL="$DATABASE_URL" \
+            -e CORS_ALLOW_ORIGIN='^https://example\.com$' \
+            -e JWT_COOKIE_SECURE=true \
+            -e JWT_COOKIE_SAMESITE=none \
+            hssan-delivery-backend:smoke-test
+
+          # Not -f: security.yaml's access_control requires auth on every
+          # /api/* route except login/register, so an unauthenticated hit
+          # is expected to come back 401/404, not 2xx. Any HTTP response at
+          # all (curl's own exit code 0) proves Apache/PHP/Symfony actually
+          # booted, which is everything this smoke test is checking for —
+          # only a connection failure (curl exit != 0, e.g. connection
+          # refused because Apache never started) counts as a failure here.
+          success=false
+          for _ in $(seq 1 15); do
+            if curl -sS -o /dev/null http://127.0.0.1/; then
+              success=true
+              break
+            fi
+            sleep 2
+          done
+
+          echo "--- container logs ---"
+          docker logs backend-smoke
+          docker rm -f backend-smoke >/dev/null
+
+          if [ "$success" != "true" ]; then
+            echo "Backend never responded — see logs above."
+            exit 1
+          fi
