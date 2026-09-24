@@ -1,6 +1,14 @@
 #!/bin/sh
 set -e
 
+# TEMPORARY DIAGNOSTIC: dump the exact bytes of CORS_ALLOW_ORIGIN as Railway
+# actually delivers it to the container. Railway's variable-read APIs redact
+# values, so this is the only way to see whether escaping survived intact
+# between the tool that set it and the running process. Remove once the CORS
+# mismatch is root-caused.
+echo "DIAGNOSTIC CORS_ALLOW_ORIGIN=[${CORS_ALLOW_ORIGIN:-<unset>}]"
+printf '%s' "${CORS_ALLOW_ORIGIN:-}" | od -c | head -5
+
 # JWT keys are gitignored (see .gitignore) and never baked into the image —
 # generate them on first boot from JWT_PASSPHRASE so a deploy only needs to
 # supply that one secret, not a key file. Skipped if a keypair was already
