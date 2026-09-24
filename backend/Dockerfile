@@ -24,12 +24,21 @@ RUN composer dump-autoload --optimize --no-dev --classmap-authoritative
 
 FROM php:8.2-apache AS app
 
+# The apt-get install below can trigger apache2's own postinst script,
+# which re-enables Debian's default MPM (mpm_event) alongside the
+# mpm_prefork this base image already has enabled for mod_php (prefork is
+# required — mod_php isn't thread-safe, so it's incompatible with the
+# threaded event/worker MPMs). Apache refuses to start with both loaded
+# ("AH00534: More than one MPM loaded"), so force prefork back on
+# explicitly; a2dismod on an already-disabled module is a harmless no-op.
 RUN apt-get update && apt-get install -y --no-install-recommends \
         libpq-dev \
         libicu-dev \
     && docker-php-ext-configure intl \
     && docker-php-ext-install -j"$(nproc)" pdo pdo_pgsql intl opcache \
     && a2enmod rewrite \
+    && (a2dismod mpm_event mpm_worker 2>/dev/null || true) \
+    && a2enmod mpm_prefork \
     && rm -rf /var/lib/apt/lists/*
 
 # Symfony serves from public/, not the vhost's default docroot.
