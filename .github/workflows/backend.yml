@@ -119,6 +119,7 @@ jobs:
             -e CORS_ALLOW_ORIGIN='^https://example\.com$' \
             -e JWT_COOKIE_SECURE=true \
             -e JWT_COOKIE_SAMESITE=none \
+            -e SEED_FIXTURES=true \
             hssan-delivery-backend:smoke-test
 
           # Not -f: security.yaml's access_control requires auth on every
@@ -141,6 +142,29 @@ jobs:
             sleep 2
           done
 
+          # "/" maps straight to the real public/index.php, so it proves
+          # nothing about how Apache routes and forwards everything else.
+          # Two real Apache-level bugs got past the check above that way:
+          # no FallbackResource (so /api/* never reached Symfony at all), and
+          # Apache stripping "Authorization: Bearer" (so mobile logins
+          # succeeded and every request after them 401'd). Log in as the
+          # seeded client and make one Bearer-authenticated call, exactly as
+          # the mobile app does.
+          auth_ok=""
+          if [ -n "$status" ]; then
+            token=$(curl -sS -X POST http://127.0.0.1/api/auth/login \
+              -H 'Content-Type: application/json' \
+              -d '{"phone":"22000001","password":"client1234"}' | jq -r '.token // empty' || true)
+            if [ -n "$token" ]; then
+              me_status=$(curl -sS -o /dev/null -w '%{http_code}' http://127.0.0.1/api/auth/me \
+                -H "Authorization: Bearer $token" || true)
+              echo "Bearer-authenticated GET /api/auth/me -> $me_status"
+              [ "$me_status" = "200" ] && auth_ok="yes"
+            else
+              echo "Login as the seeded client returned no token."
+            fi
+          fi
+
           echo "--- container logs ---"
           docker logs backend-smoke
           docker rm -f backend-smoke >/dev/null
@@ -158,3 +182,7 @@ jobs:
               echo "Backend responded with $status."
               ;;
           esac
+          if [ -z "$auth_ok" ]; then
+            echo "Login + Bearer-authenticated request failed -- see logs above."
+            exit 1
+          fi
