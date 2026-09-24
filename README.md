@@ -108,17 +108,31 @@ Admin authentication
 
 The admin dashboard authenticates like every other client (`POST
 /api/auth/login`), but instead of reading the JWT out of the response body
-and holding it in JS, the backend also mirrors it into an httpOnly,
-`SameSite=Lax` cookie (`config/packages/lexik_jwt_authentication.yaml`) that
-the browser sends automatically and JavaScript can never read — closing off
-the obvious XSS-steals-the-token-from-storage attack that plain
-`localStorage` had. `POST /api/auth/logout` clears that cookie (JS can't do
-it itself for an httpOnly cookie). Mobile is unaffected: it still reads the
-token from the JSON body and sends it as `Authorization: Bearer <jwt>`; both
-extractors run on the same firewall. `JWT_COOKIE_SECURE` (see
-`.env.example`) must be set to `true` once the admin dashboard is served
-over HTTPS — a `Secure` cookie is silently dropped by browsers over plain
-`http://`, so it defaults to `false` for local development.
+and holding it in JS, the backend also mirrors it into an httpOnly cookie
+(`config/packages/lexik_jwt_authentication.php`) that the browser sends
+automatically and JavaScript can never read — closing off the obvious
+XSS-steals-the-token-from-storage attack that plain `localStorage` had.
+`POST /api/auth/logout` clears that cookie (JS can't do it itself for an
+httpOnly cookie). Mobile is unaffected: it still reads the token from the
+JSON body and sends it as `Authorization: Bearer <jwt>`; both extractors
+run on the same firewall. `JWT_COOKIE_SECURE` (see `.env.example`) must be
+set to `true` once the admin dashboard is served over HTTPS — a `Secure`
+cookie is silently dropped by browsers over plain `http://`, so it defaults
+to `false` for local development.
+
+That cookie's `SameSite` attribute is also configurable, via
+`JWT_COOKIE_SAMESITE` (default `lax`). `lax` is correct when the admin
+dashboard and backend share a site (e.g. both under `hssan.example`), but
+must become `none` (together with `JWT_COOKIE_SECURE=true`) if they're ever
+deployed on different sites — e.g. the admin dashboard on Vercel calling a
+backend on Railway/Render/Fly. A `Lax` cookie is silently not sent on
+cross-site `fetch`/XHR requests, so login would appear to succeed and then
+every request after it would look signed out. This lives in a `.php` config
+file rather than `.yaml`: the bundle validates `samesite` against its
+literal allowed values (`none`/`lax`/`strict`) at config-processing time,
+before a YAML `%env(...)%` placeholder would ever get resolved — a `.php`
+config file resolves the real value first and hands the tree a literal
+string instead, sidestepping that limitation.
 
 Mobile needing the token in the body (`remove_token_from_body_when_cookies_used:
 false`) means `POST /api/auth/login`'s response would otherwise carry the
@@ -619,6 +633,21 @@ exist yet. docker-compose.staging.yml documents the layout such a server
 needs (backend + admin + postgres, referencing the GHCR images) — it's a
 template to fill in and place on the staging host, not something CI runs
 itself.
+
+Deploying admin and backend on different hosts (e.g. Vercel + Railway)
+
+admin/vercel.json rewrites every path to /index.html, matching what
+admin/docker/nginx.conf already does for the Docker deploy — without it, a
+hard refresh on any client-side route (e.g. /couriers/3) 404s on Vercel's
+static host. VITE_API_URL is a build-time value baked into the admin bundle
+(see admin/Dockerfile's comment), so on Vercel it's an environment variable
+set on the project, not something changed after the build.
+
+Because the admin dashboard and backend now live on different sites in this
+topology, set on the backend host: CORS_ALLOW_ORIGIN to the admin's real
+origin (not the localhost regex default), JWT_COOKIE_SECURE=true, and
+JWT_COOKIE_SAMESITE=none (see "Admin authentication" above for why — a Lax
+cookie is silently dropped on cross-site requests).
 
 Backend setup
 Requirements
