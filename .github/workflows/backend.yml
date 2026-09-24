@@ -111,16 +111,22 @@ jobs:
           # points straight at the Postgres service's own default database.
           DATABASE_URL: postgresql://hssan:hssan_test_password@127.0.0.1:5432/hssan_delivery?serverVersion=16&charset=utf8
         run: |
-          docker run -d --name backend-smoke --network host \
-            -e APP_ENV=prod \
-            -e APP_SECRET="$(openssl rand -hex 32)" \
-            -e JWT_PASSPHRASE=ci-test-passphrase \
-            -e DATABASE_URL="$DATABASE_URL" \
-            -e CORS_ALLOW_ORIGIN='^https://example\.com$' \
-            -e JWT_COOKIE_SECURE=true \
-            -e JWT_COOKIE_SAMESITE=none \
-            -e SEED_FIXTURES=true \
-            hssan-delivery-backend:smoke-test
+          # Mirrors Railway: one persistent volume at var/storage, holding
+          # uploaded photos and the JWT keypair (see docker/entrypoint.sh).
+          app_secret="$(openssl rand -hex 32)"
+          start_backend() {
+            docker run -d --name backend-smoke --network host \
+              -v smoke-storage:/var/www/html/var/storage \
+              -e APP_ENV=prod \
+              -e APP_SECRET="$app_secret" \
+              -e JWT_PASSPHRASE=ci-test-passphrase \
+              -e DATABASE_URL="$DATABASE_URL" \
+              -e CORS_ALLOW_ORIGIN='^https://example\.com$' \
+              -e JWT_COOKIE_SECURE=true \
+              -e JWT_COOKIE_SAMESITE=none \
+              -e SEED_FIXTURES=true \
+              hssan-delivery-backend:smoke-test >/dev/null
+          }
 
           # Not -f: security.yaml's access_control requires auth on every
           # /api/* route except login/register, so an unauthenticated hit
@@ -132,15 +138,25 @@ jobs:
           # connection failure (curl exit != 0, e.g. connection refused
           # because Apache never started) keeps retrying — the container
           # may just not be up yet.
-          status=""
-          for _ in $(seq 1 15); do
-            status=$(curl -sS -o /dev/null -w '%{http_code}' http://127.0.0.1/ || true)
-            if [ -n "$status" ] && [ "$status" != "000" ]; then
-              break
-            fi
+          wait_for_backend() {
             status=""
-            sleep 2
-          done
+            for _ in $(seq 1 20); do
+              status=$(curl -sS -o /dev/null -w '%{http_code}' http://127.0.0.1/ || true)
+              if [ -n "$status" ] && [ "$status" != "000" ]; then
+                return
+              fi
+              status=""
+              sleep 2
+            done
+          }
+
+          me_status() {
+            curl -sS -o /dev/null -w '%{http_code}' http://127.0.0.1/api/auth/me \
+              -H "Authorization: Bearer $1" || true
+          }
+
+          start_backend
+          wait_for_backend
 
           # "/" maps straight to the real public/index.php, so it proves
           # nothing about how Apache routes and forwards everything else.
@@ -151,15 +167,15 @@ jobs:
           # seeded client and make one Bearer-authenticated call, exactly as
           # the mobile app does.
           auth_ok=""
+          token=""
           if [ -n "$status" ]; then
             token=$(curl -sS -X POST http://127.0.0.1/api/auth/login \
               -H 'Content-Type: application/json' \
               -d '{"phone":"22000001","password":"client1234"}' | jq -r '.token // empty' || true)
             if [ -n "$token" ]; then
-              me_status=$(curl -sS -o /dev/null -w '%{http_code}' http://127.0.0.1/api/auth/me \
-                -H "Authorization: Bearer $token" || true)
-              echo "Bearer-authenticated GET /api/auth/me -> $me_status"
-              [ "$me_status" = "200" ] && auth_ok="yes"
+              s=$(me_status "$token")
+              echo "Bearer-authenticated GET /api/auth/me -> $s"
+              [ "$s" = "200" ] && auth_ok="yes"
             else
               echo "Login as the seeded client returned no token."
             fi
@@ -167,19 +183,40 @@ jobs:
 
           # Uploaded photos are served by Apache directly, outside Symfony, so
           # they need their own CORS header or the Flutter web client (which
-          # fetches image bytes cross-origin) renders them blank.
-          uploads_cors_ok=""
+          # fetches image bytes cross-origin) renders them blank. They're
+          # also served through the public/uploads -> var/storage symlink, so
+          # require an actual 200, not just the header.
+          uploads_ok=""
           if [ -n "$status" ]; then
-            docker exec backend-smoke sh -c 'mkdir -p public/uploads && echo probe > public/uploads/ci-probe.txt'
-            acao=$(curl -sS -D - -o /dev/null http://127.0.0.1/uploads/ci-probe.txt \
-              -H 'Origin: https://example.vercel.app' | tr -d '\r' | grep -i '^access-control-allow-origin:' || true)
-            echo "GET /uploads/ci-probe.txt -> ${acao:-no Access-Control-Allow-Origin header}"
-            [ -n "$acao" ] && uploads_cors_ok="yes"
+            docker exec backend-smoke sh -c 'echo probe > public/uploads/ci-probe.txt'
+            headers=$(curl -sS -D - -o /dev/null http://127.0.0.1/uploads/ci-probe.txt \
+              -H 'Origin: https://example.vercel.app' | tr -d '\r' || true)
+            code=$(printf '%s\n' "$headers" | head -1)
+            acao=$(printf '%s\n' "$headers" | grep -i '^access-control-allow-origin:' || true)
+            echo "GET /uploads/ci-probe.txt -> $code / ${acao:-no Access-Control-Allow-Origin header}"
+            case "$code" in *" 200"*) [ -n "$acao" ] && uploads_ok="yes" ;; esac
           fi
 
-          echo "--- container logs ---"
+          echo "--- container logs (first boot) ---"
           docker logs backend-smoke
           docker rm -f backend-smoke >/dev/null
+
+          # Simulate a redeploy: a brand-new container on the same volume.
+          # A token issued before it must still be valid (the keypair must
+          # not be regenerated), and the uploaded file must still be there.
+          redeploy_ok=""
+          if [ -n "$auth_ok" ]; then
+            start_backend
+            wait_for_backend
+            s=$(me_status "$token")
+            echo "After redeploy, old token GET /api/auth/me -> $s"
+            f=$(curl -sS -o /dev/null -w '%{http_code}' http://127.0.0.1/uploads/ci-probe.txt || true)
+            echo "After redeploy, GET /uploads/ci-probe.txt -> $f"
+            [ "$s" = "200" ] && [ "$f" = "200" ] && redeploy_ok="yes"
+            echo "--- container logs (after redeploy) ---"
+            docker logs backend-smoke
+            docker rm -f backend-smoke >/dev/null
+          fi
 
           if [ -z "$status" ]; then
             echo "Backend never responded — see logs above."
@@ -198,7 +235,11 @@ jobs:
             echo "Login + Bearer-authenticated request failed -- see logs above."
             exit 1
           fi
-          if [ -z "$uploads_cors_ok" ]; then
-            echo "Uploaded files are served without a CORS header -- see above."
+          if [ -z "$uploads_ok" ]; then
+            echo "Uploaded files aren't served with 200 + a CORS header -- see above."
+            exit 1
+          fi
+          if [ -z "$redeploy_ok" ]; then
+            echo "Sessions or uploads didn't survive a redeploy on the same volume -- see above."
             exit 1
           fi

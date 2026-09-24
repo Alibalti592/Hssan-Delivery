@@ -1,6 +1,38 @@
 #!/bin/sh
 set -e
 
+# Railway allows one volume per service, mounted at var/storage (outside the
+# webroot). Both things that must survive a redeploy live there: uploaded
+# photos, and the JWT keypair -- regenerating the keypair on every boot
+# silently invalidated every admin and client session after each deploy.
+# (docker-compose.staging.yml mounts public/uploads and config/jwt as their
+# own volumes instead; the guards below leave those alone.)
+mkdir -p var/storage/uploads var/storage/jwt
+
+# One-time migration: the volume used to be mounted directly at
+# public/uploads, so photos uploaded back then sit at its root.
+for d in restaurants products promotions; do
+    if [ -d "var/storage/$d" ] && [ ! -e "var/storage/uploads/$d" ]; then
+        mv "var/storage/$d" "var/storage/uploads/$d"
+    fi
+done
+
+# Point public/uploads and config/jwt at storage -- but only when each is
+# still the image's own empty directory. Never touch a mount point (same
+# device check) or a directory that already holds files.
+link_to_storage() {
+    path=$1
+    target=$2
+    if [ ! -L "$path" ] \
+        && [ -z "$(ls -A "$path" 2>/dev/null)" ] \
+        && [ "$(stat -c %d "$path")" = "$(stat -c %d "$(dirname "$path")")" ]; then
+        rmdir "$path"
+        ln -s "$target" "$path"
+    fi
+}
+link_to_storage public/uploads ../var/storage/uploads
+link_to_storage config/jwt ../var/storage/jwt
+
 # JWT keys are gitignored (see .gitignore) and never baked into the image —
 # generate them on first boot from JWT_PASSPHRASE so a deploy only needs to
 # supply that one secret, not a key file. Skipped if a keypair was already
