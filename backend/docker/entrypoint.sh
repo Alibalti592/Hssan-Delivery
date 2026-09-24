@@ -66,22 +66,35 @@ ln -sf ../mods-available/mpm_prefork.conf /etc/apache2/mods-enabled/mpm_prefork.
 apache2ctl start
 sleep 2
 php -r '
-$fp = @fsockopen("127.0.0.1", 80, $errno, $errstr, 5);
-if (!$fp) {
-    echo "DIAG: connect failed: $errstr ($errno)\n";
-} else {
-    $req = "OPTIONS /api/auth/login HTTP/1.1\r\n"
-         . "Host: hssan-delivery-production.up.railway.app\r\n"
-         . "Origin: https://admin-puce-xi-35.vercel.app\r\n"
-         . "Access-Control-Request-Method: POST\r\n"
-         . "Access-Control-Request-Headers: content-type,x-client-platform\r\n"
-         . "Connection: close\r\n\r\n";
-    fwrite($fp, $req);
+function probe($label, $raw) {
+    $fp = @fsockopen("127.0.0.1", 80, $errno, $errstr, 5);
+    if (!$fp) {
+        echo "DIAG $label: connect failed: $errstr ($errno)\n";
+        return;
+    }
+    fwrite($fp, $raw);
     $resp = "";
     while (!feof($fp)) { $resp .= fread($fp, 8192); }
     fclose($fp);
-    echo "DIAG RAW RESPONSE START\n" . $resp . "DIAG RAW RESPONSE END\n";
+    echo "DIAG $label RAW RESPONSE START\n" . $resp . "DIAG $label RAW RESPONSE END\n";
 }
+
+probe("PREFLIGHT", "OPTIONS /api/auth/login HTTP/1.1\r\n"
+    . "Host: hssan-delivery-production.up.railway.app\r\n"
+    . "Origin: https://admin-puce-xi-35.vercel.app\r\n"
+    . "Access-Control-Request-Method: POST\r\n"
+    . "Access-Control-Request-Headers: content-type,x-client-platform\r\n"
+    . "Connection: close\r\n\r\n");
+
+$body = json_encode(["phone" => "20000000", "password" => "admin1234"]);
+probe("LOGIN", "POST /api/auth/login HTTP/1.1\r\n"
+    . "Host: hssan-delivery-production.up.railway.app\r\n"
+    . "Origin: https://admin-puce-xi-35.vercel.app\r\n"
+    . "Content-Type: application/json\r\n"
+    . "X-Client-Platform: web\r\n"
+    . "Content-Length: " . strlen($body) . "\r\n"
+    . "Connection: close\r\n\r\n"
+    . $body);
 '
 apache2ctl stop
 sleep 1

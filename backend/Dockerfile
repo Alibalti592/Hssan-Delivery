@@ -46,6 +46,20 @@ ENV APACHE_DOCUMENT_ROOT=/var/www/html/public
 RUN sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/sites-available/*.conf \
     && sed -ri -e 's!/var/www/!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/apache2.conf /etc/apache2/conf-available/*.conf
 
+# This image ships no public/.htaccess (not installed via symfony/apache-pack)
+# and the base vhost has no rewrite/fallback rule of its own, so nothing
+# routes a "pretty" URL like /api/auth/login to index.php -- only requests
+# that map to a real file (e.g. "/" via DirectoryIndex, which resolves
+# straight to the real public/index.php) ever reach PHP. Every other path,
+# OPTIONS preflights included, was being answered directly by Apache's own
+# bare default handler (a 404 for GET/POST, or for OPTIONS specifically a
+# contentless 200 just listing "Allow: HEAD,GET,POST,OPTIONS") -- Symfony,
+# and therefore Nelmio's CORS listener, never even saw the request. This is
+# the modern (no .htaccess needed) equivalent of Symfony's recommended
+# front-controller rewrite: send anything that isn't a real file to
+# index.php, for every HTTP method.
+RUN sed -ri -e '/DocumentRoot/a\    FallbackResource /index.php' /etc/apache2/sites-available/*.conf
+
 WORKDIR /var/www/html
 COPY --from=vendor /app ./
 COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
