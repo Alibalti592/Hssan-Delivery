@@ -157,6 +157,9 @@ jobs:
 
           start_backend
           wait_for_backend
+          # wait_for_backend runs again for the redeploy below; the checks at
+          # the end are about this first boot.
+          first_status="$status"
 
           # "/" maps straight to the real public/index.php, so it proves
           # nothing about how Apache routes and forwards everything else.
@@ -197,6 +200,28 @@ jobs:
             case "$code" in *" 200"*) [ -n "$acao" ] && uploads_ok="yes" ;; esac
           fi
 
+          # A realistic phone photo (3 MB) must upload -- PHP's own default
+          # 2 MB cap once rejected these before PhotoUploader's 5 MB check.
+          # Also, /uploads/*/ must not be browsable as a directory listing.
+          photo_ok=""
+          listing_ok=""
+          if [ -n "$status" ]; then
+            admin_token=$(curl -sS -X POST http://127.0.0.1/api/auth/login \
+              -H 'Content-Type: application/json' \
+              -d '{"phone":"20000000","password":"admin1234"}' | jq -r '.token // empty' || true)
+            restaurant_id=$(curl -sS http://127.0.0.1/api/admin/restaurants \
+              -H "Authorization: Bearer $admin_token" | jq -r '.items[0].id // empty' || true)
+            { printf '\377\330\377\340\000\020JFIF\000'; head -c 3000000 /dev/urandom; } > /tmp/photo.jpg
+            p=$(curl -sS -o /tmp/photo-response.json -w '%{http_code}' \
+              -X POST "http://127.0.0.1/api/admin/restaurants/$restaurant_id/photo" \
+              -H "Authorization: Bearer $admin_token" -F 'photo=@/tmp/photo.jpg;type=image/jpeg' || true)
+            echo "3 MB photo upload to restaurant $restaurant_id -> $p"
+            [ "$p" = "200" ] && photo_ok="yes" || cat /tmp/photo-response.json
+            l=$(curl -sS -o /dev/null -w '%{http_code}' http://127.0.0.1/uploads/restaurants/ || true)
+            echo "GET /uploads/restaurants/ -> $l"
+            [ "$l" != "200" ] && listing_ok="yes"
+          fi
+
           echo "--- container logs (first boot) ---"
           docker logs backend-smoke
           docker rm -f backend-smoke >/dev/null
@@ -218,17 +243,17 @@ jobs:
             docker rm -f backend-smoke >/dev/null
           fi
 
-          if [ -z "$status" ]; then
+          if [ -z "$first_status" ]; then
             echo "Backend never responded — see logs above."
             exit 1
           fi
-          case "$status" in
+          case "$first_status" in
             5??)
-              echo "Backend responded with $status (server error) — see logs above."
+              echo "Backend responded with $first_status (server error) — see logs above."
               exit 1
               ;;
             *)
-              echo "Backend responded with $status."
+              echo "Backend responded with $first_status."
               ;;
           esac
           if [ -z "$auth_ok" ]; then
@@ -237,6 +262,14 @@ jobs:
           fi
           if [ -z "$uploads_ok" ]; then
             echo "Uploaded files aren't served with 200 + a CORS header -- see above."
+            exit 1
+          fi
+          if [ -z "$photo_ok" ]; then
+            echo "A 3 MB photo upload was rejected -- see above."
+            exit 1
+          fi
+          if [ -z "$listing_ok" ]; then
+            echo "/uploads/restaurants/ is served as a directory listing."
             exit 1
           fi
           if [ -z "$redeploy_ok" ]; then

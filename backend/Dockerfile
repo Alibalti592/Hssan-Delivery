@@ -77,19 +77,26 @@ RUN echo 'SetEnvIf Authorization "(.*)" HTTP_AUTHORIZATION=$1' > /etc/apache2/co
 # photo blank. They're public, non-credentialed images, so a wildcard is fine.
 #
 # Matched by URL rather than directory: public/uploads is a symlink into
-# var/storage (the persistent volume -- see docker/entrypoint.sh), so the
-# filesystem path Apache ends up at isn't under public/. The explicit
-# Require grant covers that symlink target.
+# var/storage (the persistent volume -- see docker/entrypoint.sh). The
+# Directory block drops the docroot's inherited "Indexes" so /uploads/*/
+# can't be listed (it would enumerate every stored filename), while keeping
+# FollowSymLinks for that symlink.
 RUN a2enmod headers \
     && printf '%s\n' \
         '<LocationMatch "^/uploads/">' \
         '    Header set Access-Control-Allow-Origin "*"' \
         '</LocationMatch>' \
-        '<Directory /var/www/html/var/storage/uploads>' \
+        '<Directory /var/www/html/public/uploads>' \
         '    Options FollowSymLinks' \
-        '    Require all granted' \
         '</Directory>' > /etc/apache2/conf-available/uploads-cors.conf \
     && a2enconf uploads-cors
+
+# PHP's built-in defaults (no php.ini ships in this image) cap uploads at
+# 2 MB, below PhotoUploader's own 5 MB limit -- a 2-5 MB phone photo passed
+# the admin's size check and then failed with "The uploaded file could not
+# be read." Raise PHP's caps just above the app's so PhotoUploader decides.
+RUN printf '%s\n' 'upload_max_filesize = 6M' 'post_max_size = 8M' \
+        > /usr/local/etc/php/conf.d/uploads.ini
 
 WORKDIR /var/www/html
 COPY --from=vendor /app ./

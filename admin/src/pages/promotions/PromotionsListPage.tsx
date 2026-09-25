@@ -8,16 +8,26 @@ import {
   Loading,
   ErrorBanner,
   EmptyState,
-  ActiveBadge,
   Pagination,
   formatDate,
 } from '../../components/ui';
+
+// "Active" is only the admin's on/off switch — clients see a promotion only
+// while it's also inside its start/end window (backend
+// PromotionRepository::findCurrentlyValid), so show that combined state.
+// Judged as of when the list was fetched (it refetches on focus/changes).
+function PromotionStatusBadge({ isActive, startAt, endAt, now }: { isActive: boolean; startAt: string; endAt: string; now: number }) {
+  if (!isActive) return <span className="badge closed">Deactivated</span>;
+  if (new Date(startAt).getTime() > now) return <span className="badge warn">Scheduled</span>;
+  if (new Date(endAt).getTime() < now) return <span className="badge muted">Expired</span>;
+  return <span className="badge">Live</span>;
+}
 
 export default function PromotionsListPage() {
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
 
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading, error, dataUpdatedAt } = useQuery({
     queryKey: ['promotions', page],
     queryFn: () => promotionsApi.list({ page }),
   });
@@ -54,7 +64,7 @@ export default function PromotionsListPage() {
                   <th>Title</th>
                   <th>Discount</th>
                   <th>Restaurant</th>
-                  <th>Valid until</th>
+                  <th>Valid</th>
                   <th>Status</th>
                   <th></th>
                 </tr>
@@ -81,9 +91,12 @@ export default function PromotionsListPage() {
                       {p.promoCode && ` · ${p.promoCode}`}
                     </td>
                     <td>{p.restaurantName ?? 'All restaurants'}</td>
-                    <td>{formatDate(p.endAt)}</td>
                     <td>
-                      <ActiveBadge isActive={p.isActive} />
+                      {formatDate(p.startAt)}
+                      <div className="rmeta">until {formatDate(p.endAt)}</div>
+                    </td>
+                    <td>
+                      <PromotionStatusBadge isActive={p.isActive} startAt={p.startAt} endAt={p.endAt} now={dataUpdatedAt} />
                     </td>
                     <td style={{ display: 'flex', gap: 8 }}>
                       <button
