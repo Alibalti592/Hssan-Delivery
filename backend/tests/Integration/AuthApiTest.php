@@ -5,6 +5,7 @@ namespace App\Tests\Integration;
 use App\Entity\User;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
+use Symfony\Component\HttpFoundation\Cookie;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
@@ -248,6 +249,66 @@ final class AuthApiTest extends WebTestCase
         );
 
         self::assertSame($user->getPhone(), $me['phone']);
+    }
+
+    /**
+     * The clearing cookie must carry the same SameSite/Secure/Path as the
+     * one login set. Production sets BEARER with SameSite=None (admin and
+     * API on different sites), and browsers ignore a SameSite=Lax
+     * Set-Cookie on a cross-site response -- logout used to hardcode 'lax',
+     * so signing out of the admin never actually removed the cookie.
+     */
+    public function testLogoutClearsAuthCookieWithTheSameAttributesLoginSetIt(): void
+    {
+        $client = static::createClient();
+
+        $this->entityManager = self::getContainer()
+            ->get(EntityManagerInterface::class);
+
+        $user = $this->createTestUser();
+
+        $client->request(
+            'POST',
+            '/api/auth/login',
+            server: [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_X_CLIENT_PLATFORM' => 'web',
+            ],
+            content: json_encode([
+                'phone' => $user->getPhone(),
+                'password' => 'password123',
+            ])
+        );
+
+        $loginCookie = $this->responseCookie($client->getResponse(), 'BEARER');
+        self::assertNotNull($loginCookie);
+
+        $client->request('POST', '/api/auth/logout');
+
+        self::assertResponseStatusCodeSame(Response::HTTP_NO_CONTENT);
+
+        $clearingCookie = $this->responseCookie($client->getResponse(), 'BEARER');
+        self::assertNotNull($clearingCookie);
+        self::assertTrue($clearingCookie->isCleared());
+        self::assertSame($loginCookie->getSameSite(), $clearingCookie->getSameSite());
+        self::assertSame($loginCookie->isSecure(), $clearingCookie->isSecure());
+        self::assertSame($loginCookie->getPath(), $clearingCookie->getPath());
+        self::assertSame($loginCookie->getDomain(), $clearingCookie->getDomain());
+
+        $client->request('GET', '/api/auth/me');
+
+        self::assertResponseStatusCodeSame(Response::HTTP_UNAUTHORIZED);
+    }
+
+    private function responseCookie(Response $response, string $name): ?Cookie
+    {
+        foreach ($response->headers->getCookies() as $cookie) {
+            if ($cookie->getName() === $name) {
+                return $cookie;
+            }
+        }
+
+        return null;
     }
 
     public function testAuthenticatedUserCanAccessMe(): void

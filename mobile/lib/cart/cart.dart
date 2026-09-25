@@ -16,6 +16,10 @@ class CartLine {
 /// restaurant replaces the cart; callers should confirm with the user first
 /// via [belongsToDifferentRestaurant].
 class CartController extends ChangeNotifier {
+  /// The backend rejects an order line above this (OrderItemRequest's
+  /// Range(max: 100)), so the cart never lets one grow past it.
+  static const maxQuantityPerProduct = 100;
+
   int? _restaurantId;
   String? _restaurantName;
   final Map<int, CartLine> _lines = {};
@@ -44,15 +48,23 @@ class CartController extends ChangeNotifier {
 
     final existing = _lines[product.id];
     if (existing != null) {
-      existing.quantity += quantity;
+      existing.quantity = (existing.quantity + quantity).clamp(
+        1,
+        maxQuantityPerProduct,
+      );
     } else {
-      _lines[product.id] = CartLine(product: product, quantity: quantity);
+      _lines[product.id] = CartLine(
+        product: product,
+        quantity: quantity.clamp(1, maxQuantityPerProduct),
+      );
     }
     notifyListeners();
   }
 
   void increment(int productId) {
-    _lines[productId]?.quantity++;
+    final line = _lines[productId];
+    if (line == null || line.quantity >= maxQuantityPerProduct) return;
+    line.quantity++;
     notifyListeners();
   }
 

@@ -64,7 +64,7 @@ export default function ProductsListPage() {
           ]}
         />
 
-        <ErrorBanner error={products.error} />
+        <ErrorBanner error={products.error ?? toggleAvailability.error} />
 
         {products.isLoading || categories.isLoading ? (
           <Loading />

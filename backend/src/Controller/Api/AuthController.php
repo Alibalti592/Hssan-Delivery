@@ -30,6 +30,7 @@ class AuthController extends AbstractApiController
         private readonly RateLimiterFactory $registerLimiter,
         private readonly RateLimiterFactory $passwordChangeLimiter,
         private readonly bool $jwtCookieSecure,
+        private readonly string $jwtCookieSameSite,
     ) {
         parent::__construct($serializer, $validator);
     }
@@ -88,7 +89,7 @@ class AuthController extends AbstractApiController
             null,
             $this->jwtCookieSecure,
             true,
-            'lax'
+            $this->jwtCookieSameSite
         );
 
         return $response;

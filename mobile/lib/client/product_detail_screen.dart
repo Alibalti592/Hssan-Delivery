@@ -149,7 +149,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                             ),
                             _StepButton(
                               icon: Icons.add,
-                              onTap: () => setState(() => _quantity++),
+                              onTap:
+                                  _quantity <
+                                      CartController.maxQuantityPerProduct
+                                  ? () => setState(() => _quantity++)
+                                  : null,
                             ),
                           ],
                         ),

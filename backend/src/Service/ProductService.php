@@ -158,10 +158,12 @@ final class ProductService
             throw new ConflictException('This product has existing orders and cannot be deleted. Deactivate it instead.');
         }
 
-        $this->photoUploader->delete($product->getPhotoFilename(), self::PHOTO_SUBDIRECTORY);
+        $filename = $product->getPhotoFilename();
 
         $this->entityManager->remove($product);
         $this->entityManager->flush();
+
+        $this->photoUploader->delete($filename, self::PHOTO_SUBDIRECTORY);
     }
 
     public function setPhoto(Product $product, UploadedFile $file): Product

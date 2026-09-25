@@ -222,6 +222,17 @@ jobs:
             [ "$l" != "200" ] && listing_ok="yes"
           fi
 
+          # Runs with the production cookie settings (SameSite=None): the
+          # clearing cookie must match, or browsers ignore it cross-site and
+          # "Sign out" in the admin never removes the session cookie.
+          logout_ok=""
+          if [ -n "$token" ]; then
+            clearing=$(curl -sS -D - -o /dev/null -X POST http://127.0.0.1/api/auth/logout \
+              -H "Authorization: Bearer $token" | tr -d '\r' | grep -i '^set-cookie: BEARER=' || true)
+            echo "POST /api/auth/logout -> ${clearing:-no BEARER Set-Cookie}"
+            printf '%s' "$clearing" | grep -qi 'samesite=none' && logout_ok="yes"
+          fi
+
           echo "--- container logs (first boot) ---"
           docker logs backend-smoke
           docker rm -f backend-smoke >/dev/null
@@ -262,6 +273,10 @@ jobs:
           fi
           if [ -z "$uploads_ok" ]; then
             echo "Uploaded files aren't served with 200 + a CORS header -- see above."
+            exit 1
+          fi
+          if [ -z "$logout_ok" ]; then
+            echo "Logout's clearing cookie doesn't match the login cookie's SameSite=None."
             exit 1
           fi
           if [ -z "$photo_ok" ]; then

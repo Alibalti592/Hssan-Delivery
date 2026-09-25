@@ -66,7 +66,7 @@ export default function RestaurantsListPage() {
         }
       />
       <div className="content">
-        <ErrorBanner error={error} />
+        <ErrorBanner error={error ?? toggleAvailability.error} />
         {isLoading ? (
           <Loading />
         ) : !data || data.items.length === 0 ? (
