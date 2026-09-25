@@ -18,12 +18,14 @@ for d in restaurants products promotions; do
 done
 
 # Point public/uploads and config/jwt at storage -- but only when each is
-# still the image's own empty directory. Never touch a mount point (same
-# device check) or a directory that already holds files.
+# still the image's own empty directory. Never touch a mount point (a bind
+# mount can sit on the same device, hence mountpoint as well as the device
+# check) or a directory that already holds files.
 link_to_storage() {
     path=$1
     target=$2
     if [ ! -L "$path" ] \
+        && ! mountpoint -q "$path" 2>/dev/null \
         && [ -z "$(ls -A "$path" 2>/dev/null)" ] \
         && [ "$(stat -c %d "$path")" = "$(stat -c %d "$(dirname "$path")")" ]; then
         rmdir "$path"
@@ -32,6 +34,10 @@ link_to_storage() {
 }
 link_to_storage public/uploads ../var/storage/uploads
 link_to_storage config/jwt ../var/storage/jwt
+
+if ! mountpoint -q var/storage 2>/dev/null && ! mountpoint -q public/uploads 2>/dev/null; then
+    echo "WARNING: no volume mounted at var/storage -- uploaded photos and the JWT keypair will be lost on the next deploy." >&2
+fi
 
 # JWT keys are gitignored (see .gitignore) and never baked into the image —
 # generate them on first boot from JWT_PASSPHRASE so a deploy only needs to
@@ -65,13 +71,14 @@ fi
 # request then fails with a 500 trying to rewrite the routes cache.
 # Re-chown before handing off to Apache so www-data owns whatever root
 # just created, same as the Dockerfile already does at build time for
-# whatever existed then. public/uploads is included here (not just at build
-# time) because on hosts that mount a persistent volume there (Railway, so
-# uploaded photos survive a redeploy instead of vanishing with the
-# container's ephemeral filesystem), the volume is mounted fresh on every
-# boot and typically comes back owned by root, not www-data — without this,
-# PhotoUploader's write on the next upload fails.
-chown -R www-data:www-data var config/jwt public/uploads
+# whatever existed then. This also covers var/storage, which a host mounts
+# fresh on every boot, typically owned by root -- without it PhotoUploader's
+# next write fails. Only entries not already owned by www-data are touched,
+# so boot time doesn't grow with the number of stored photos. -H follows
+# public/uploads and config/jwt when they're symlinks into var/storage, or
+# separate volumes (docker-compose.staging.yml).
+find -H var config/jwt public/uploads \( ! -user www-data -o ! -group www-data \) \
+    -exec chown -h www-data:www-data {} +
 
 # The exact same rm -f done at build time (Dockerfile) doesn't stick on
 # Railway: diagnostic logging confirmed mpm_prefork.load gets a fresh

@@ -10,3 +10,6 @@ var/
 tests/
 public/uploads/
 .git
+# Local JWT keys: baked in, they'd stop entrypoint.sh moving config/jwt
+# onto the persistent volume (it only links an empty directory).
+config/jwt/*.pem
