@@ -104,10 +104,12 @@ final class PromotionService
 
     public function delete(Promotion $promotion): void
     {
-        $this->photoUploader->delete($promotion->getImageFilename(), self::PHOTO_SUBDIRECTORY);
+        $filename = $promotion->getImageFilename();
 
         $this->entityManager->remove($promotion);
         $this->entityManager->flush();
+
+        $this->photoUploader->delete($filename, self::PHOTO_SUBDIRECTORY);
     }
 
     public function setPhoto(Promotion $promotion, UploadedFile $file): Promotion

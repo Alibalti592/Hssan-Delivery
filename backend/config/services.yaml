@@ -7,6 +7,8 @@
 # Put parameters here that don't need to change on each machine where the app is deployed
 # https://symfony.com/doc/current/best_practices.html#use-parameters-for-application-configuration
 parameters:
+    # Mirrors the 'lax' fallback in packages/lexik_jwt_authentication.php.
+    env(JWT_COOKIE_SAMESITE): 'lax'
 
 services:
     # default configuration for services in *this* file
@@ -21,6 +23,11 @@ services:
             # in lexik_jwt_authentication.yaml, or the browser won't recognize
             # the clearing cookie as overriding the one login set.
             bool $jwtCookieSecure: '%env(bool:JWT_COOKIE_SECURE)%'
+            # Same for SameSite: production sets BEARER with SameSite=None
+            # (admin and API on different sites), and browsers drop a
+            # SameSite=Lax Set-Cookie on a cross-site response -- so a
+            # hardcoded 'lax' here meant logout never cleared the cookie.
+            string $jwtCookieSameSite: '%env(JWT_COOKIE_SAMESITE)%'
 
     # makes classes in src/ available to be used as services
     # this creates a service per class whose id is the fully-qualified class name

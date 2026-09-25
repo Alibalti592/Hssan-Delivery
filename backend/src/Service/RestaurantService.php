@@ -10,6 +10,7 @@ use App\Exception\ConflictException;
 use App\Pagination\PaginatedResult;
 use App\Pagination\Paginator;
 use App\Repository\OrderRepository;
+use App\Repository\PromotionRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
 
@@ -20,6 +21,7 @@ final class RestaurantService
     public function __construct(
         private readonly EntityManagerInterface $entityManager,
         private readonly OrderRepository $orderRepository,
+        private readonly PromotionRepository $promotionRepository,
         private readonly PhotoUploader $photoUploader,
     ) {
     }
@@ -117,7 +119,8 @@ final class RestaurantService
     }
 
     /**
-     * Deletes a restaurant along with its categories and products. Refuses
+     * Deletes a restaurant along with its categories, products and the
+     * promotions scoped to it (platform-wide ones are untouched). Refuses
      * when the restaurant has any orders, since those reference it (and its
      * products) directly — deactivate it instead.
      */
@@ -127,8 +130,12 @@ final class RestaurantService
             throw new ConflictException('This restaurant has existing orders and cannot be deleted. Deactivate it instead.');
         }
 
+        // Photo files are only removed once the rows are actually gone, so a
+        // failed flush can't leave a restaurant with its images deleted.
+        $photos = [[$restaurant->getPhotoFilename(), self::PHOTO_SUBDIRECTORY]];
+
         foreach ($restaurant->getProducts() as $product) {
-            $this->photoUploader->delete($product->getPhotoFilename(), 'products');
+            $photos[] = [$product->getPhotoFilename(), 'products'];
             $this->entityManager->remove($product);
         }
 
@@ -136,10 +143,17 @@ final class RestaurantService
             $this->entityManager->remove($category);
         }
 
-        $this->photoUploader->delete($restaurant->getPhotoFilename(), self::PHOTO_SUBDIRECTORY);
+        foreach ($this->promotionRepository->findBy(['restaurant' => $restaurant]) as $promotion) {
+            $photos[] = [$promotion->getImageFilename(), 'promotions'];
+            $this->entityManager->remove($promotion);
+        }
 
         $this->entityManager->remove($restaurant);
         $this->entityManager->flush();
+
+        foreach ($photos as [$filename, $subdirectory]) {
+            $this->photoUploader->delete($filename, $subdirectory);
+        }
     }
 
     public function setPhoto(Restaurant $restaurant, UploadedFile $file): Restaurant

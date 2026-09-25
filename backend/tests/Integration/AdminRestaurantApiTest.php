@@ -8,6 +8,8 @@ use App\Entity\Category;
 use App\Entity\DeliveryZone;
 use App\Entity\Order;
 use App\Entity\Product;
+use App\Entity\Promotion;
+use App\Enum\DiscountType;
 use App\Enum\OrderStatus;
 use App\Enum\RestaurantType;
 use Doctrine\ORM\EntityManagerInterface;
@@ -411,6 +413,74 @@ final class AdminRestaurantApiTest extends WebTestCase
         self::assertNull(
             $this->entityManager->getRepository(Category::class)->find($categoryId)
         );
+    }
+
+    /**
+     * A promotion scoped to a restaurant is meaningless once the restaurant
+     * is gone, so it goes with it. Before, its foreign key made the delete
+     * fail with a 500 -- after the restaurant's photos had already been
+     * removed from disk. A platform-wide promotion must be left alone.
+     */
+    public function testDeletingRestaurantAlsoDeletesItsOwnPromotions(): void
+    {
+        $client = static::createClient();
+
+        $this->entityManager = self::getContainer()
+            ->get(EntityManagerInterface::class);
+
+        $admin = $this->createTestUser('ROLE_ADMIN', 'Test Admin');
+
+        $restaurant = (new Restaurant())
+            ->setName('Restaurant With Promotion')
+            ->setDescription(null)
+            ->setIsAvailable(true);
+
+        $this->entityManager->persist($restaurant);
+
+        $scoped = $this->createPromotion('Scoped Promo', $restaurant);
+        $platformWide = $this->createPromotion('Platform Promo', null);
+
+        $this->entityManager->flush();
+
+        $restaurantId = $restaurant->getId();
+        $scopedId = $scoped->getId();
+        $platformWideId = $platformWide->getId();
+
+        $adminToken = $this->authenticateClient($client, $admin);
+
+        $client->request(
+            'DELETE',
+            '/api/admin/restaurants/'.$restaurantId,
+            server: [
+                'HTTP_AUTHORIZATION' => 'Bearer '.$adminToken,
+            ]
+        );
+
+        self::assertResponseStatusCodeSame(Response::HTTP_NO_CONTENT);
+
+        $this->entityManager->clear();
+
+        self::assertNull($this->entityManager->getRepository(Restaurant::class)->find($restaurantId));
+        self::assertNull($this->entityManager->getRepository(Promotion::class)->find($scopedId));
+        self::assertNotNull($this->entityManager->getRepository(Promotion::class)->find($platformWideId));
+    }
+
+    private function createPromotion(string $title, ?Restaurant $restaurant): Promotion
+    {
+        $promotion = (new Promotion())
+            ->setTitle($title)
+            ->setDescription(null)
+            ->setDiscountType(DiscountType::PERCENTAGE)
+            ->setDiscountValue('10.000')
+            ->setPromoCode(null)
+            ->setStartAt(new \DateTimeImmutable('-1 day'))
+            ->setEndAt(new \DateTimeImmutable('+1 day'))
+            ->setIsActive(true)
+            ->setRestaurant($restaurant);
+
+        $this->entityManager->persist($promotion);
+
+        return $promotion;
     }
 
     public function testAdminCannotDeleteRestaurantWithOrders(): void
