@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "162751503293",
+    "project_id": "hssan-delivery",
+    "storage_bucket": "hssan-delivery.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:162751503293:android:c2c85ceafccffb5a88d0d4",
+        "android_client_info": {
+          "package_name": "tn.hssan.delivery"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAfv2nSn8mXKvMEaQOwpVO9kpKZUg-tjwA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

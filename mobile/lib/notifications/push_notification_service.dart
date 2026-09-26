@@ -45,13 +45,19 @@ class PushNotificationService {
     if (!AppConfig.firebaseConfigured) return;
 
     try {
+      // On Android the default Firebase app is already set up natively from
+      // android/app/google-services.json (that native setup is what lets a
+      // push show while the app is closed), so reuse it rather than passing
+      // the same settings a second time.
       await Firebase.initializeApp(
-        options: FirebaseOptions(
-          apiKey: AppConfig.firebaseApiKey,
-          appId: AppConfig.firebaseAppId,
-          messagingSenderId: AppConfig.firebaseMessagingSenderId,
-          projectId: AppConfig.firebaseProjectId,
-        ),
+        options: !kIsWeb && defaultTargetPlatform == TargetPlatform.android
+            ? null
+            : FirebaseOptions(
+                apiKey: AppConfig.firebaseApiKey,
+                appId: AppConfig.firebaseAppId,
+                messagingSenderId: AppConfig.firebaseMessagingSenderId,
+                projectId: AppConfig.firebaseProjectId,
+              ),
       );
       await FirebaseMessaging.instance.requestPermission();
       FirebaseMessaging.onMessage.listen(_showForegroundMessage);
