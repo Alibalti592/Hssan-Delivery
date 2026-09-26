@@ -8,6 +8,7 @@ import '../cart/cart.dart';
 import '../catalogue/catalogue_models.dart' show Restaurant, RestaurantType;
 import '../catalogue/catalogue_repository.dart';
 import '../config.dart';
+import '../promotions/auto_carousel.dart';
 import '../promotions/offer_screen.dart';
 import '../promotions/promotion_model.dart';
 import '../promotions/promotions_repository.dart';
@@ -743,7 +744,8 @@ class _PromotionsSection extends StatelessWidget {
         }
 
         // Offers (orderable, sold at a set price) get tall cards that show
-        // their whole flyer; plain discounts keep the banner strip.
+        // their whole flyer; plain discounts keep the banner strip. Both
+        // slide on their own (AutoCarousel).
         final offers = promotions.where((p) => p.isOffer).toList();
         final banners = promotions.where((p) => !p.isOffer).toList();
 
@@ -752,34 +754,23 @@ class _PromotionsSection extends StatelessWidget {
           children: [
             const _SectionHeader(title: 'Promotions'),
             if (offers.isNotEmpty)
-              SizedBox(
+              AutoCarousel(
+                itemCount: offers.length,
+                itemWidth: _OfferCard.width,
                 height: _OfferCard.height,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  itemCount: offers.length,
-                  separatorBuilder: (_, _) => const SizedBox(width: 12),
-                  itemBuilder: (context, index) =>
-                      _OfferCard(offer: offers[index]),
-                ),
+                itemBuilder: (context, index) =>
+                    _OfferCard(offer: offers[index]),
               ),
-            if (banners.isNotEmpty)
-              SizedBox(
-                height: offers.isNotEmpty ? 146 : 134,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  padding: EdgeInsets.fromLTRB(
-                    16,
-                    offers.isNotEmpty ? 12 : 0,
-                    16,
-                    0,
-                  ),
-                  itemCount: banners.length,
-                  separatorBuilder: (_, _) => const SizedBox(width: 12),
-                  itemBuilder: (context, index) =>
-                      _PromotionCard(promotion: banners[index]),
-                ),
+            if (banners.isNotEmpty) ...[
+              if (offers.isNotEmpty) const SizedBox(height: 14),
+              AutoCarousel(
+                itemCount: banners.length,
+                itemWidth: 260,
+                height: 134,
+                itemBuilder: (context, index) =>
+                    _PromotionCard(promotion: banners[index]),
               ),
+            ],
           ],
         );
       },
