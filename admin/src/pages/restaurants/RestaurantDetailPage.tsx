@@ -76,7 +76,10 @@ export default function RestaurantDetailPage() {
   function handleDelete() {
     if (
       window.confirm(
-        `Delete "${data?.name}"? This also deletes its categories and products, and cannot be undone.`,
+        `Permanently delete "${data?.name}"?\n\n` +
+          'This also deletes ALL its orders (with their deliveries), categories, products and promotions. ' +
+          'This cannot be undone.\n\n' +
+          'To only hide it from customers, use "Mark unavailable" instead.',
       )
     ) {
       deleteRestaurant.mutate();

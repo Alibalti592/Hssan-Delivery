@@ -277,9 +277,11 @@ PATCH  /api/admin/products/{id}/availability
 POST   /api/admin/products/{id}/photo
 DELETE /api/admin/products/{id}/photo
 
-Deleting a restaurant or product that has existing orders is refused (409) —
-deactivate it instead. Deleting a restaurant with no orders cascades to its
-categories and products.
+Deleting a restaurant is permanent and cascades to everything that belongs to
+it: its orders (with their items and deliveries), categories, products and
+the promotions scoped to it. Use "Mark unavailable" to hide a restaurant while
+keeping its history. Deleting a product that has existing orders is still
+refused (409) — deactivate it instead.
 Admin delivery zone management
 POST /api/admin/delivery-zones
 GET  /api/admin/delivery-zones
