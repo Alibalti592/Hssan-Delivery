@@ -20,6 +20,9 @@ dependencies:
   firebase_core: ^4.14.0
   firebase_messaging: ^16.7.0
   geolocator: ^14.0.3
+  # A regular dependency, not just the dev-time generator: main.dart uses
+  # it to hold the native launch screen until the splash image is ready.
+  flutter_native_splash: ^2.4.8
 
 dev_dependencies:
   flutter_test:
@@ -27,10 +30,13 @@ dev_dependencies:
 
   flutter_lints: ^6.0.0
   flutter_launcher_icons: ^0.14.4
-  flutter_native_splash: ^2.4.8
 
 flutter:
   uses-material-design: true
+
+  # The native launch image, also drawn by SplashScreen so the two match.
+  assets:
+    - assets/icon/splash_logo.png
 
   # Bundled so the app renders text without a network fetch to Google Fonts —
   # on web, Flutter's CanvasKit renderer otherwise fetches Roboto from
@@ -64,9 +70,15 @@ flutter_launcher_icons:
   remove_alpha_ios: true
 
 # Native splash screen, regenerated with `dart run flutter_native_splash:create`.
-# Same black brand background in both themes with the chrome "DH" monogram
-# centered — there's no separate dark-mode splash asset because the brand
-# background is already black.
+# Black background with the chrome "DH" script monogram centered. The image
+# is the glyph from assets/icon/app_icon_foreground.png, 140dp wide at 4x, in
+# a 1152x1152 transparent square -- the size Android 12+ expects for a
+# splash icon without an icon background (it shows it at 288dp, content
+# inside the central 192dp circle) and the 4x flutter_native_splash assumes
+# elsewhere. SplashScreen draws the same file in the same box, so the logo
+# doesn't move on the hand-off (update SplashMonogram.glyphHeight if the
+# glyph changes). No separate dark-mode assets: the brand background is
+# already black.
 flutter_native_splash:
   color: "#000000"
   image: assets/icon/splash_logo.png
@@ -74,6 +86,6 @@ flutter_native_splash:
   image_dark: assets/icon/splash_logo.png
   android_12:
     image: assets/icon/splash_logo.png
-    icon_background_color: "#000000"
+    color: "#000000"
     image_dark: assets/icon/splash_logo.png
-    icon_background_color_dark: "#000000"
+    color_dark: "#000000"

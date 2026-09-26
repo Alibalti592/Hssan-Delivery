@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:provider/provider.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 
@@ -33,6 +34,14 @@ Future<void> main() async {
   // Throws before the app runs if this is a release build pointed at a
   // non-HTTPS backend — see config.dart.
   AppConfig.assertSecureTransportInRelease();
+
+  // Keep the native launch screen up until the splash monogram has been
+  // decoded (see _RootState.didChangeDependencies): otherwise the first
+  // Flutter frame shows SplashScreen with the image still loading, and the
+  // logo blinks out for a moment on the hand-off.
+  FlutterNativeSplash.preserve(
+    widgetsBinding: WidgetsFlutterBinding.ensureInitialized(),
+  );
 
   // Empty DSN (the default — see config.dart) makes the SDK a no-op: it
   // still runs the app via appRunner, just never sends anything anywhere.
@@ -175,6 +184,7 @@ class _Root extends StatefulWidget {
 class _RootState extends State<_Root> {
   final _onboardingStorage = OnboardingStorage();
   bool? _onboardingSeen;
+  bool _splashImageRequested = false;
 
   @override
   void initState() {
@@ -182,6 +192,21 @@ class _RootState extends State<_Root> {
     _onboardingStorage.hasSeenOnboarding().then((seen) {
       if (mounted) setState(() => _onboardingSeen = seen);
     });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // _Root is always mounted, whichever screen it shows, so this always
+    // releases the native launch screen that main() held -- including when
+    // the image fails to load (precacheImage reports that and completes).
+    if (!_splashImageRequested) {
+      _splashImageRequested = true;
+      precacheImage(
+        SplashMonogram.image,
+        context,
+      ).whenComplete(FlutterNativeSplash.remove);
+    }
   }
 
   void _completeOnboarding() {
