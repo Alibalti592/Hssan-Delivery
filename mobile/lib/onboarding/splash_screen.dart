@@ -5,10 +5,11 @@ import '../theme.dart';
 /// Shown while [AuthController] restores a session on app start. Purely a
 /// branded loading state — there is nothing to interact with here.
 ///
-/// It takes over from the native launch screen, which shows the same
-/// [SplashMonogram.image] at the same size in the center of the screen, so
-/// the hand-off doesn't move the logo: only the name, tagline and spinner
-/// fade in underneath it.
+/// It takes over from the native launch screen, whose image
+/// (assets/icon/splash_logo.png) is [SplashMonogram] rendered at 4x and
+/// centered on screen. This screen keeps the monogram at the exact center
+/// too, so the hand-off doesn't move it: only the name, tagline and spinner
+/// fade in underneath.
 class SplashScreen extends StatelessWidget {
   const SplashScreen({super.key});
 
@@ -31,7 +32,7 @@ class SplashScreen extends StatelessWidget {
                     Opacity(opacity: opacity, child: child),
                 child: const Column(
                   children: [
-                    SizedBox(height: 18),
+                    SizedBox(height: 14),
                     Text(
                       'Delivery Hassen',
                       style: TextStyle(
@@ -65,31 +66,28 @@ class SplashScreen extends StatelessWidget {
   }
 }
 
-/// The chrome "DH" script monogram, drawn from the very image the native
-/// launch screen uses (see flutter_native_splash in pubspec.yaml).
-///
-/// That image is a 1152x1152 transparent square with the glyph centered.
-/// flutter_native_splash treats it as 4x, and Android 12+ shows its splash
-/// icon in a [imageSize] box, so drawing it here in the same box at the
-/// center of the screen lines the two up exactly. The widget only claims the
-/// glyph's own height, so the text below sits under the glyph rather than
-/// under the square's transparent padding.
+/// The plain italic "DH" brand monogram. The native launch image and the
+/// launcher icon are renders of this widget, so keep them in sync (see the
+/// flutter_launcher_icons / flutter_native_splash notes in pubspec.yaml).
 class SplashMonogram extends StatelessWidget {
   const SplashMonogram({super.key});
 
-  static const image = AssetImage('assets/icon/splash_logo.png');
-  static const double imageSize = 288;
-  static const double glyphHeight = 71.5;
-
   @override
   Widget build(BuildContext context) {
-    return const SizedBox(
-      width: imageSize,
-      height: glyphHeight,
-      child: OverflowBox(
-        maxWidth: imageSize,
-        maxHeight: imageSize,
-        child: Image(image: image, width: imageSize, height: imageSize),
+    return const Text(
+      'DH',
+      style: TextStyle(
+        fontFamily: 'Roboto',
+        color: Color(0xFFE8ECF2),
+        fontSize: 56,
+        fontWeight: FontWeight.w800,
+        fontStyle: FontStyle.italic,
+        letterSpacing: -2,
+        height: 1,
+        // Pinned rather than inherited: the Material theme sets `even`, the
+        // icon/launch-image renders have no theme, and the two place the
+        // glyphs differently inside the line box.
+        leadingDistribution: TextLeadingDistribution.even,
       ),
     );
   }
