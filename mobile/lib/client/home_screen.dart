@@ -170,7 +170,6 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
           ),
-          _PromotionsSection(future: _promotionsFuture, onRetry: _refresh),
           const SizedBox(height: 8),
           const _SectionHeader(title: 'Services'),
           SizedBox(
@@ -189,6 +188,10 @@ class _HomeScreenState extends State<HomeScreen> {
               },
             ),
           ),
+          // Below the services, not above: the services are how the app is
+          // used, and the tall offer cards would otherwise push them below
+          // the fold on small phones. The row still shows on first screen.
+          _PromotionsSection(future: _promotionsFuture, onRetry: _refresh),
           const SizedBox(height: 8),
           _SectionHeader(
             title: 'Restaurants',
@@ -747,12 +750,13 @@ class _PromotionsSection extends StatelessWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            const _SectionHeader(title: 'Promotions'),
             if (offers.isNotEmpty)
               SizedBox(
-                height: _OfferCard.height + 16,
+                height: _OfferCard.height,
                 child: ListView.separated(
                   scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
                   itemCount: offers.length,
                   separatorBuilder: (_, _) => const SizedBox(width: 12),
                   itemBuilder: (context, index) =>
@@ -761,10 +765,15 @@ class _PromotionsSection extends StatelessWidget {
               ),
             if (banners.isNotEmpty)
               SizedBox(
-                height: 150,
+                height: offers.isNotEmpty ? 146 : 134,
                 child: ListView.separated(
                   scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                  padding: EdgeInsets.fromLTRB(
+                    16,
+                    offers.isNotEmpty ? 12 : 0,
+                    16,
+                    0,
+                  ),
                   itemCount: banners.length,
                   separatorBuilder: (_, _) => const SizedBox(width: 12),
                   itemBuilder: (context, index) =>
@@ -785,7 +794,9 @@ class _OfferCard extends StatelessWidget {
 
   final Promotion offer;
 
-  static const double width = 230;
+  // Sized so the row shows on the first screen together with the services
+  // above it; the offer page shows the flyer in full.
+  static const double width = 185;
   // 3:4 -- the usual shape of a social-media flyer.
   static const double height = width * 4 / 3;
 
@@ -821,72 +832,75 @@ class _OfferCard extends StatelessWidget {
               Positioned.fill(
                 child: DecoratedBox(
                   decoration: BoxDecoration(
+                    // Dark enough at the bottom for the title to read over
+                    // whatever text the flyer itself has there.
                     gradient: LinearGradient(
-                      begin: Alignment.center,
+                      begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
+                      stops: const [0.35, 0.72, 1],
                       colors: [
                         Colors.black.withValues(alpha: 0),
-                        Colors.black.withValues(alpha: 0.8),
+                        Colors.black.withValues(alpha: 0.82),
+                        Colors.black.withValues(alpha: 0.95),
                       ],
                     ),
                   ),
                 ),
               ),
-              const Positioned(top: 10, left: 10, child: OfferTag()),
+              const Positioned(top: 8, left: 8, child: OfferTag()),
               Positioned(
-                left: 12,
-                right: 12,
-                bottom: 12,
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.end,
+                left: 10,
+                right: 10,
+                bottom: 10,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            offer.title,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w800,
-                              fontSize: 15,
-                              height: 1.2,
-                            ),
-                          ),
-                          if (offer.restaurantName != null)
-                            Text(
-                              offer.restaurantName!,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: Color(0xFFD5DAE1),
-                                fontSize: 12,
-                              ),
-                            ),
-                        ],
+                    Text(
+                      offer.title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 14,
+                        height: 1.2,
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        offer.discountLabel,
-                        style: const TextStyle(
-                          color: navy,
-                          fontWeight: FontWeight.w800,
-                          fontSize: 14,
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            offer.restaurantName ?? '',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Color(0xFFD5DAE1),
+                              fontSize: 11,
+                            ),
+                          ),
                         ),
-                      ),
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            offer.discountLabel,
+                            style: const TextStyle(
+                              color: navy,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
