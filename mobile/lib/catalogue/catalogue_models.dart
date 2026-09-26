@@ -67,6 +67,22 @@ class MenuCategory {
   }
 }
 
+/// A size/portion of a product ("M", "Familiale", "12 pièces"...) with its
+/// own price.
+class ProductOption {
+  const ProductOption({required this.name, required this.price});
+
+  final String name;
+  final String price;
+
+  factory ProductOption.fromJson(Map<String, dynamic> json) {
+    return ProductOption(
+      name: json['name'] as String? ?? '',
+      price: json['price'] as String? ?? '0.000',
+    );
+  }
+}
+
 class Product {
   Product({
     required this.id,
@@ -77,6 +93,7 @@ class Product {
     required this.photoUrl,
     required this.restaurantId,
     required this.categoryId,
+    this.options = const [],
   });
 
   final int id;
@@ -88,6 +105,12 @@ class Product {
   final int restaurantId;
   final int categoryId;
 
+  /// When non-empty, the customer must choose one and pays its price;
+  /// [price] is then the cheapest option ("à partir de").
+  final List<ProductOption> options;
+
+  bool get hasOptions => options.isNotEmpty;
+
   factory Product.fromJson(Map<String, dynamic> json) {
     return Product(
       id: json['id'] as int,
@@ -98,6 +121,9 @@ class Product {
       photoUrl: json['photoUrl'] as String?,
       restaurantId: json['restaurantId'] as int,
       categoryId: json['categoryId'] as int,
+      options: (json['options'] as List<dynamic>? ?? const [])
+          .map((o) => ProductOption.fromJson(o as Map<String, dynamic>))
+          .toList(growable: false),
     );
   }
 }

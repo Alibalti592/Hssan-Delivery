@@ -11,6 +11,7 @@ use App\Entity\Restaurant;
 use App\Entity\User;
 use App\Enum\OrderStatus;
 use Doctrine\ORM\EntityManagerInterface;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
@@ -148,6 +149,119 @@ final class AdminProductApiTest extends WebTestCase
             $category->getId(),
             $product->getCategory()?->getId()
         );
+    }
+
+    /**
+     * Sizes/portions: each option keeps its own price (normalized to 3
+     * decimals), the product price becomes the cheapest option, and an
+     * update can drop the options again in favour of a single price.
+     */
+    public function testAdminCanCreateAndUpdateProductWithOptions(): void
+    {
+        $client = static::createClient();
+
+        $this->entityManager = self::getContainer()
+            ->get(EntityManagerInterface::class);
+
+        $admin = $this->createTestUser('ROLE_ADMIN', 'Test Admin');
+        $restaurant = $this->createRestaurant('Pizzeria');
+        $category = $this->createCategory($restaurant, 'Pizzas');
+        $token = $this->authenticateClient($client, $admin);
+
+        $client->request(
+            'POST',
+            '/api/admin/restaurants/'.$restaurant->getId().'/products',
+            server: [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_AUTHORIZATION' => 'Bearer '.$token,
+            ],
+            content: json_encode([
+                'name' => 'Pizza Margherita',
+                'categoryId' => $category->getId(),
+                'options' => [
+                    ['name' => ' M ', 'price' => '12.5'],
+                    ['name' => 'L', 'price' => '16'],
+                    ['name' => 'Familiale', 'price' => '22.000'],
+                ],
+            ])
+        );
+
+        self::assertResponseStatusCodeSame(Response::HTTP_CREATED);
+
+        $created = json_decode($client->getResponse()->getContent(), true);
+
+        self::assertSame('12.500', $created['price']);
+        self::assertSame([
+            ['name' => 'M', 'price' => '12.500'],
+            ['name' => 'L', 'price' => '16.000'],
+            ['name' => 'Familiale', 'price' => '22.000'],
+        ], $created['options']);
+
+        $client->request(
+            'PUT',
+            '/api/admin/products/'.$created['id'],
+            server: [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_AUTHORIZATION' => 'Bearer '.$token,
+            ],
+            content: json_encode([
+                'name' => 'Pizza Margherita',
+                'price' => '14.000',
+                'categoryId' => $category->getId(),
+                'options' => [],
+            ])
+        );
+
+        self::assertResponseIsSuccessful();
+
+        $updated = json_decode($client->getResponse()->getContent(), true);
+
+        self::assertSame('14.000', $updated['price']);
+        self::assertSame([], $updated['options']);
+    }
+
+    #[DataProvider('invalidOptionPayloads')]
+    public function testInvalidProductOptionsAreRejected(array $payload): void
+    {
+        $client = static::createClient();
+
+        $this->entityManager = self::getContainer()
+            ->get(EntityManagerInterface::class);
+
+        $admin = $this->createTestUser('ROLE_ADMIN', 'Test Admin');
+        $restaurant = $this->createRestaurant('Pizzeria');
+        $category = $this->createCategory($restaurant, 'Pizzas');
+        $token = $this->authenticateClient($client, $admin);
+
+        $client->request(
+            'POST',
+            '/api/admin/restaurants/'.$restaurant->getId().'/products',
+            server: [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_AUTHORIZATION' => 'Bearer '.$token,
+            ],
+            content: json_encode($payload + [
+                'name' => 'Pizza',
+                'categoryId' => $category->getId(),
+            ])
+        );
+
+        self::assertResponseStatusCodeSame(Response::HTTP_UNPROCESSABLE_ENTITY);
+    }
+
+    public static function invalidOptionPayloads(): iterable
+    {
+        yield 'no price and no options' => [[]];
+        yield 'duplicate option names' => [['options' => [
+            ['name' => 'M', 'price' => '12.000'],
+            ['name' => 'm', 'price' => '13.000'],
+        ]]];
+        yield 'option without a price' => [['options' => [['name' => 'M']]]];
+        yield 'option with a blank name' => [['options' => [['name' => '', 'price' => '12.000']]]];
+        yield 'too many options' => [['options' => array_map(
+            static fn (int $i) => ['name' => "Size $i", 'price' => '10.000'],
+            range(1, 11)
+        )]];
     }
 
     public function testNonAdminCannotCreateProduct(): void

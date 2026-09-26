@@ -30,6 +30,7 @@ class OrderItemLine {
     required this.productName,
     required this.quantity,
     required this.unitPrice,
+    this.option,
   });
 
   final int productId;
@@ -37,12 +38,19 @@ class OrderItemLine {
   final int quantity;
   final String unitPrice;
 
+  /// The size/portion ordered ("Familiale"...), if the product had options.
+  final String? option;
+
+  String get displayName =>
+      option == null ? productName : '$productName ($option)';
+
   factory OrderItemLine.fromJson(Map<String, dynamic> json) {
     return OrderItemLine(
       productId: json['productId'] as int? ?? 0,
       productName: json['productName'] as String? ?? 'Article',
       quantity: json['quantity'] as int? ?? 1,
       unitPrice: json['unitPrice'] as String? ?? '0.000',
+      option: json['option'] as String?,
     );
   }
 }

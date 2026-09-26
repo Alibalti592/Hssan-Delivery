@@ -35,6 +35,17 @@ class _RestaurantMenuScreenState extends State<RestaurantMenuScreen> {
     return (categories, products);
   }
 
+  void _openProduct(Product product) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ProductDetailScreen(
+          product: product,
+          restaurantName: widget.restaurant.name,
+        ),
+      ),
+    );
+  }
+
   Future<void> _addToCart(Product product) async {
     final cart = context.read<CartController>();
     final messenger = ScaffoldMessenger.of(context);
@@ -196,17 +207,18 @@ class _RestaurantMenuScreenState extends State<RestaurantMenuScreen> {
                         _ProductRow(
                           product: product,
                           quantity: cart.quantityOf(product.id),
-                          onAdd: () => _addToCart(product),
-                          onIncrement: () => cart.increment(product.id),
-                          onDecrement: () => cart.decrement(product.id),
-                          onTap: () => Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => ProductDetailScreen(
-                                product: product,
-                                restaurantName: widget.restaurant.name,
-                              ),
-                            ),
+                          // A product with sizes/portions is added from its
+                          // detail screen, where the option is chosen.
+                          onAdd: product.hasOptions
+                              ? () => _openProduct(product)
+                              : () => _addToCart(product),
+                          onIncrement: () => cart.increment(
+                            CartController.lineKey(product.id, null),
                           ),
+                          onDecrement: () => cart.decrement(
+                            CartController.lineKey(product.id, null),
+                          ),
+                          onTap: () => _openProduct(product),
                         ),
                     ],
                   ],
@@ -344,7 +356,9 @@ class _ProductRow extends StatelessWidget {
                   ],
                   const SizedBox(height: 4),
                   Text(
-                    '${product.price} DT',
+                    product.hasOptions
+                        ? 'à partir de ${product.price} DT'
+                        : '${product.price} DT',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       fontWeight: FontWeight.w700,
                       color: navy,
@@ -354,7 +368,7 @@ class _ProductRow extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 8),
-            quantity == 0
+            quantity == 0 || product.hasOptions
                 ? OutlinedButton(
                     onPressed: onAdd,
                     // The app-wide OutlinedButtonTheme sets minimumSize to
@@ -366,7 +380,13 @@ class _ProductRow extends StatelessWidget {
                       minimumSize: const Size(0, 34),
                       padding: const EdgeInsets.symmetric(horizontal: 14),
                     ),
-                    child: const Text('AJOUTER'),
+                    child: Text(
+                      !product.hasOptions
+                          ? 'AJOUTER'
+                          : quantity == 0
+                          ? 'CHOISIR'
+                          : 'CHOISIR · $quantity',
+                    ),
                   )
                 : Row(
                     mainAxisSize: MainAxisSize.min,

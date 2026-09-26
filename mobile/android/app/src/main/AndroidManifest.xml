@@ -1,4 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Flutter's template only adds INTERNET to the debug/profile manifests
+         (for hot reload), so without this a release build can't reach the
+         API at all: every request fails as if the phone were offline. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <!-- Foreground-only: lets a courier's position be read while the app is
          open (see CourierLocationService). No ACCESS_BACKGROUND_LOCATION —
          background GPS tracking is intentionally not implemented, so the
@@ -10,7 +14,7 @@
          POST_NOTIFICATIONS and pushes are silently dropped by the OS. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <application
-        android:label="mobile"
+        android:label="Hssan Delivery"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

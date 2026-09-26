@@ -62,7 +62,7 @@ class CartView extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              line.product.name,
+                              line.displayName,
                               style: Theme.of(context).textTheme.titleSmall
                                   ?.copyWith(fontWeight: FontWeight.w700),
                             ),
@@ -71,7 +71,7 @@ class CartView extends StatelessWidget {
                               children: [
                                 _QtyButton(
                                   icon: Icons.remove,
-                                  onTap: () => cart.decrement(line.product.id),
+                                  onTap: () => cart.decrement(line.key),
                                 ),
                                 SizedBox(
                                   width: 28,
@@ -86,7 +86,7 @@ class CartView extends StatelessWidget {
                                 ),
                                 _QtyButton(
                                   icon: Icons.add,
-                                  onTap: () => cart.increment(line.product.id),
+                                  onTap: () => cart.increment(line.key),
                                 ),
                               ],
                             ),

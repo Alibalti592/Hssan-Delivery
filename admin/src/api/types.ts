@@ -19,11 +19,19 @@ export interface Category {
   updatedAt: string;
 }
 
+// A size/portion of a product ("M", "Familiale", "12 pièces"...) with its
+// own price. When a product has options, `price` is the cheapest one.
+export interface ProductOption {
+  name: string;
+  price: string;
+}
+
 export interface Product {
   id: number;
   name: string;
   description: string | null;
   price: string;
+  options: ProductOption[];
   isAvailable: boolean;
   photoUrl: string | null;
   restaurantId: number;
@@ -58,6 +66,7 @@ export interface OrderItem {
   id: number;
   productId: number;
   productName: string;
+  option: string | null;
   quantity: number;
   unitPrice: string;
 }

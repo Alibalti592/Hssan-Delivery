@@ -41,6 +41,7 @@ final class DeliveryResponse
         foreach ($order->getItems() as $item) {
             $items[] = [
                 'productName' => $item->getProduct()?->getName(),
+                'option' => $item->getOptionName(),
                 'quantity' => $item->getQuantity(),
                 'unitPrice' => $item->getUnitPrice(),
             ];

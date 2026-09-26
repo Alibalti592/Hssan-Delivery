@@ -3,12 +3,23 @@ import 'package:flutter/foundation.dart';
 import '../catalogue/catalogue_models.dart';
 
 class CartLine {
-  CartLine({required this.product, required this.quantity});
+  CartLine({required this.product, required this.quantity, this.option});
 
   final Product product;
+
+  /// The chosen size/portion, for a product that has options.
+  final ProductOption? option;
   int quantity;
 
-  double get lineTotal => (double.tryParse(product.price) ?? 0) * quantity;
+  /// Identifies the line: the same pizza in M and in Familiale are two lines.
+  String get key => CartController.lineKey(product.id, option?.name);
+
+  String get displayName =>
+      option == null ? product.name : '${product.name} (${option!.name})';
+
+  String get unitPrice => option?.price ?? product.price;
+
+  double get lineTotal => (double.tryParse(unitPrice) ?? 0) * quantity;
 }
 
 /// A cart can only hold items from one restaurant at a time — the backend's
@@ -20,9 +31,12 @@ class CartController extends ChangeNotifier {
   /// Range(max: 100)), so the cart never lets one grow past it.
   static const maxQuantityPerProduct = 100;
 
+  static String lineKey(int productId, String? optionName) =>
+      optionName == null ? '$productId' : '$productId|$optionName';
+
   int? _restaurantId;
   String? _restaurantName;
-  final Map<int, CartLine> _lines = {};
+  final Map<String, CartLine> _lines = {};
 
   int? get restaurantId => _restaurantId;
   String? get restaurantName => _restaurantName;
@@ -39,6 +53,7 @@ class CartController extends ChangeNotifier {
     Product product, {
     required String restaurantName,
     int quantity = 1,
+    ProductOption? option,
   }) {
     if (belongsToDifferentRestaurant(product.restaurantId)) {
       _lines.clear();
@@ -46,34 +61,36 @@ class CartController extends ChangeNotifier {
     _restaurantId = product.restaurantId;
     _restaurantName = restaurantName;
 
-    final existing = _lines[product.id];
+    final key = lineKey(product.id, option?.name);
+    final existing = _lines[key];
     if (existing != null) {
       existing.quantity = (existing.quantity + quantity).clamp(
         1,
         maxQuantityPerProduct,
       );
     } else {
-      _lines[product.id] = CartLine(
+      _lines[key] = CartLine(
         product: product,
+        option: option,
         quantity: quantity.clamp(1, maxQuantityPerProduct),
       );
     }
     notifyListeners();
   }
 
-  void increment(int productId) {
-    final line = _lines[productId];
+  void increment(String key) {
+    final line = _lines[key];
     if (line == null || line.quantity >= maxQuantityPerProduct) return;
     line.quantity++;
     notifyListeners();
   }
 
-  void decrement(int productId) {
-    final line = _lines[productId];
+  void decrement(String key) {
+    final line = _lines[key];
     if (line == null) return;
 
     if (line.quantity <= 1) {
-      _lines.remove(productId);
+      _lines.remove(key);
     } else {
       line.quantity--;
     }
@@ -85,7 +102,10 @@ class CartController extends ChangeNotifier {
     notifyListeners();
   }
 
-  int quantityOf(int productId) => _lines[productId]?.quantity ?? 0;
+  /// Total quantity of a product in the cart, across all its options.
+  int quantityOf(int productId) => _lines.values
+      .where((l) => l.product.id == productId)
+      .fold(0, (sum, l) => sum + l.quantity);
 
   void clear() {
     _lines.clear();

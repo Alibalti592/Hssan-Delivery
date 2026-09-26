@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useParams } from 'react-router-dom';
 import { categoriesApi, productsApi, restaurantsApi } from '../../api/resources';
+import type { ProductOption } from '../../api/types';
 import { PageHeader, Loading, ErrorBanner, Breadcrumb, MONEY_PATTERN, MONEY_TITLE } from '../../components/ui';
 import { PhotoUploader } from '../../components/PhotoUploader';
 
@@ -31,6 +32,9 @@ export default function ProductFormPage() {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState('');
+  // Sizes/portions ("M", "L", "Familiale", "6 pièces"...), each with its own
+  // price. Empty = the product is sold at the single `price` above.
+  const [options, setOptions] = useState<ProductOption[]>([]);
   const [categoryId, setCategoryId] = useState<number | ''>('');
   const [isAvailable, setIsAvailable] = useState(true);
 
@@ -39,6 +43,7 @@ export default function ProductFormPage() {
       setName(existing.data.name);
       setDescription(existing.data.description ?? '');
       setPrice(existing.data.price);
+      setOptions(existing.data.options ?? []);
       setCategoryId(existing.data.categoryId);
       setIsAvailable(existing.data.isAvailable);
     }
@@ -55,7 +60,8 @@ export default function ProductFormPage() {
       const payload = {
         name,
         description: description || null,
-        price,
+        price: options.length > 0 ? null : price,
+        options: options.map((o) => ({ name: o.name.trim(), price: o.price })),
         categoryId: Number(categoryId),
         isAvailable,
       };
@@ -93,6 +99,10 @@ export default function ProductFormPage() {
       navigate(`/restaurants/${restaurantId}/products`);
     },
   });
+
+  function updateOption(index: number, change: Partial<ProductOption>) {
+    setOptions((current) => current.map((o, i) => (i === index ? { ...o, ...change } : o)));
+  }
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -168,21 +178,75 @@ export default function ProductFormPage() {
                 onChange={(e) => setDescription(e.target.value)}
               />
             </div>
+            {options.length === 0 && (
+              <div className="field-group">
+                <label className="field-label" htmlFor="price">
+                  Price (DT)
+                </label>
+                <input
+                  id="price"
+                  className="field-input"
+                  value={price}
+                  onChange={(e) => setPrice(e.target.value)}
+                  placeholder="18.500"
+                  inputMode="decimal"
+                  pattern={MONEY_PATTERN}
+                  title={MONEY_TITLE}
+                  required
+                />
+              </div>
+            )}
             <div className="field-group">
-              <label className="field-label" htmlFor="price">
-                Price (DT)
-              </label>
-              <input
-                id="price"
-                className="field-input"
-                value={price}
-                onChange={(e) => setPrice(e.target.value)}
-                placeholder="18.500"
-                inputMode="decimal"
-                pattern={MONEY_PATTERN}
-                title={MONEY_TITLE}
-                required
-              />
+              <span className="field-label">Sizes / options</span>
+              <span className="rmeta" style={{ marginTop: 0 }}>
+                Optional. For a pizza: M, L, Familiale; for nuggets: 6 pièces, 12 pièces. Each option has its own
+                price and the customer must choose one.
+              </span>
+              {options.map((option, index) => (
+                <div key={index} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <input
+                    className="field-input"
+                    aria-label={`Option ${index + 1} name`}
+                    value={option.name}
+                    onChange={(e) => updateOption(index, { name: e.target.value })}
+                    placeholder="Familiale"
+                    maxLength={50}
+                    required
+                    style={{ flex: 2 }}
+                  />
+                  <input
+                    className="field-input"
+                    aria-label={`Option ${index + 1} price`}
+                    value={option.price}
+                    onChange={(e) => updateOption(index, { price: e.target.value })}
+                    placeholder="22.000"
+                    inputMode="decimal"
+                    pattern={MONEY_PATTERN}
+                    title={MONEY_TITLE}
+                    required
+                    style={{ flex: 1 }}
+                  />
+                  <button
+                    type="button"
+                    className="btn ghost sm"
+                    aria-label={`Remove option ${index + 1}`}
+                    onClick={() => setOptions((current) => current.filter((_, i) => i !== index))}
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+              {options.length < 10 && (
+                <div>
+                  <button
+                    type="button"
+                    className="btn ghost sm"
+                    onClick={() => setOptions((current) => [...current, { name: '', price: '' }])}
+                  >
+                    + Add size / option
+                  </button>
+                </div>
+              )}
             </div>
             <div className="field-group">
               <label className="field-label" htmlFor="categoryId">

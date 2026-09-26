@@ -1,0 +1,80 @@
+name: Android release APK
+
+# Builds a sideloadable release APK against the production API and publishes
+# it as the "android-latest" pre-release, so there's always one direct .apk
+# link to open on a phone. Signed with the runner's throwaway debug key (see
+# android/app/build.gradle.kts): fine for testing, not for the Play Store --
+# and since that key changes every run, uninstall the previous build before
+# installing a new one.
+
+on:
+  push:
+    branches:
+      - dev
+      - main
+    paths:
+      - 'mobile/**'
+      - '.github/workflows/android-release.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-release
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: mobile
+
+    env:
+      API_BASE_URL: https://hssan-delivery-production.up.railway.app
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build release APK
+        run: |
+          flutter build apk --release \
+            --dart-define=API_BASE_URL="$API_BASE_URL" \
+            --build-number="${{ github.run_number }}"
+          cp build/app/outputs/flutter-apk/app-release.apk hssan-delivery.apk
+          ls -l hssan-delivery.apk
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: hssan-delivery-apk
+          path: mobile/hssan-delivery.apk
+
+      - name: Publish the android-latest pre-release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete android-latest --yes --cleanup-tag || true
+          gh release create android-latest hssan-delivery.apk \
+            --target "$GITHUB_SHA" \
+            --prerelease \
+            --title "Android test build (${GITHUB_REF_NAME} #${{ github.run_number }})" \
+            --notes "Release APK built from ${GITHUB_REF_NAME} @ ${GITHUB_SHA::7}, pointing at ${API_BASE_URL}. Test build signed with a throwaway key: uninstall any previous Hssan Delivery build before installing this one."

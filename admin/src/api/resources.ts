@@ -10,6 +10,7 @@ import type {
   DiscountType,
   Paginated,
   Product,
+  ProductOption,
   Promotion,
   Restaurant,
   RestaurantType,
@@ -84,18 +85,24 @@ export const categoriesApi = {
 };
 
 // Products
+// `price` is only sent for a single-price product; with options the backend
+// derives it from the cheapest option.
+export interface ProductPayload {
+  name: string;
+  description: string | null;
+  price: string | null;
+  options: ProductOption[];
+  categoryId: number;
+  isAvailable: boolean;
+}
+
 export const productsApi = {
   listForRestaurant: (restaurantId: number, params?: PageParams) =>
     api.get<Paginated<Product>>(`/api/admin/restaurants/${restaurantId}/products${toQuery(params)}`),
   get: (id: number) => api.get<Product>(`/api/admin/products/${id}`),
-  create: (
-    restaurantId: number,
-    data: { name: string; description: string | null; price: string; categoryId: number; isAvailable: boolean },
-  ) => api.post<Product>(`/api/admin/restaurants/${restaurantId}/products`, data),
-  update: (
-    id: number,
-    data: { name: string; description: string | null; price: string; categoryId: number; isAvailable: boolean },
-  ) => api.put<Product>(`/api/admin/products/${id}`, data),
+  create: (restaurantId: number, data: ProductPayload) =>
+    api.post<Product>(`/api/admin/restaurants/${restaurantId}/products`, data),
+  update: (id: number, data: ProductPayload) => api.put<Product>(`/api/admin/products/${id}`, data),
   setAvailability: (id: number, isAvailable: boolean) =>
     api.patch<Product>(`/api/admin/products/${id}/availability`, { isAvailable }),
   delete: (id: number) => api.delete<void>(`/api/admin/products/${id}`),

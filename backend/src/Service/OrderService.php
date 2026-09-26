@@ -81,6 +81,24 @@ final class OrderService
             }
 
             $unitPrice = $product->getPrice();
+            $optionName = null;
+
+            if ([] !== $product->getOptions()) {
+                if (null === $itemDto->option) {
+                    throw new InvalidOperationException("Choose an option for product {$itemDto->productId}.");
+                }
+
+                $option = $product->findOption($itemDto->option);
+
+                if (null === $option) {
+                    throw new InvalidOperationException("Option \"{$itemDto->option}\" is not available for product {$itemDto->productId}.");
+                }
+
+                $unitPrice = $option['price'];
+                $optionName = $option['name'];
+            } elseif (null !== $itemDto->option) {
+                throw new InvalidOperationException("Product {$itemDto->productId} has no options.");
+            }
 
             if (null === $unitPrice) {
                 throw new InvalidOperationException("Product {$itemDto->productId} has no price.");
@@ -98,6 +116,7 @@ final class OrderService
             $orderItem->setProduct($product);
             $orderItem->setQuantity($itemDto->quantity);
             $orderItem->setUnitPrice($unitPrice);
+            $orderItem->setOptionName($optionName);
 
             $order->addItem($orderItem);
         }

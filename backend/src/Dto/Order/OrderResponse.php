@@ -39,6 +39,7 @@ final class OrderResponse
                 'id' => $item->getId(),
                 'productId' => $item->getProduct()?->getId(),
                 'productName' => $item->getProduct()?->getName(),
+                'option' => $item->getOptionName(),
                 'quantity' => $item->getQuantity(),
                 'unitPrice' => $item->getUnitPrice(),
             ];
