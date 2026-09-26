@@ -36,7 +36,8 @@ class Promotion
     #[ORM\Column]
     private ?\DateTimeImmutable $startAt = null;
 
-    #[ORM\Column]
+    /** Null = no end date: shown until the admin hides it (isActive). */
+    #[ORM\Column(nullable: true)]
     private ?\DateTimeImmutable $endAt = null;
 
     #[ORM\Column]
@@ -50,6 +51,26 @@ class Promotion
     #[ORM\ManyToOne]
     #[ORM\JoinColumn(nullable: true)]
     private ?Restaurant $restaurant = null;
+
+    /**
+     * What a FIXED_PRICE offer includes, one line per item ("2 Sandwichs
+     * Chawarma", "Frites dorées", ...). Empty for the other types.
+     *
+     * @var list<string>
+     */
+    #[ORM\Column(type: 'json')]
+    private array $items = [];
+
+    /**
+     * The product a FIXED_PRICE offer is ordered as: created and kept in
+     * sync by PromotionService (name = title, price = discountValue), in
+     * the restaurant's "Offres" category. Going through a real product
+     * means the cart, orders and deliveries need nothing offer-specific.
+     * Null for the other types.
+     */
+    #[ORM\OneToOne]
+    #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
+    private ?Product $product = null;
 
     #[ORM\Column]
     private ?\DateTimeImmutable $createdAt = null;
@@ -166,7 +187,7 @@ class Promotion
         return $this->endAt;
     }
 
-    public function setEndAt(\DateTimeImmutable $endAt): static
+    public function setEndAt(?\DateTimeImmutable $endAt): static
     {
         $this->endAt = $endAt;
 
@@ -197,6 +218,36 @@ class Promotion
         return $this;
     }
 
+    /**
+     * @return list<string>
+     */
+    public function getItems(): array
+    {
+        return $this->items;
+    }
+
+    /**
+     * @param list<string> $items
+     */
+    public function setItems(array $items): static
+    {
+        $this->items = $items;
+
+        return $this;
+    }
+
+    public function getProduct(): ?Product
+    {
+        return $this->product;
+    }
+
+    public function setProduct(?Product $product): static
+    {
+        $this->product = $product;
+
+        return $this;
+    }
+
     public function getCreatedAt(): ?\DateTimeImmutable
     {
         return $this->createdAt;
@@ -215,6 +266,6 @@ class Promotion
     {
         return $this->isActive
             && $this->startAt <= $now
-            && $this->endAt >= $now;
+            && (null === $this->endAt || $this->endAt >= $now);
     }
 }

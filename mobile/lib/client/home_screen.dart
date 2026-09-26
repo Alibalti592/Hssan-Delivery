@@ -8,6 +8,7 @@ import '../cart/cart.dart';
 import '../catalogue/catalogue_models.dart' show Restaurant, RestaurantType;
 import '../catalogue/catalogue_repository.dart';
 import '../config.dart';
+import '../promotions/offer_screen.dart';
 import '../promotions/promotion_model.dart';
 import '../promotions/promotions_repository.dart';
 import '../theme.dart';
@@ -738,18 +739,162 @@ class _PromotionsSection extends StatelessWidget {
           return const SizedBox.shrink();
         }
 
-        return SizedBox(
-          height: 150,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-            itemCount: promotions.length,
-            separatorBuilder: (_, _) => const SizedBox(width: 12),
-            itemBuilder: (context, index) =>
-                _PromotionCard(promotion: promotions[index]),
-          ),
+        // Offers (orderable, sold at a set price) get tall cards that show
+        // their whole flyer; plain discounts keep the banner strip.
+        final offers = promotions.where((p) => p.isOffer).toList();
+        final banners = promotions.where((p) => !p.isOffer).toList();
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (offers.isNotEmpty)
+              SizedBox(
+                height: _OfferCard.height + 16,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                  itemCount: offers.length,
+                  separatorBuilder: (_, _) => const SizedBox(width: 12),
+                  itemBuilder: (context, index) =>
+                      _OfferCard(offer: offers[index]),
+                ),
+              ),
+            if (banners.isNotEmpty)
+              SizedBox(
+                height: 150,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                  itemCount: banners.length,
+                  separatorBuilder: (_, _) => const SizedBox(width: 12),
+                  itemBuilder: (context, index) =>
+                      _PromotionCard(promotion: banners[index]),
+                ),
+              ),
+          ],
         );
       },
+    );
+  }
+}
+
+/// A fixed-price offer: its flyer in portrait, the price, and a tap into
+/// [OfferScreen] to order it.
+class _OfferCard extends StatelessWidget {
+  const _OfferCard({required this.offer});
+
+  final Promotion offer;
+
+  static const double width = 230;
+  // 3:4 -- the usual shape of a social-media flyer.
+  static const double height = width * 4 / 3;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: width,
+      height: height,
+      child: Card(
+        clipBehavior: Clip.antiAlias,
+        margin: EdgeInsets.zero,
+        child: InkWell(
+          onTap: () => Navigator.of(
+            context,
+          ).push(MaterialPageRoute(builder: (_) => OfferScreen(offer: offer))),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              offer.photoUrl != null
+                  ? Image.network(
+                      AppConfig.resolvePhotoUrl(offer.photoUrl!),
+                      fit: BoxFit.cover,
+                      alignment: Alignment.topCenter,
+                    )
+                  : Container(
+                      color: fieldFill,
+                      child: const Icon(
+                        Icons.local_offer_outlined,
+                        size: 40,
+                        color: Color(0xFF9FB0C4),
+                      ),
+                    ),
+              Positioned.fill(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.center,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.black.withValues(alpha: 0),
+                        Colors.black.withValues(alpha: 0.8),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const Positioned(top: 10, left: 10, child: OfferTag()),
+              Positioned(
+                left: 12,
+                right: 12,
+                bottom: 12,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            offer.title,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 15,
+                              height: 1.2,
+                            ),
+                          ),
+                          if (offer.restaurantName != null)
+                            Text(
+                              offer.restaurantName!,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: Color(0xFFD5DAE1),
+                                fontSize: 12,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        offer.discountLabel,
+                        style: const TextStyle(
+                          color: navy,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

@@ -7,6 +7,7 @@ use App\Dto\Admin\ProductOptionRequest;
 use App\Dto\Admin\UpdateProductRequest;
 use App\Entity\Category;
 use App\Entity\Product;
+use App\Entity\Promotion;
 use App\Entity\Restaurant;
 use App\Exception\ConflictException;
 use App\Exception\InvalidOperationException;
@@ -82,7 +83,9 @@ final class ProductService
     }
 
     /**
-     * The public catalogue: only what a client could actually order.
+     * The public catalogue: only what a client could actually order. A
+     * fixed-price offer's product counts only while its offer is live
+     * (same rule as Promotion::isCurrentlyValid).
      *
      * @return PaginatedResult<Product>
      */
@@ -92,10 +95,13 @@ final class ProductService
         int $limit,
     ): PaginatedResult {
         $qb = $this->productRepository->createQueryBuilder('p')
+            ->leftJoin(Promotion::class, 'offer', 'WITH', 'offer.product = p')
             ->andWhere('p.restaurant = :restaurant')
             ->andWhere('p.isAvailable = :available')
+            ->andWhere('offer.id IS NULL OR (offer.isActive = :available AND offer.startAt <= :now AND (offer.endAt IS NULL OR offer.endAt >= :now))')
             ->setParameter('restaurant', $restaurant)
             ->setParameter('available', true)
+            ->setParameter('now', new \DateTimeImmutable())
             ->orderBy('p.createdAt', 'ASC')
             ->addOrderBy('p.id', 'ASC');
 

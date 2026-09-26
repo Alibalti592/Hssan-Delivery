@@ -16,10 +16,10 @@ import {
 // while it's also inside its start/end window (backend
 // PromotionRepository::findCurrentlyValid), so show that combined state.
 // Judged as of when the list was fetched (it refetches on focus/changes).
-function PromotionStatusBadge({ isActive, startAt, endAt, now }: { isActive: boolean; startAt: string; endAt: string; now: number }) {
-  if (!isActive) return <span className="badge closed">Deactivated</span>;
+function PromotionStatusBadge({ isActive, startAt, endAt, now }: { isActive: boolean; startAt: string; endAt: string | null; now: number }) {
+  if (!isActive) return <span className="badge closed">Hidden</span>;
   if (new Date(startAt).getTime() > now) return <span className="badge warn">Scheduled</span>;
-  if (new Date(endAt).getTime() < now) return <span className="badge muted">Expired</span>;
+  if (endAt !== null && new Date(endAt).getTime() < now) return <span className="badge muted">Expired</span>;
   return <span className="badge">Live</span>;
 }
 
@@ -87,13 +87,15 @@ export default function PromotionsListPage() {
                     <td>
                       {p.discountType === 'PERCENTAGE'
                         ? `${p.discountValue}%`
-                        : `${p.discountValue} DT`}
+                        : p.discountType === 'FIXED_PRICE'
+                          ? `Offer · ${p.discountValue} DT`
+                          : `-${p.discountValue} DT`}
                       {p.promoCode && ` · ${p.promoCode}`}
                     </td>
                     <td>{p.restaurantName ?? 'All restaurants'}</td>
                     <td>
                       {formatDate(p.startAt)}
-                      <div className="rmeta">until {formatDate(p.endAt)}</div>
+                      <div className="rmeta">{p.endAt ? `until ${formatDate(p.endAt)}` : 'no end date'}</div>
                     </td>
                     <td>
                       <PromotionStatusBadge isActive={p.isActive} startAt={p.startAt} endAt={p.endAt} now={dataUpdatedAt} />
@@ -107,7 +109,7 @@ export default function PromotionsListPage() {
                           toggleActive.mutate({ id: p.id, isActive: !p.isActive })
                         }
                       >
-                        {p.isActive ? 'Deactivate' : 'Activate'}
+                        {p.isActive ? 'Hide from app' : 'Show in app'}
                       </button>
                       <Link to={`/promotions/${p.id}/edit`} className="btn sm">
                         Edit

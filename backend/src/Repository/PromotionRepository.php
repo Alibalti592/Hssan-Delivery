@@ -24,7 +24,7 @@ class PromotionRepository extends ServiceEntityRepository
         return $this->createQueryBuilder('p')
             ->andWhere('p.isActive = :active')
             ->andWhere('p.startAt <= :now')
-            ->andWhere('p.endAt >= :now')
+            ->andWhere('p.endAt IS NULL OR p.endAt >= :now')
             ->setParameter('active', true)
             ->setParameter('now', $now)
             ->orderBy('p.startAt', 'DESC')

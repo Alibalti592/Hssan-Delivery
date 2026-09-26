@@ -142,9 +142,10 @@ export interface PromotionPayload {
   discountValue: string;
   promoCode: string | null;
   startAt: string;
-  endAt: string;
+  endAt: string | null;
   isActive: boolean;
   restaurantId: number | null;
+  items: string[];
 }
 
 export const promotionsApi = {
