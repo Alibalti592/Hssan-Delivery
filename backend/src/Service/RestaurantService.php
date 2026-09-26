@@ -6,10 +6,8 @@ use App\Dto\Admin\CreateRestaurantRequest;
 use App\Dto\Admin\UpdateRestaurantRequest;
 use App\Entity\Restaurant;
 use App\Enum\RestaurantType;
-use App\Exception\ConflictException;
 use App\Pagination\PaginatedResult;
 use App\Pagination\Paginator;
-use App\Repository\OrderRepository;
 use App\Repository\PromotionRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
@@ -20,7 +18,6 @@ final class RestaurantService
 
     public function __construct(
         private readonly EntityManagerInterface $entityManager,
-        private readonly OrderRepository $orderRepository,
         private readonly PromotionRepository $promotionRepository,
         private readonly PhotoUploader $photoUploader,
     ) {
@@ -119,37 +116,53 @@ final class RestaurantService
     }
 
     /**
-     * Deletes a restaurant along with its categories, products and the
-     * promotions scoped to it (platform-wide ones are untouched). Refuses
-     * when the restaurant has any orders, since those reference it (and its
-     * products) directly — deactivate it instead.
+     * Permanently deletes a restaurant together with everything that belongs
+     * to it: its orders (with their items and deliveries), categories,
+     * products and the promotions scoped to it (platform-wide ones are
+     * untouched). Irreversible — the admin UI confirms first; "Mark
+     * unavailable" is the way to hide a restaurant while keeping its history.
      */
     public function delete(Restaurant $restaurant): void
     {
-        if ($this->orderRepository->count(['restaurant' => $restaurant]) > 0) {
-            throw new ConflictException('This restaurant has existing orders and cannot be deleted. Deactivate it instead.');
-        }
-
         // Photo files are only removed once the rows are actually gone, so a
-        // failed flush can't leave a restaurant with its images deleted.
+        // failed delete can't leave a restaurant with its images deleted.
         $photos = [[$restaurant->getPhotoFilename(), self::PHOTO_SUBDIRECTORY]];
 
-        foreach ($restaurant->getProducts() as $product) {
-            $photos[] = [$product->getPhotoFilename(), 'products'];
-            $this->entityManager->remove($product);
-        }
+        $this->entityManager->wrapInTransaction(function () use ($restaurant, &$photos) {
+            // Orders, and what points at them, go first: order items and
+            // deliveries reference the order, and orders reference the
+            // restaurant and its products.
+            $restaurantOrders = 'SELECT o.id FROM App\Entity\Order o WHERE o.restaurant = :restaurant';
 
-        foreach ($restaurant->getCategories() as $category) {
-            $this->entityManager->remove($category);
-        }
+            foreach (['App\Entity\Delivery d WHERE d.order', 'App\Entity\OrderItem i WHERE i.order'] as $target) {
+                $this->entityManager
+                    ->createQuery("DELETE FROM $target IN ($restaurantOrders)")
+                    ->setParameter('restaurant', $restaurant)
+                    ->execute();
+            }
 
-        foreach ($this->promotionRepository->findBy(['restaurant' => $restaurant]) as $promotion) {
-            $photos[] = [$promotion->getImageFilename(), 'promotions'];
-            $this->entityManager->remove($promotion);
-        }
+            $this->entityManager
+                ->createQuery('DELETE FROM App\Entity\Order o WHERE o.restaurant = :restaurant')
+                ->setParameter('restaurant', $restaurant)
+                ->execute();
 
-        $this->entityManager->remove($restaurant);
-        $this->entityManager->flush();
+            foreach ($restaurant->getProducts() as $product) {
+                $photos[] = [$product->getPhotoFilename(), 'products'];
+                $this->entityManager->remove($product);
+            }
+
+            foreach ($restaurant->getCategories() as $category) {
+                $this->entityManager->remove($category);
+            }
+
+            foreach ($this->promotionRepository->findBy(['restaurant' => $restaurant]) as $promotion) {
+                $photos[] = [$promotion->getImageFilename(), 'promotions'];
+                $this->entityManager->remove($promotion);
+            }
+
+            $this->entityManager->remove($restaurant);
+            $this->entityManager->flush();
+        });
 
         foreach ($photos as [$filename, $subdirectory]) {
             $this->photoUploader->delete($filename, $subdirectory);

@@ -2,6 +2,9 @@
 
 namespace App\Tests\Integration;
 
+use App\Entity\Delivery;
+use App\Entity\OrderItem;
+use App\Enum\DeliveryStatus;
 use App\Entity\Restaurant;
 use App\Entity\User;
 use App\Entity\Category;
@@ -483,54 +486,38 @@ final class AdminRestaurantApiTest extends WebTestCase
         return $promotion;
     }
 
-    public function testAdminCannotDeleteRestaurantWithOrders(): void
+    /**
+     * Deleting a restaurant is permanent and takes its order history with
+     * it: orders, their items and deliveries are removed too. Another
+     * restaurant's orders must not be touched.
+     */
+    public function testDeletingRestaurantAlsoDeletesItsOrders(): void
     {
         $client = static::createClient();
 
         $this->entityManager = self::getContainer()
             ->get(EntityManagerInterface::class);
 
-        $admin = $this->createTestUser(
-            'ROLE_ADMIN',
-            'Test Admin'
-        );
-
-        $clientUser = $this->createTestUser(
-            'ROLE_USER',
-            'Order Client'
-        );
-
-        $restaurant = (new Restaurant())
-            ->setName('Restaurant With Orders')
-            ->setDescription(null)
-            ->setIsAvailable(true);
-
-        $this->entityManager->persist($restaurant);
+        $admin = $this->createTestUser('ROLE_ADMIN', 'Test Admin');
+        $clientUser = $this->createTestUser('ROLE_USER', 'Order Client');
 
         $deliveryZone = (new DeliveryZone())
             ->setName('Zone '.random_int(1000, 9999))
             ->setFee('4.000');
-
         $this->entityManager->persist($deliveryZone);
 
-        $order = (new Order())
-            ->setUser($clientUser)
-            ->setRestaurant($restaurant)
-            ->setDeliveryAddress('Tunis, Tunisia')
-            ->setDeliveryZone($deliveryZone)
-            ->setDeliveryFee('4.000')
-            ->setTotalAmount('4.000')
-            ->setStatus(OrderStatus::PENDING);
+        $doomed = $this->createRestaurantWithOrder('Restaurant With Orders', $clientUser, $deliveryZone);
+        $kept = $this->createRestaurantWithOrder('Other Restaurant', $clientUser, $deliveryZone);
 
-        $this->entityManager->persist($order);
         $this->entityManager->flush();
 
-        $restaurantId = $restaurant->getId();
+        $restaurantId = $doomed['restaurant']->getId();
+        $orderId = $doomed['order']->getId();
+        $deliveryId = $doomed['order']->getDelivery()->getId();
+        $itemId = $doomed['order']->getItems()->first()->getId();
+        $keptOrderId = $kept['order']->getId();
 
-        $adminToken = $this->authenticateClient(
-            $client,
-            $admin
-        );
+        $adminToken = $this->authenticateClient($client, $admin);
 
         $client->request(
             'DELETE',
@@ -540,25 +527,69 @@ final class AdminRestaurantApiTest extends WebTestCase
             ]
         );
 
-        self::assertResponseStatusCodeSame(
-            Response::HTTP_CONFLICT
-        );
-
-        $response = json_decode(
-            $client->getResponse()->getContent(),
-            true
-        );
-
-        self::assertSame(
-            'This restaurant has existing orders and cannot be deleted. Deactivate it instead.',
-            $response['message']
-        );
+        self::assertResponseStatusCodeSame(Response::HTTP_NO_CONTENT);
 
         $this->entityManager->clear();
 
-        self::assertNotNull(
-            $this->entityManager->getRepository(Restaurant::class)->find($restaurantId)
-        );
+        self::assertNull($this->entityManager->getRepository(Restaurant::class)->find($restaurantId));
+        self::assertNull($this->entityManager->getRepository(Order::class)->find($orderId));
+        self::assertNull($this->entityManager->getRepository(Delivery::class)->find($deliveryId));
+        self::assertNull($this->entityManager->getRepository(OrderItem::class)->find($itemId));
+
+        $keptOrder = $this->entityManager->getRepository(Order::class)->find($keptOrderId);
+        self::assertNotNull($keptOrder);
+        self::assertNotNull($keptOrder->getDelivery());
+        self::assertCount(1, $keptOrder->getItems());
+    }
+
+    /**
+     * @return array{restaurant: Restaurant, order: Order}
+     */
+    private function createRestaurantWithOrder(string $name, User $customer, DeliveryZone $zone): array
+    {
+        $restaurant = (new Restaurant())
+            ->setName($name)
+            ->setDescription(null)
+            ->setIsAvailable(true);
+        $this->entityManager->persist($restaurant);
+
+        $category = (new Category())
+            ->setName('Menu')
+            ->setRestaurant($restaurant);
+        $this->entityManager->persist($category);
+
+        $product = (new Product())
+            ->setName('Pizza')
+            ->setPrice('12.000')
+            ->setIsAvailable(true)
+            ->setRestaurant($restaurant)
+            ->setCategory($category);
+        $this->entityManager->persist($product);
+
+        $order = (new Order())
+            ->setUser($customer)
+            ->setRestaurant($restaurant)
+            ->setDeliveryAddress('Tunis, Tunisia')
+            ->setDeliveryZone($zone)
+            ->setDeliveryFee('4.000')
+            ->setTotalAmount('16.000')
+            ->setStatus(OrderStatus::PENDING);
+
+        $item = (new OrderItem())
+            ->setProduct($product)
+            ->setQuantity(1)
+            ->setUnitPrice('12.000');
+        $order->addItem($item);
+
+        $delivery = (new Delivery())
+            ->setOrder($order)
+            ->setStatus(DeliveryStatus::PENDING);
+        $order->setDelivery($delivery);
+
+        $this->entityManager->persist($order);
+        $this->entityManager->persist($delivery);
+
+        return ['restaurant' => $restaurant, 'order' => $order];
     }
 
     public function testNonAdminCannotDeleteRestaurant(): void
