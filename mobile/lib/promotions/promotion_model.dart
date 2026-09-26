@@ -42,10 +42,14 @@ class Promotion {
   /// matching the discount types the backend supports (see
   /// App\Enum\DiscountType).
   String get discountLabel => switch (discountType) {
-    'PERCENTAGE' => '-$discountValue%',
+    // The API sends "10.000"; a percentage reads as "-10%" / "-12.5%".
+    'PERCENTAGE' => '-${_trimZeros(discountValue)}%',
     'FIXED_PRICE' => '$discountValue DT',
     _ => '-$discountValue DT',
   };
+
+  static String _trimZeros(String value) =>
+      value.contains('.') ? value.replaceFirst(RegExp(r'\.?0+$'), '') : value;
 
   /// The offer as the catalogue product it's ordered through, for the cart.
   /// Only meaningful when [isOffer].

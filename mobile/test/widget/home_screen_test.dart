@@ -150,8 +150,9 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Summer Discount'), findsOneWidget);
-      expect(find.text('Weekend Special'), findsOneWidget);
+      // findsWidgets: the carousel loops, so a card can be built twice.
+      expect(find.text('Summer Discount'), findsWidgets);
+      expect(find.text('Weekend Special'), findsWidgets);
     },
   );
 
