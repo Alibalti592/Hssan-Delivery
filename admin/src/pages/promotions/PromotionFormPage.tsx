@@ -36,9 +36,16 @@ export default function PromotionFormPage() {
   const [promoCode, setPromoCode] = useState('');
   const [startAt, setStartAt] = useState('');
   const [endAt, setEndAt] = useState('');
+  const [noEndDate, setNoEndDate] = useState(false);
   const [isActive, setIsActive] = useState(true);
   const [restaurantId, setRestaurantId] = useState<number | ''>('');
+  const [items, setItems] = useState<string[]>([]);
   const [clientError, setClientError] = useState<Error | null>(null);
+
+  // A fixed-price offer ("2 sandwiches + frites — 11 DT") is ordered in the
+  // app as one of its restaurant's products, so it needs a restaurant, has
+  // a price instead of a discount, and lists what it includes.
+  const isOffer = discountType === 'FIXED_PRICE';
 
   useEffect(() => {
     if (existing.data) {
@@ -48,9 +55,11 @@ export default function PromotionFormPage() {
       setDiscountValue(existing.data.discountValue);
       setPromoCode(existing.data.promoCode ?? '');
       setStartAt(toDatetimeLocal(existing.data.startAt));
-      setEndAt(toDatetimeLocal(existing.data.endAt));
+      setEndAt(existing.data.endAt ? toDatetimeLocal(existing.data.endAt) : '');
+      setNoEndDate(existing.data.endAt === null);
       setIsActive(existing.data.isActive);
       setRestaurantId(existing.data.restaurantId ?? '');
+      setItems(existing.data.items);
     }
   }, [existing.data]);
 
@@ -61,11 +70,12 @@ export default function PromotionFormPage() {
         description: description || null,
         discountType,
         discountValue,
-        promoCode: promoCode || null,
+        promoCode: isOffer ? null : promoCode || null,
         startAt: new Date(startAt).toISOString(),
-        endAt: new Date(endAt).toISOString(),
+        endAt: noEndDate ? null : new Date(endAt).toISOString(),
         isActive,
         restaurantId: restaurantId === '' ? null : Number(restaurantId),
+        items: isOffer ? items.map((item) => item.trim()) : [],
       };
 
       return isEdit
@@ -109,7 +119,7 @@ export default function PromotionFormPage() {
     // Mirrors PromotionService::applyRequest's own checks — catching these
     // here saves a round trip for the common typo, but the backend still
     // enforces both regardless of what this form does.
-    if (new Date(endAt) <= new Date(startAt)) {
+    if (!noEndDate && new Date(endAt) <= new Date(startAt)) {
       setClientError(new Error('End date must be after the start date.'));
       return;
     }
@@ -161,6 +171,13 @@ export default function PromotionFormPage() {
             }
           />
 
+          {isOffer && (
+            <p className="rmeta" style={{ marginTop: 0 }}>
+              {isEdit
+                ? 'Upload the offer flyer below: the app shows it in full, portrait works best.'
+                : 'After creating the offer you can upload its flyer.'}
+            </p>
+          )}
           {isEdit && existing.data && (
             <PhotoUploader
               photoUrl={existing.data.photoUrl}
@@ -208,18 +225,25 @@ export default function PromotionFormPage() {
               >
                 <option value="PERCENTAGE">Percentage</option>
                 <option value="FIXED_AMOUNT">Fixed amount</option>
+                <option value="FIXED_PRICE">Fixed-price offer (e.g. 2 sandwiches for 11 DT)</option>
               </select>
+              {isOffer && (
+                <span className="rmeta">
+                  Customers order the offer in the app like any dish: it goes to the restaurant and a courier as a
+                  normal order, and also shows in the restaurant's menu under "Offres".
+                </span>
+              )}
             </div>
             <div className="field-group">
               <label className="field-label" htmlFor="discountValue">
-                Discount value{discountType === 'PERCENTAGE' ? ' (%)' : ' (DT)'}
+                {isOffer ? 'Offer price (DT)' : `Discount value${discountType === 'PERCENTAGE' ? ' (%)' : ' (DT)'}`}
               </label>
               <input
                 id="discountValue"
                 className="field-input"
                 value={discountValue}
                 onChange={(e) => setDiscountValue(e.target.value)}
-                placeholder={discountType === 'PERCENTAGE' ? '10' : '5.000'}
+                placeholder={discountType === 'PERCENTAGE' ? '10' : isOffer ? '11.000' : '5.000'}
                 inputMode="decimal"
                 pattern={MONEY_PATTERN}
                 title={
@@ -230,29 +254,74 @@ export default function PromotionFormPage() {
                 required
               />
             </div>
-            <div className="field-group">
-              <label className="field-label" htmlFor="promoCode">
-                Promo code (optional)
-              </label>
-              <input
-                id="promoCode"
-                className="field-input"
-                value={promoCode}
-                onChange={(e) => setPromoCode(e.target.value)}
-                placeholder="SUMMER10"
-              />
-            </div>
+            {isOffer ? (
+              <div className="field-group">
+                <span className="field-label">What's included</span>
+                <span className="rmeta" style={{ marginTop: 0 }}>
+                  One line per item, shown with a ✓ on the offer page.
+                </span>
+                {items.map((item, index) => (
+                  <div key={index} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <input
+                      className="field-input"
+                      aria-label={`Included item ${index + 1}`}
+                      value={item}
+                      onChange={(e) =>
+                        setItems((current) => current.map((it, i) => (i === index ? e.target.value : it)))
+                      }
+                      placeholder={index === 0 ? '2 Sandwichs Chawarma au Poulet Grillé' : 'Frites dorées'}
+                      maxLength={100}
+                      required
+                      style={{ flex: 1 }}
+                    />
+                    <button
+                      type="button"
+                      className="btn ghost sm"
+                      aria-label={`Remove included item ${index + 1}`}
+                      onClick={() => setItems((current) => current.filter((_, i) => i !== index))}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+                {items.length < 10 && (
+                  <div>
+                    <button
+                      type="button"
+                      className="btn ghost sm"
+                      onClick={() => setItems((current) => [...current, ''])}
+                    >
+                      + Add item
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="field-group">
+                <label className="field-label" htmlFor="promoCode">
+                  Promo code (optional)
+                </label>
+                <input
+                  id="promoCode"
+                  className="field-input"
+                  value={promoCode}
+                  onChange={(e) => setPromoCode(e.target.value)}
+                  placeholder="SUMMER10"
+                />
+              </div>
+            )}
             <div className="field-group">
               <label className="field-label" htmlFor="restaurantId">
-                Restaurant (optional)
+                {isOffer ? 'Restaurant' : 'Restaurant (optional)'}
               </label>
               <select
                 id="restaurantId"
                 className="field-select"
                 value={restaurantId}
                 onChange={(e) => setRestaurantId(e.target.value === '' ? '' : Number(e.target.value))}
+                required={isOffer}
               >
-                <option value="">All restaurants</option>
+                <option value="">{isOffer ? 'Choose a restaurant' : 'All restaurants'}</option>
                 {restaurants.data?.items.map((r) => (
                   <option key={r.id} value={r.id}>
                     {r.name}
@@ -274,18 +343,30 @@ export default function PromotionFormPage() {
               />
             </div>
             <div className="field-group">
-              <label className="field-label" htmlFor="endAt">
-                Ends at
+              <label className="field-checkbox">
+                <input
+                  type="checkbox"
+                  checked={noEndDate}
+                  onChange={(e) => setNoEndDate(e.target.checked)}
+                />
+                No end date — runs until I hide it (e.g. while stock lasts)
               </label>
-              <input
-                id="endAt"
-                type="datetime-local"
-                className="field-input"
-                value={endAt}
-                onChange={(e) => setEndAt(e.target.value)}
-                required
-              />
             </div>
+            {!noEndDate && (
+              <div className="field-group">
+                <label className="field-label" htmlFor="endAt">
+                  Ends at
+                </label>
+                <input
+                  id="endAt"
+                  type="datetime-local"
+                  className="field-input"
+                  value={endAt}
+                  onChange={(e) => setEndAt(e.target.value)}
+                  required
+                />
+              </div>
+            )}
             <div className="field-group">
               <label className="field-checkbox">
                 <input
@@ -293,7 +374,7 @@ export default function PromotionFormPage() {
                   checked={isActive}
                   onChange={(e) => setIsActive(e.target.checked)}
                 />
-                Active
+                Visible in the app
               </label>
             </div>
             <div style={{ display: 'flex', gap: 10 }}>

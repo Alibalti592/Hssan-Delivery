@@ -42,6 +42,20 @@ Map<String, dynamic> _promotion(int id, String title) => {
   'restaurantName': null,
 };
 
+Map<String, dynamic> _offer() => {
+  'id': 7,
+  'title': '2 Sandwiches Chawarma',
+  'description': null,
+  'photoUrl': null,
+  'discountType': 'FIXED_PRICE',
+  'discountValue': '11.000',
+  'promoCode': null,
+  'restaurantId': 4,
+  'restaurantName': 'Chawarma House',
+  'items': ['2 Sandwichs Chawarma au Poulet Grillé', 'Frites dorées'],
+  'productId': 30,
+};
+
 /// Wires up the full provider graph HomeScreen now depends on (address,
 /// catalogue, auth, cart — mirroring main.dart's real composition), with an
 /// empty-but-valid response for everything not explicitly overridden.
@@ -138,6 +152,48 @@ void main() {
 
       expect(find.text('Summer Discount'), findsOneWidget);
       expect(find.text('Weekend Special'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'an offer opens its page and "Commander" puts it in the cart at its price',
+    (tester) async {
+      // Tall enough for the offer page's included-items list and its
+      // bottom bar in the test font.
+      tester.view.physicalSize = const Size(800, 2000);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+
+      final cart = CartController();
+      await tester.pumpWidget(_wrap(promotions: [_offer()], cart: cart));
+      await tester.pumpAndSettle();
+
+      expect(find.text('2 Sandwiches Chawarma'), findsOneWidget);
+      expect(find.text('11.000 DT'), findsOneWidget);
+
+      await tester.tap(find.text('2 Sandwiches Chawarma'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Ce qui est inclus'), findsOneWidget);
+      expect(
+        find.text('2 Sandwichs Chawarma au Poulet Grillé'),
+        findsOneWidget,
+      );
+      expect(find.text('Frites dorées'), findsOneWidget);
+      expect(find.text('Chawarma House'), findsOneWidget);
+
+      await tester.tap(find.byIcon(Icons.add));
+      await tester.pump();
+      expect(find.text('COMMANDER · 22.000 DT'), findsOneWidget);
+
+      await tester.tap(find.text('COMMANDER · 22.000 DT'));
+      await tester.pumpAndSettle();
+
+      expect(cart.restaurantId, 4);
+      expect(cart.restaurantName, 'Chawarma House');
+      expect(cart.lines.single.product.id, 30);
+      expect(cart.lines.single.quantity, 2);
+      expect(cart.subtotal, 22);
     },
   );
 

@@ -24,6 +24,10 @@ final class PromotionResponse
             'isActive' => $promotion->isActive(),
             'restaurantId' => $restaurant?->getId(),
             'restaurantName' => $restaurant?->getName(),
+            // FIXED_PRICE offers: what's included, and the product to order
+            // it as (null for the other types).
+            'items' => $promotion->getItems(),
+            'productId' => $promotion->getProduct()?->getId(),
             'createdAt' => $promotion->getCreatedAt()?->format(\DateTimeInterface::ATOM),
             'updatedAt' => $promotion->getUpdatedAt()?->format(\DateTimeInterface::ATOM),
         ];

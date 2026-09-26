@@ -17,6 +17,7 @@ use App\Pagination\Paginator;
 use App\Repository\DeliveryZoneRepository;
 use App\Repository\OrderRepository;
 use App\Repository\ProductRepository;
+use App\Repository\PromotionRepository;
 use App\Repository\RestaurantRepository;
 use App\Util\Money;
 use Doctrine\ORM\EntityManagerInterface;
@@ -30,6 +31,7 @@ final class OrderService
         private readonly ProductRepository $productRepository,
         private readonly DeliveryZoneRepository $deliveryZoneRepository,
         private readonly DeliveryService $deliveryService,
+        private readonly PromotionRepository $promotionRepository,
     ) {
     }
 
@@ -78,6 +80,14 @@ final class OrderService
 
             if (!$product->isAvailable()) {
                 throw new InvalidOperationException("Product {$itemDto->productId} is currently unavailable.");
+            }
+
+            // A fixed-price offer's product sells only while the offer is
+            // live: hidden, not started yet, or past its end date, it's off.
+            $offer = $this->promotionRepository->findOneBy(['product' => $product]);
+
+            if (null !== $offer && !$offer->isCurrentlyValid(new \DateTimeImmutable())) {
+                throw new InvalidOperationException("The offer \"{$offer->getTitle()}\" is no longer available.");
             }
 
             $unitPrice = $product->getPrice();

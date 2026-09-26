@@ -52,6 +52,40 @@ final class PhotoUploader
         return $filename;
     }
 
+    /**
+     * Copies a stored photo into another subdirectory under a fresh name,
+     * so the two owners can later replace or delete theirs independently.
+     *
+     * @return string|null the copy's filename; null when there is nothing
+     *                     to copy (no photo, or its file is missing)
+     */
+    public function copy(?string $filename, string $fromSubdirectory, string $toSubdirectory): ?string
+    {
+        if (null === $filename) {
+            return null;
+        }
+
+        $source = $this->uploadsDir.'/'.$fromSubdirectory.'/'.$filename;
+
+        if (!is_file($source)) {
+            return null;
+        }
+
+        $extension = pathinfo($filename, PATHINFO_EXTENSION);
+        $copy = bin2hex(random_bytes(16)).('' !== $extension ? '.'.$extension : '');
+        $directory = $this->uploadsDir.'/'.$toSubdirectory;
+
+        if (!is_dir($directory)) {
+            mkdir($directory, 0775, true);
+        }
+
+        if (!copy($source, $directory.'/'.$copy)) {
+            return null;
+        }
+
+        return $copy;
+    }
+
     public function delete(?string $filename, string $subdirectory): void
     {
         if (null === $filename) {

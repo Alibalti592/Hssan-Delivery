@@ -129,7 +129,10 @@ export interface AdminDelivery {
   createdAt: string;
 }
 
-export type DiscountType = 'PERCENTAGE' | 'FIXED_AMOUNT';
+// FIXED_PRICE is a bundle sold at a set price ("2 sandwiches + frites —
+// 11 DT"): discountValue is that price, and the backend orders it through a
+// product it manages (productId).
+export type DiscountType = 'PERCENTAGE' | 'FIXED_AMOUNT' | 'FIXED_PRICE';
 
 export interface Promotion {
   id: number;
@@ -140,10 +143,14 @@ export interface Promotion {
   discountValue: string;
   promoCode: string | null;
   startAt: string;
-  endAt: string;
+  /** null = no end date: shown until the admin hides it. */
+  endAt: string | null;
   isActive: boolean;
   restaurantId: number | null;
   restaurantName: string | null;
+  /** FIXED_PRICE only: what the offer includes, one line per item. */
+  items: string[];
+  productId: number | null;
   createdAt: string;
   updatedAt: string;
 }
