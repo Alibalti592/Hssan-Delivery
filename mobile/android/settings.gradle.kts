@@ -20,6 +20,10 @@ plugins {
     id("dev.flutter.flutter-plugin-loader") version "1.0.0"
     id("com.android.application") version "8.13.0" apply false
     id("org.jetbrains.kotlin.android") version "2.3.20" apply false
+    // Reads app/google-services.json so Firebase (push notifications) is
+    // initialized natively at process start -- needed for FCM to display
+    // notifications while the app is in the background or closed.
+    id("com.google.gms.google-services") version "4.4.2" apply false
 }
 
 include(":app")
