@@ -27,6 +27,14 @@ class OrderItem
     #[ORM\Column(type: 'decimal', precision: 10, scale: 3)]
     private ?string $unitPrice = null;
 
+    /**
+     * The product option ordered ("Familiale", "12 pièces"...), copied by
+     * name so the order keeps what was chosen even if the product's options
+     * are edited later. Null for a product without options.
+     */
+    #[ORM\Column(length: 50, nullable: true)]
+    private ?string $optionName = null;
+
     public function getId(): ?int
     {
         return $this->id;
@@ -64,6 +72,18 @@ class OrderItem
     public function setQuantity(int $quantity): static
     {
         $this->quantity = $quantity;
+
+        return $this;
+    }
+
+    public function getOptionName(): ?string
+    {
+        return $this->optionName;
+    }
+
+    public function setOptionName(?string $optionName): static
+    {
+        $this->optionName = $optionName;
 
         return $this;
     }

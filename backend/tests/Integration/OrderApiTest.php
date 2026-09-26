@@ -13,6 +13,7 @@ use App\Enum\DeliveryType;
 use App\Enum\OrderStatus;
 use App\Enum\RestaurantType;
 use Doctrine\ORM\EntityManagerInterface;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
@@ -639,6 +640,107 @@ final class OrderApiTest extends WebTestCase
 
         // Don't leak an exhausted limiter into whichever test runs next.
         self::getContainer()->get('cache.rate_limiter')->clear();
+    }
+
+    public function testOrderingAProductOptionChargesAndRecordsThatOption(): void
+    {
+        $client = static::createClient();
+
+        $this->entityManager = self::getContainer()
+            ->get(EntityManagerInterface::class);
+
+        $user = $this->createTestUser();
+        $restaurant = $this->createTestRestaurant();
+        $category = $this->createTestCategory($restaurant);
+        $pizza = $this->createTestProductWithOptions($restaurant, $category);
+        $zone = $this->createTestDeliveryZone('4.000');
+        $token = $this->authenticateClient($client, $user);
+
+        $response = $this->postOrder($client, $token, $restaurant, $zone, [
+            ['productId' => $pizza->getId(), 'option' => 'Familiale', 'quantity' => 2],
+            ['productId' => $pizza->getId(), 'option' => 'M', 'quantity' => 1],
+        ]);
+
+        self::assertResponseStatusCodeSame(201);
+
+        // 2 x 22.000 + 1 x 12.000 + 4.000 delivery
+        self::assertSame('60.000', $response['totalAmount']);
+        self::assertSame(
+            [['Familiale', '22.000', 2], ['M', '12.000', 1]],
+            array_map(
+                static fn (array $item) => [$item['option'], $item['unitPrice'], $item['quantity']],
+                $response['items']
+            )
+        );
+    }
+
+    #[DataProvider('invalidOptionChoices')]
+    public function testOrderItemOptionMustMatchTheProduct(bool $productHasOptions, ?string $option, string $expectedMessage): void
+    {
+        $client = static::createClient();
+
+        $this->entityManager = self::getContainer()
+            ->get(EntityManagerInterface::class);
+
+        $user = $this->createTestUser();
+        $restaurant = $this->createTestRestaurant();
+        $category = $this->createTestCategory($restaurant);
+        $product = $productHasOptions
+            ? $this->createTestProductWithOptions($restaurant, $category)
+            : $this->createTestProduct($restaurant, $category);
+        $zone = $this->createTestDeliveryZone('4.000');
+        $token = $this->authenticateClient($client, $user);
+
+        $response = $this->postOrder($client, $token, $restaurant, $zone, [
+            ['productId' => $product->getId(), 'option' => $option, 'quantity' => 1],
+        ]);
+
+        self::assertResponseStatusCodeSame(400);
+        self::assertSame(
+            sprintf($expectedMessage, $product->getId()),
+            $response['message']
+        );
+    }
+
+    public static function invalidOptionChoices(): iterable
+    {
+        yield 'no option chosen' => [true, null, 'Choose an option for product %d.'];
+        yield 'unknown option' => [true, 'XXL', 'Option "XXL" is not available for product %d.'];
+        yield 'option on a single-price product' => [false, 'M', 'Product %d has no options.'];
+    }
+
+    private function createTestProductWithOptions(Restaurant $restaurant, Category $category): Product
+    {
+        $product = $this->createTestProduct($restaurant, $category);
+        $product->setOptions([
+            ['name' => 'M', 'price' => '12.000'],
+            ['name' => 'Familiale', 'price' => '22.000'],
+        ]);
+        $product->setPrice('12.000');
+
+        $this->entityManager->flush();
+
+        return $product;
+    }
+
+    private function postOrder(KernelBrowser $client, string $token, Restaurant $restaurant, DeliveryZone $zone, array $items): array
+    {
+        $client->request(
+            'POST',
+            '/api/orders',
+            server: [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_AUTHORIZATION' => 'Bearer '.$token,
+            ],
+            content: json_encode([
+                'restaurantId' => $restaurant->getId(),
+                'items' => $items,
+                'deliveryAddress' => 'Tunis, Tunisia',
+                'deliveryZoneId' => $zone->getId(),
+            ])
+        );
+
+        return json_decode($client->getResponse()->getContent(), true);
     }
 
     public function testCreateOrderFailsWhenQuantityIsInvalid(): void

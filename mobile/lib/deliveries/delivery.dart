@@ -70,17 +70,26 @@ class DeliveryItem {
     required this.productName,
     required this.quantity,
     required this.unitPrice,
+    this.option,
   });
 
   final String productName;
   final int quantity;
   final String unitPrice;
 
+  /// The size/portion ordered ("Familiale"...), if the product had options —
+  /// what the courier must check they were handed at pickup.
+  final String? option;
+
+  String get displayName =>
+      option == null ? productName : '$productName ($option)';
+
   factory DeliveryItem.fromJson(Map<String, dynamic> json) {
     return DeliveryItem(
       productName: json['productName'] as String? ?? 'Item',
       quantity: json['quantity'] as int? ?? 1,
       unitPrice: json['unitPrice'] as String? ?? '0.000',
+      option: json['option'] as String?,
     );
   }
 }

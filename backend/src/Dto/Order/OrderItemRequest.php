@@ -16,4 +16,10 @@ final class OrderItemRequest
     #[Assert\NotNull]
     #[Assert\Range(min: 1, max: 100)]
     public ?int $quantity = null;
+
+    // Name of the chosen option ("Familiale", "12 pièces"...), required for
+    // a product that has options and rejected for one that doesn't — see
+    // OrderService::createOrder().
+    #[Assert\Length(max: 50)]
+    public ?string $option = null;
 }

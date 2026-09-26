@@ -101,7 +101,12 @@ export default function ProductsListPage() {
                     </td>
                     <td className="rname">{p.name}</td>
                     <td>{categoryName(p.categoryId)}</td>
-                    <td>{money(p.price)}</td>
+                    <td>
+                      {p.options?.length ? `from ${money(p.price)}` : money(p.price)}
+                      {p.options?.length ? (
+                        <div className="rmeta">{p.options.map((o) => o.name).join(' · ')}</div>
+                      ) : null}
+                    </td>
                     <td>
                       <AvailabilityBadge isAvailable={p.isAvailable} />
                     </td>

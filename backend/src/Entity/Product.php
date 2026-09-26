@@ -23,6 +23,17 @@ class Product
     #[ORM\Column(type: 'decimal', precision: 10, scale: 3)]
     private ?string $price = null;
 
+    /**
+     * Optional sizes/portions ("M", "L", "Familiale", "6 pièces"...), each
+     * with its own price. Empty for a product sold at a single price. When
+     * set, a client must pick one when ordering (see OrderService) and
+     * $price holds the lowest option price, for "from X DT" listings.
+     *
+     * @var list<array{name: string, price: string}>
+     */
+    #[ORM\Column(type: 'json')]
+    private array $options = [];
+
     #[ORM\Column]
     private bool $isAvailable = true;
 
@@ -97,6 +108,38 @@ class Product
         $this->price = $price;
 
         return $this;
+    }
+
+    /**
+     * @return list<array{name: string, price: string}>
+     */
+    public function getOptions(): array
+    {
+        return $this->options;
+    }
+
+    /**
+     * @param list<array{name: string, price: string}> $options
+     */
+    public function setOptions(array $options): static
+    {
+        $this->options = $options;
+
+        return $this;
+    }
+
+    /**
+     * @return array{name: string, price: string}|null
+     */
+    public function findOption(string $name): ?array
+    {
+        foreach ($this->options as $option) {
+            if ($option['name'] === $name) {
+                return $option;
+            }
+        }
+
+        return null;
     }
 
     public function isAvailable(): bool

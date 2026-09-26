@@ -23,6 +23,12 @@ class ProductDetailScreen extends StatefulWidget {
 class _ProductDetailScreenState extends State<ProductDetailScreen> {
   int _quantity = 1;
 
+  /// The chosen size/portion; the first one is preselected so the price
+  /// shown is always one the customer can actually order.
+  late ProductOption? _option = widget.product.hasOptions
+      ? widget.product.options.first
+      : null;
+
   Future<void> _addToCart() async {
     final cart = context.read<CartController>();
     final messenger = ScaffoldMessenger.of(context);
@@ -57,17 +63,20 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       widget.product,
       restaurantName: widget.restaurantName,
       quantity: _quantity,
+      option: _option,
     );
     navigator.pop();
-    messenger.showSnackBar(
-      SnackBar(content: Text('${widget.product.name} ajouté au panier')),
-    );
+    final label = _option == null
+        ? widget.product.name
+        : '${widget.product.name} (${_option!.name})';
+    messenger.showSnackBar(SnackBar(content: Text('$label ajouté au panier')));
   }
 
   @override
   Widget build(BuildContext context) {
     final product = widget.product;
-    final total = (double.tryParse(product.price) ?? 0) * _quantity;
+    final unitPrice = _option?.price ?? product.price;
+    final total = (double.tryParse(unitPrice) ?? 0) * _quantity;
 
     return Scaffold(
       body: SafeArea(
@@ -124,6 +133,31 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       Text(
                         product.description!,
                         style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                    ],
+                    if (product.hasOptions) ...[
+                      const SizedBox(height: 20),
+                      Text(
+                        'Taille',
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          for (final option in product.options)
+                            ChoiceChip(
+                              label: Text(
+                                '${option.name} · ${option.price} DT',
+                              ),
+                              selected: option.name == _option?.name,
+                              onSelected: (_) =>
+                                  setState(() => _option = option),
+                            ),
+                        ],
                       ),
                     ],
                     const SizedBox(height: 24),

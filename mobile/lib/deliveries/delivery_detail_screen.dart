@@ -119,7 +119,7 @@ class DeliveryDetailScreen extends StatelessWidget {
                           Padding(
                             padding: const EdgeInsets.only(bottom: 4),
                             child: Text(
-                              '${item.quantity}× ${item.productName}',
+                              '${item.quantity}× ${item.displayName}',
                             ),
                           ),
                         const Divider(height: 20),

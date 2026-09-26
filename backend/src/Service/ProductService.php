@@ -3,6 +3,7 @@
 namespace App\Service;
 
 use App\Dto\Admin\CreateProductRequest;
+use App\Dto\Admin\ProductOptionRequest;
 use App\Dto\Admin\UpdateProductRequest;
 use App\Entity\Category;
 use App\Entity\Product;
@@ -14,6 +15,7 @@ use App\Pagination\Paginator;
 use App\Repository\CategoryRepository;
 use App\Repository\OrderItemRepository;
 use App\Repository\ProductRepository;
+use App\Util\Money;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
 
@@ -48,10 +50,11 @@ final class ProductService
                     ? null
                     : trim($dto->description)
             )
-            ->setPrice($dto->price)
             ->setIsAvailable($dto->isAvailable)
             ->setRestaurant($restaurant)
             ->setCategory($category);
+
+        $this->applyPricing($product, $dto->price, $dto->options);
 
         $this->entityManager->persist($product);
         $this->entityManager->flush();
@@ -128,9 +131,10 @@ final class ProductService
                     ? null
                     : trim($dto->description)
             )
-            ->setPrice($dto->price)
             ->setIsAvailable($dto->isAvailable)
             ->setCategory($category);
+
+        $this->applyPricing($product, $dto->price, $dto->options);
 
         $this->entityManager->flush();
 
@@ -225,4 +229,34 @@ final class ProductService
         ->getRepository(Restaurant::class)
         ->find($id);
 }
+
+    /**
+     * Stores the options (prices normalized to 3 decimals, names trimmed) and
+     * the product price: the given one for a single-price product, or the
+     * lowest option price when there are options, so "from X DT" listings
+     * and anything reading $price stay meaningful. The request DTOs have
+     * already ensured a price exists when there are no options.
+     *
+     * @param ProductOptionRequest[] $options
+     */
+    private function applyPricing(Product $product, ?string $price, array $options): void
+    {
+        $normalized = array_map(
+            static fn (ProductOptionRequest $option) => [
+                'name' => trim((string) $option->name),
+                'price' => Money::fromMillimes(Money::toMillimes((string) $option->price)),
+            ],
+            array_values($options)
+        );
+
+        if ([] !== $normalized) {
+            $price = Money::fromMillimes(min(array_map(
+                static fn (array $option) => Money::toMillimes($option['price']),
+                $normalized
+            )));
+        }
+
+        $product->setOptions($normalized);
+        $product->setPrice((string) $price);
+    }
 }

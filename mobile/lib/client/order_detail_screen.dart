@@ -299,7 +299,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                           child: Row(
                             children: [
                               Text('${item.quantity}x '),
-                              Expanded(child: Text(item.productName)),
+                              Expanded(child: Text(item.displayName)),
                               Text('${item.unitPrice} DT'),
                             ],
                           ),

@@ -25,7 +25,13 @@ class OrdersRepository {
     final body = await _api.post('/api/orders', {
       'restaurantId': restaurantId,
       'items': items
-          .map((l) => {'productId': l.product.id, 'quantity': l.quantity})
+          .map(
+            (l) => {
+              'productId': l.product.id,
+              'quantity': l.quantity,
+              if (l.option != null) 'option': l.option!.name,
+            },
+          )
           .toList(growable: false),
       'deliveryAddress': deliveryAddress,
       'deliveryZoneId': deliveryZoneId,

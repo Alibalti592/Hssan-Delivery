@@ -141,7 +141,10 @@ export default function OrderDetailPage() {
                 <tbody>
                   {data.items.map((item) => (
                     <tr key={item.id}>
-                      <td className="rname">{item.productName}</td>
+                      <td className="rname">
+                        {item.productName}
+                        {item.option && <div className="rmeta">{item.option}</div>}
+                      </td>
                       <td>{item.quantity}</td>
                       <td>{money(item.unitPrice)}</td>
                       <td>
