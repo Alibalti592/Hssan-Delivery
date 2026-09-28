@@ -200,6 +200,16 @@ jobs:
             case "$code" in *" 200"*) [ -n "$acao" ] && uploads_ok="yes" ;; esac
           fi
 
+          # Nothing under /uploads/ may run as PHP -- a script that got in
+          # there must come back as plain text, never execute.
+          php_ok=""
+          if [ -n "$status" ]; then
+            docker exec backend-smoke sh -c 'printf "%s" "<?php echo \"php-\" . \"executed\";" > public/uploads/ci-probe.php'
+            body=$(curl -sS http://127.0.0.1/uploads/ci-probe.php || true)
+            echo "GET /uploads/ci-probe.php -> ${body:0:80}"
+            case "$body" in *php-executed*) ;; *) php_ok="yes" ;; esac
+          fi
+
           # A realistic phone photo (3 MB) must upload -- PHP's own default
           # 2 MB cap once rejected these before PhotoUploader's 5 MB check.
           # Also, /uploads/*/ must not be browsable as a directory listing.
@@ -273,6 +283,10 @@ jobs:
           fi
           if [ -z "$uploads_ok" ]; then
             echo "Uploaded files aren't served with 200 + a CORS header -- see above."
+            exit 1
+          fi
+          if [ -z "$php_ok" ]; then
+            echo "A .php file under /uploads/ was executed -- see above."
             exit 1
           fi
           if [ -z "$logout_ok" ]; then

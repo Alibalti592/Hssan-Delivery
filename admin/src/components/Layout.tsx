@@ -43,6 +43,10 @@ export default function Layout() {
         <div className="sfoot">
           {user?.name}
           <br />
+          <NavLink to="/account/password" className="sfoot-link">
+            Change password
+          </NavLink>
+          <br />
           <button type="button" onClick={handleLogout}>
             Log out
           </button>

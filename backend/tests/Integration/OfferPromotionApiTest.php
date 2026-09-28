@@ -221,6 +221,51 @@ final class OfferPromotionApiTest extends WebTestCase
         self::assertContains($id, $this->publicPromotionIds($clientToken));
     }
 
+    public function testPromotionsOfAClosedRestaurantAreNotShown(): void
+    {
+        $restaurant = $this->createRestaurant();
+        $offer = $this->saveOffer('POST', '/api/admin/promotions', $restaurant);
+        $banner = $this->saveOffer('POST', '/api/admin/promotions', $restaurant, [
+            'title' => '-10%',
+            'discountType' => 'PERCENTAGE',
+            'discountValue' => '10',
+        ]);
+        $clientToken = $this->authenticate($this->createUser('ROLE_USER'));
+
+        self::assertContains($offer['id'], $this->publicPromotionIds($clientToken));
+
+        $this->setRestaurantAvailable($restaurant, false);
+
+        $ids = $this->publicPromotionIds($clientToken);
+        self::assertNotContains($offer['id'], $ids);
+        self::assertNotContains($banner['id'], $ids);
+        $this->client->request('GET', '/api/promotions/'.$offer['id'], server: ['HTTP_AUTHORIZATION' => 'Bearer '.$clientToken]);
+        self::assertResponseStatusCodeSame(Response::HTTP_NOT_FOUND);
+
+        // Back open: back in the app.
+        $this->setRestaurantAvailable($restaurant, true);
+        self::assertContains($offer['id'], $this->publicPromotionIds($clientToken));
+    }
+
+    public function testAnOfferWhoseProductIsOffSaleIsNotShown(): void
+    {
+        $offer = $this->saveOffer('POST', '/api/admin/promotions', $this->createRestaurant());
+        $clientToken = $this->authenticate($this->createUser('ROLE_USER'));
+
+        // The admin switches the offer's product off in the restaurant menu.
+        $this->client->request(
+            'PATCH',
+            '/api/admin/products/'.$offer['productId'].'/availability',
+            server: $this->adminHeaders(),
+            content: json_encode(['isAvailable' => false])
+        );
+        self::assertResponseIsSuccessful();
+
+        self::assertNotContains($offer['id'], $this->publicPromotionIds($clientToken));
+        $this->client->request('GET', '/api/promotions/'.$offer['id'], server: ['HTTP_AUTHORIZATION' => 'Bearer '.$clientToken]);
+        self::assertResponseStatusCodeSame(Response::HTTP_NOT_FOUND);
+    }
+
     /**
      * @param array<string, mixed> $overrides
      */
@@ -341,6 +386,14 @@ final class OfferPromotionApiTest extends WebTestCase
         $this->entityManager->flush();
 
         return $restaurant;
+    }
+
+    private function setRestaurantAvailable(Restaurant $restaurant, bool $available): void
+    {
+        $this->entityManager->clear();
+        $managed = $this->entityManager->getRepository(Restaurant::class)->find($restaurant->getId());
+        $managed->setIsAvailable($available);
+        $this->entityManager->flush();
     }
 
     private function createZone(): DeliveryZone

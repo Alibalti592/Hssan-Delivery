@@ -19,6 +19,7 @@ import DeliveryDetailPage from './pages/deliveries/DeliveryDetailPage';
 import PromotionsListPage from './pages/promotions/PromotionsListPage';
 import PromotionFormPage from './pages/promotions/PromotionFormPage';
 import CourierMapPage from './pages/courier-map/CourierMapPage';
+import ChangePasswordPage from './pages/account/ChangePasswordPage';
 
 export default function App() {
   return (
@@ -58,6 +59,8 @@ export default function App() {
         <Route path="promotions/:promotionId/edit" element={<PromotionFormPage />} />
 
         <Route path="courier-map" element={<CourierMapPage />} />
+
+        <Route path="account/password" element={<ChangePasswordPage />} />
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>

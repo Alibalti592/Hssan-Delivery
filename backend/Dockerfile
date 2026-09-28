@@ -81,10 +81,16 @@ RUN echo 'SetEnvIf Authorization "(.*)" HTTP_AUTHORIZATION=$1' > /etc/apache2/co
 # Directory block drops the docroot's inherited "Indexes" so /uploads/*/
 # can't be listed (it would enumerate every stored filename), while keeping
 # FollowSymLinks for that symlink.
+#
+# SetHandler none: nothing under /uploads/ is ever run as a script, only
+# served as a file. PhotoUploader only stores images, but if a .php file
+# ever landed there it must not execute. Location sections merge last, so
+# this beats the image's own "\.php$ -> PHP" handler.
 RUN a2enmod headers \
     && printf '%s\n' \
         '<LocationMatch "^/uploads/">' \
         '    Header set Access-Control-Allow-Origin "*"' \
+        '    SetHandler none' \
         '</LocationMatch>' \
         '<Directory /var/www/html/public/uploads>' \
         '    Options FollowSymLinks' \

@@ -741,6 +741,12 @@ courier   21000002 / courier1234   (deactivated)
 client    22000001 / client1234
 client    22000002 / client1234
 
+These are public (this repository is public): they're for local development
+and tests only. On a real deployment, right after the first boot with
+`SEED_FIXTURES=true`, change the admin password (admin dashboard → "Change
+password" in the sidebar), deactivate or re-password the seeded
+courier/client accounts, and unset `SEED_FIXTURES`.
+
 Run the backend
 
 Using the Symfony CLI:
