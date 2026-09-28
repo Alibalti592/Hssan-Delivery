@@ -102,13 +102,7 @@ final class PromotionService
      */
     public function getIfCurrentlyValid(int $id): ?Promotion
     {
-        $promotion = $this->promotionRepository->find($id);
-
-        if (null === $promotion || !$promotion->isCurrentlyValid(new \DateTimeImmutable())) {
-            return null;
-        }
-
-        return $promotion;
+        return $this->promotionRepository->findOneCurrentlyValid($id, new \DateTimeImmutable());
     }
 
     public function setActive(Promotion $promotion, bool $isActive): Promotion
