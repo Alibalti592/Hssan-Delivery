@@ -41,6 +41,16 @@ class PushNotificationService {
   bool _initialized = false;
   String? _registeredToken;
 
+  /// Between registerForCurrentUser and unregister: a token Firebase hands
+  /// out in that window (onTokenRefresh) belongs to the signed-in account.
+  bool _signedIn = false;
+
+  /// On iOS the FCM token is derived from the APNs token Apple gives the
+  /// app, which arrives asynchronously after launch; asking Firebase for its
+  /// token before that throws.
+  static bool get _needsApnsToken =>
+      !kIsWeb && defaultTargetPlatform == TargetPlatform.iOS;
+
   Future<void> initialize() async {
     if (!AppConfig.firebaseConfigured) return;
 
@@ -64,6 +74,9 @@ class PushNotificationService {
       // App was backgrounded (not terminated) and the user tapped the push
       // to bring it back to the foreground.
       FirebaseMessaging.onMessageOpenedApp.listen(handleTap);
+      // Firebase rotates tokens now and then (and on iOS mints the first one
+      // only once APNs has answered): keep the backend's copy current.
+      FirebaseMessaging.instance.onTokenRefresh.listen(_onTokenRefresh);
 
       // Cold start: the app was launched *by* tapping a push while fully
       // terminated, so there's no onMessageOpenedApp event for it — the
@@ -87,24 +100,51 @@ class PushNotificationService {
   /// backend knows this device belongs to the current account.
   Future<void> registerForCurrentUser() async {
     if (!_initialized) return;
+    _signedIn = true;
 
     try {
+      // Not there yet: onTokenRefresh registers the token once it exists.
+      if (_needsApnsToken && !await _waitForApnsToken()) return;
+
       final token = await FirebaseMessaging.instance.getToken();
       if (token == null) return;
 
-      await _repository.registerDeviceToken(
-        token,
-        platform: defaultTargetPlatform.name,
-      );
-      _registeredToken = token;
+      await _register(token);
     } catch (_) {
       // Sign-in must succeed regardless of whether this did.
     }
   }
 
+  Future<bool> _waitForApnsToken() async {
+    for (var attempt = 0; attempt < 10; attempt++) {
+      if (await FirebaseMessaging.instance.getAPNSToken() != null) return true;
+      await Future<void>.delayed(const Duration(seconds: 1));
+    }
+    return false;
+  }
+
+  Future<void> _onTokenRefresh(String token) async {
+    if (!_signedIn || token == _registeredToken) return;
+
+    try {
+      await _register(token);
+    } catch (_) {
+      // Retried on the next sign-in or refresh.
+    }
+  }
+
+  Future<void> _register(String token) async {
+    await _repository.registerDeviceToken(
+      token,
+      platform: defaultTargetPlatform.name,
+    );
+    _registeredToken = token;
+  }
+
   /// Call before clearing the session on sign-out, so a shared/reset device
   /// stops receiving pushes for an account no longer signed in on it.
   Future<void> unregister() async {
+    _signedIn = false;
     final token = _registeredToken;
     if (!_initialized || token == null) return;
 

@@ -6,6 +6,7 @@ use App\Entity\User;
 use App\Repository\DeviceTokenRepository;
 use Kreait\Firebase\Contract\Messaging;
 use Kreait\Firebase\Factory;
+use Kreait\Firebase\Messaging\ApnsConfig;
 use Kreait\Firebase\Messaging\CloudMessage;
 use Kreait\Firebase\Messaging\Notification;
 use Psr\Log\LoggerInterface;
@@ -54,7 +55,10 @@ class PushNotificationService
 
         $message = CloudMessage::new()
             ->withNotification(Notification::create($title, $body))
-            ->withData($data);
+            ->withData($data)
+            // iOS shows a notification silently unless the APNs payload
+            // asks for a sound; Android already plays its channel's sound.
+            ->withApnsConfig(ApnsConfig::new()->withDefaultSound());
 
         try {
             $report = $messaging->sendMulticast($message, $tokens);

@@ -177,10 +177,19 @@ the app and upload it to App Store Connect once these are set up:
    to `main`. The build appears in TestFlight after Apple processes it;
    add testers there, and they install it with the TestFlight app.
 
-Push notifications on iPhone also need an iOS app registered in the
-Firebase project (its app ID goes in the `FIREBASE_IOS_APP_ID` Actions
-*variable*) and an APNs key uploaded to Firebase; without them the iOS app
-runs with notifications off.
+Push notifications on iPhone (the Push Notifications capability and
+background delivery are already in the Xcode project):
+
+1. developer.apple.com → Certificates, IDs & Profiles → Keys → +, tick
+   **Apple Push Notifications service (APNs)**, download the `.p8`.
+2. Firebase console → Project settings → Cloud Messaging → Apple app
+   configuration: upload that `.p8` with its Key ID and your Team ID.
+3. Firebase console → Project settings → General → Add app → iOS, bundle
+   ID `tn.hssan.delivery`. From its `GoogleService-Info.plist`, add two
+   GitHub Actions *variables*: `FIREBASE_IOS_APP_ID` (= `GOOGLE_APP_ID`) and
+   `FIREBASE_IOS_API_KEY` (= `API_KEY`).
+
+Without them the iOS app runs with notifications off.
 
 ## Test
 
