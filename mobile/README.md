@@ -151,6 +151,37 @@ Seed accounts in the backend first (`composer fixtures`):
 courier `21000001` / `courier1234`, client `22000001` / `client1234` — or
 register a new client from the login screen.
 
+## Release builds
+
+**Android** — every push to `dev`/`main` that touches `mobile/` builds a
+release APK (`.github/workflows/android-release.yml`) and publishes it as
+the `android-latest` pre-release: one direct link to open on a phone.
+
+**iOS (TestFlight)** — `.github/workflows/ios-testflight.yml` builds on a
+GitHub-hosted Mac (iOS apps can only be compiled with Xcode). Pull
+requests get an unsigned compile check; `main` and manual runs also sign
+the app and upload it to App Store Connect once these are set up:
+
+1. Join the Apple Developer Program (developer.apple.com, $99/year).
+2. In App Store Connect → Apps, create the app with bundle ID
+   `tn.hssan.delivery`.
+3. In App Store Connect → Users and Access → Integrations → App Store
+   Connect API, generate a key with the **Admin** role and download its
+   `AuthKey_XXXX.p8` (it can only be downloaded once). Xcode uses the key
+   to create the signing certificate and provisioning profile itself.
+4. In GitHub → Settings → Secrets and variables → Actions, add the
+   secrets `APP_STORE_CONNECT_KEY_ID`, `APP_STORE_CONNECT_ISSUER_ID`,
+   `APP_STORE_CONNECT_API_KEY` (the whole `.p8` file) and `APPLE_TEAM_ID`
+   (developer.apple.com → Membership details).
+5. Run the workflow (Actions → iOS TestFlight → Run workflow), or merge
+   to `main`. The build appears in TestFlight after Apple processes it;
+   add testers there, and they install it with the TestFlight app.
+
+Push notifications on iPhone also need an iOS app registered in the
+Firebase project (its app ID goes in the `FIREBASE_IOS_APP_ID` Actions
+*variable*) and an APNs key uploaded to Firebase; without them the iOS app
+runs with notifications off.
+
 ## Test
 
 ```
