@@ -17,7 +17,10 @@ dependencies:
   url_launcher: ^6.3.1
   intl: ^0.20.3
   sentry_flutter: ^9.30.0
-  firebase_core: ^4.14.0
+  # Keep firebase_core and firebase_messaging on the same FlutterFire
+  # release: on iOS each pins an exact firebase-ios-sdk version (Swift
+  # Package Manager), and Xcode refuses two different ones.
+  firebase_core: ^4.15.0
   firebase_messaging: ^16.7.0
   geolocator: ^14.0.3
 
