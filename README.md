@@ -744,8 +744,11 @@ client    22000002 / client1234
 These are public (this repository is public): they're for local development
 and tests only. On a real deployment, right after the first boot with
 `SEED_FIXTURES=true`, change the admin password (admin dashboard → "Change
-password" in the sidebar), deactivate or re-password the seeded
-courier/client accounts, and unset `SEED_FIXTURES`.
+password" in the sidebar) and unset `SEED_FIXTURES`. The seeded
+courier/client accounts don't survive on a deployed database: migration
+`Version20260928090000` deletes them (and their orders, addresses, device
+tokens and locations) the first time it runs there; on a fresh database it
+runs before the fixtures, so they still exist for development and tests.
 
 Run the backend
 
