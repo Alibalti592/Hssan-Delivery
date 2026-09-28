@@ -19,9 +19,12 @@ name: iOS TestFlight
 #   APP_STORE_CONNECT_API_KEY     the contents of the downloaded AuthKey_*.p8
 #   APPLE_TEAM_ID                 Membership details -> Team ID
 #
-# Optional variable, for push notifications on iPhone (Firebase console ->
-# add an iOS app with bundle ID tn.hssan.delivery): FIREBASE_IOS_APP_ID.
-# Without it the app runs with notifications off.
+# Optional variables, for push notifications on iPhone -- from the iOS app
+# registered in the Firebase console (bundle ID tn.hssan.delivery), whose
+# GoogleService-Info.plist lists them: FIREBASE_IOS_APP_ID (GOOGLE_APP_ID)
+# and FIREBASE_IOS_API_KEY (API_KEY). Firebase also needs the APNs key
+# uploaded (Project settings -> Cloud Messaging). Without the variables the
+# app runs with notifications off.
 #
 # macOS runner minutes count ten times against the GitHub Actions quota on
 # private repositories (~15 min per build), hence no run on every dev push.
@@ -59,9 +62,9 @@ jobs:
 
     env:
       API_BASE_URL: https://hssan-delivery-production.up.railway.app
-      # Public client identifiers (see android-release.yml); the iOS app ID
-      # is its own, so push stays off until it's set.
-      FIREBASE_API_KEY: AIzaSyAfv2nSn8mXKvMEaQOwpVO9kpKZUg-tjwA
+      # Public client identifiers, like android-release.yml's, but for the
+      # iOS app registered in Firebase -- push stays off until they're set.
+      FIREBASE_API_KEY: ${{ vars.FIREBASE_IOS_API_KEY }}
       FIREBASE_APP_ID: ${{ vars.FIREBASE_IOS_APP_ID }}
       FIREBASE_MESSAGING_SENDER_ID: '162751503293'
       FIREBASE_PROJECT_ID: hssan-delivery
