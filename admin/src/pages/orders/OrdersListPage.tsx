@@ -53,7 +53,17 @@ export default function OrdersListPage() {
                       {o.userName}
                       <div className="rmeta">{o.userPhone}</div>
                     </td>
-                    <td>{o.restaurantName ?? <span className="rmeta">— (Colis)</span>}</td>
+                    <td>
+                      {o.restaurantName ??
+                        (o.bill ? (
+                          <>
+                            {o.bill.providerName}
+                            <div className="rmeta">{o.bill.providerKind === 'TRANSFER' ? 'Mandat' : 'Facture'}</div>
+                          </>
+                        ) : (
+                          <span className="rmeta">— (Colis)</span>
+                        ))}
+                    </td>
                     <td>{deliveryTypeLabel(o.deliveryType)}</td>
                     <td>{money(o.totalAmount)}</td>
                     <td>

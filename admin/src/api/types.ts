@@ -73,6 +73,34 @@ export interface OrderItem {
 
 export type DeliveryType = 'RESTAURANT' | 'BILL' | 'GROCERY' | 'PARCEL';
 
+/** BILL: the courier pays a bill; TRANSFER: sends a mandat (IZI, Wafa Cash). */
+export type BillProviderKind = 'BILL' | 'TRANSFER';
+
+/** A company on the app's Factures screen (see backend BillProvider). */
+export interface BillProvider {
+  id: number;
+  name: string;
+  kind: BillProviderKind;
+  logoUrl: string | null;
+  /** Hidden providers stay on past orders but aren't offered in the app. */
+  isActive: boolean;
+  position: number;
+}
+
+/** The Factures part of an order (backend BillSummary). A mandat's receiver
+ * is the order's recipientName/recipientPhone. */
+export interface OrderBill {
+  providerId: number;
+  providerName: string;
+  providerKind: BillProviderKind;
+  providerLogoUrl: string | null;
+  /** The bill's reference; null for a mandat. */
+  reference: string | null;
+  amount: string;
+  /** Private: load it with api.blobUrl, never as a plain <img src>. */
+  photoUrl: string | null;
+}
+
 export interface AdminOrder {
   id: number;
   userId: number;
@@ -95,6 +123,8 @@ export interface AdminOrder {
   status: OrderStatus;
   deliveryType: DeliveryType;
   deliveryId: number | null;
+  /** Factures orders only. */
+  bill: OrderBill | null;
   createdAt: string;
   updatedAt: string;
 }

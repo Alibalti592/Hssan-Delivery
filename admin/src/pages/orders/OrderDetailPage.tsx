@@ -11,6 +11,7 @@ import {
   formatDate,
   deliveryTypeLabel,
 } from '../../components/ui';
+import { BillDetails } from '../../components/BillDetails';
 
 // Mirrors DeliveryDetailPage's CANCELLABLE: an order can be called off any
 // time before it's actually completed or already cancelled. Cancelling goes
@@ -75,7 +76,9 @@ export default function OrderDetailPage() {
                   </div>
                 </div>
                 <div className="detail-item">
-                  <div className="field-label">{data.restaurantName ? 'Restaurant' : 'Pickup address'}</div>
+                  <div className="field-label">
+                    {data.restaurantName ? 'Restaurant' : data.bill ? 'Collect cash at' : 'Pickup address'}
+                  </div>
                   <div className="value">{data.restaurantName ?? data.pickupAddress}</div>
                 </div>
                 <div className="detail-item">
@@ -83,10 +86,10 @@ export default function OrderDetailPage() {
                   <div className="value">{deliveryTypeLabel(data.deliveryType)}</div>
                 </div>
                 <div className="detail-item">
-                  <div className="field-label">Delivery address</div>
+                  <div className="field-label">{data.bill ? 'Bring the receipt to' : 'Delivery address'}</div>
                   <div className="value">{data.deliveryAddress}</div>
                 </div>
-                {data.recipientName && (
+                {data.recipientName && !data.bill && (
                   <div className="detail-item">
                     <div className="field-label">Recipient</div>
                     <div className="value">
@@ -128,6 +131,8 @@ export default function OrderDetailPage() {
               </div>
             </div>
 
+            {data.bill && <BillDetails order={data} bill={data.bill} />}
+
             <div className="card">
               <table>
                 <thead>
@@ -152,6 +157,14 @@ export default function OrderDetailPage() {
                       </td>
                     </tr>
                   ))}
+                  {data.bill && (
+                    <tr>
+                      <td colSpan={3} style={{ textAlign: 'right', fontWeight: 700 }}>
+                        {data.bill.providerKind === 'TRANSFER' ? 'Amount to send' : 'Bill amount'}
+                      </td>
+                      <td style={{ fontWeight: 700 }}>{money(data.bill.amount)}</td>
+                    </tr>
+                  )}
                   <tr>
                     <td colSpan={3} style={{ textAlign: 'right', fontWeight: 700 }}>
                       Delivery fee

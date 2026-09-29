@@ -9,6 +9,7 @@ const NAV_ITEMS = [
   { to: '/orders', label: 'Orders' },
   { to: '/deliveries', label: 'Deliveries' },
   { to: '/promotions', label: 'Promotions' },
+  { to: '/bill-providers', label: 'Bill Providers' },
   { to: '/courier-map', label: 'Courier Map' },
 ];
 
