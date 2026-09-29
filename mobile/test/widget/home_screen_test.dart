@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/testing.dart';
 import 'package:mobile/addresses/address_repository.dart';
+import 'package:mobile/addresses/selected_address.dart';
 import 'package:mobile/auth/auth_controller.dart';
 import 'package:mobile/auth/auth_repository.dart';
 import 'package:mobile/bills/bill_providers_screen.dart';
@@ -91,6 +92,9 @@ Widget _wrap({
       Provider<PromotionsRepository>.value(value: PromotionsRepository(api)),
       Provider<CatalogueRepository>.value(value: CatalogueRepository(api)),
       Provider<AddressRepository>.value(value: AddressRepository(api)),
+      ChangeNotifierProvider(
+        create: (_) => SelectedAddressController(AddressRepository(api)),
+      ),
       Provider<OrdersRepository>.value(value: OrdersRepository(api)),
       Provider<BillsRepository>.value(value: BillsRepository(api)),
       ChangeNotifierProvider<AuthController>.value(
@@ -266,6 +270,9 @@ void main() {
           ),
           Provider<CatalogueRepository>.value(value: CatalogueRepository(api)),
           Provider<AddressRepository>.value(value: AddressRepository(api)),
+          ChangeNotifierProvider(
+            create: (_) => SelectedAddressController(AddressRepository(api)),
+          ),
           ChangeNotifierProvider<AuthController>.value(
             value: AuthController(
               repository: AuthRepository(api),

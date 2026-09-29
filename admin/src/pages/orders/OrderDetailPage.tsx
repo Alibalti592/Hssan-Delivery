@@ -18,7 +18,12 @@ import { BillDetails } from '../../components/BillDetails';
 // through the order's 1:1 delivery (see DeliveryService::cancelDeliveryAsAdmin),
 // which every order has from creation — including one still PENDING, before
 // a courier has ever been assigned.
-const ORDER_CANCELLABLE = ['PENDING', 'CONFIRMED', 'PREPARING', 'READY_FOR_PICKUP'];
+// The pin the client placed in the app, on OpenStreetMap.
+function mapLink(latitude: number, longitude: number): string {
+  return `https://www.openstreetmap.org/?mlat=${latitude}&mlon=${longitude}#map=18/${latitude}/${longitude}`;
+}
+
+const ORDER_CANCELLABLE =['PENDING', 'CONFIRMED', 'PREPARING', 'READY_FOR_PICKUP'];
 
 export default function OrderDetailPage() {
   const { id } = useParams();
@@ -87,7 +92,20 @@ export default function OrderDetailPage() {
                 </div>
                 <div className="detail-item">
                   <div className="field-label">{data.bill ? 'Bring the receipt to' : 'Delivery address'}</div>
-                  <div className="value">{data.deliveryAddress}</div>
+                  <div className="value">
+                    {data.deliveryAddress}
+                    {typeof data.deliveryLatitude === 'number' && typeof data.deliveryLongitude === 'number' && (
+                      <div>
+                        <a
+                          href={mapLink(data.deliveryLatitude, data.deliveryLongitude)}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          View on map ↗
+                        </a>
+                      </div>
+                    )}
+                  </div>
                 </div>
                 {data.recipientName && !data.bill && (
                   <div className="detail-item">

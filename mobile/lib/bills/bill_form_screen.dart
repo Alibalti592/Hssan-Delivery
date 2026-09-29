@@ -4,13 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
-import '../addresses/address_models.dart';
-import '../client/addresses_screen.dart';
+import '../addresses/address_picker.dart';
+import '../addresses/selected_address.dart';
 import '../client/order_confirmed_screen.dart';
 import '../core/api_exception.dart';
 import '../core/phone_format.dart';
-import '../orders/order_models.dart';
-import '../orders/orders_repository.dart';
 import '../theme.dart';
 import '../widgets/dark_header.dart';
 import 'bill_models.dart';
@@ -43,10 +41,8 @@ class _BillFormScreenState extends State<BillFormScreen> {
   final _amount = TextEditingController();
   final _recipientName = TextEditingController();
   final _recipientPhone = TextEditingController();
-  final _address = TextEditingController();
   final _note = TextEditingController();
-  late Future<List<DeliveryZoneOption>> _zonesFuture;
-  DeliveryZoneOption? _zone;
+  AddressSelection? _selection;
   XFile? _photo;
   Uint8List? _photoBytes;
   bool _submitting = false;
@@ -57,7 +53,6 @@ class _BillFormScreenState extends State<BillFormScreen> {
   @override
   void initState() {
     super.initState();
-    _zonesFuture = context.read<OrdersRepository>().listDeliveryZones();
     _amount.addListener(() => setState(() {}));
   }
 
@@ -67,7 +62,6 @@ class _BillFormScreenState extends State<BillFormScreen> {
     _amount.dispose();
     _recipientName.dispose();
     _recipientPhone.dispose();
-    _address.dispose();
     _note.dispose();
     super.dispose();
   }
@@ -116,22 +110,10 @@ class _BillFormScreenState extends State<BillFormScreen> {
     }
   }
 
-  Future<void> _pickSavedAddress() async {
-    final picked = await Navigator.of(context).push<SavedAddress>(
-      MaterialPageRoute(builder: (_) => const AddressesScreen(pickMode: true)),
-    );
-    if (picked != null) {
-      setState(() => _address.text = picked.addressLine);
-    }
-  }
-
   Future<void> _submit() async {
     setState(() => _error = null);
     if (!_formKey.currentState!.validate()) return;
-    if (_zone == null) {
-      setState(() => _error = 'Choisissez une zone de livraison.');
-      return;
-    }
+    final place = _selection!;
 
     final bills = context.read<BillsRepository>();
     final messenger = ScaffoldMessenger.of(context);
@@ -142,8 +124,10 @@ class _BillFormScreenState extends State<BillFormScreen> {
       var order = await bills.createBillOrder(
         providerId: widget.provider.id,
         amount: _normalizeAmount(_amount.text)!,
-        address: _address.text.trim(),
-        deliveryZoneId: _zone!.id,
+        address: place.address.fullText,
+        deliveryZoneId: place.zone!.id,
+        latitude: place.address.latitude,
+        longitude: place.address.longitude,
         reference: _isTransfer ? null : _reference.text.trim(),
         recipientName: _isTransfer ? _recipientName.text.trim() : null,
         recipientPhone: _isTransfer ? _recipientPhone.text.trim() : null,
@@ -283,61 +267,16 @@ class _BillFormScreenState extends State<BillFormScreen> {
                         ),
                       ],
                       const SizedBox(height: 20),
-                      TextFormField(
-                        controller: _address,
+                      AddressField(
+                        label: _isTransfer
+                            ? "Récupérer l'argent à"
+                            : 'Récupérer la facture à',
                         enabled: !_submitting,
-                        minLines: 1,
-                        maxLines: 3,
-                        decoration: const InputDecoration(
-                          labelText: 'Votre adresse',
-                        ),
-                        validator: (v) => (v == null || v.trim().isEmpty)
-                            ? 'Adresse requise'
-                            : null,
-                      ),
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: TextButton.icon(
-                          onPressed: _submitting ? null : _pickSavedAddress,
-                          icon: const Icon(Icons.place_outlined, size: 16),
-                          label: const Text('Choisir une adresse enregistrée'),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      FutureBuilder<List<DeliveryZoneOption>>(
-                        future: _zonesFuture,
-                        builder: (context, snapshot) {
-                          if (snapshot.connectionState ==
-                              ConnectionState.waiting) {
-                            return const LinearProgressIndicator();
-                          }
-                          if (snapshot.hasError) {
-                            return Text(
-                              'Impossible de charger les zones de livraison.',
-                              style: TextStyle(
-                                color: Theme.of(context).colorScheme.error,
-                              ),
-                            );
-                          }
-                          final zones = snapshot.data ?? const [];
-                          return DropdownButtonFormField<DeliveryZoneOption>(
-                            initialValue: _zone,
-                            decoration: const InputDecoration(
-                              labelText: 'Zone de livraison',
-                            ),
-                            items: zones
-                                .map(
-                                  (z) => DropdownMenuItem(
-                                    value: z,
-                                    child: Text('${z.name} — ${z.fee} DT'),
-                                  ),
-                                )
-                                .toList(growable: false),
-                            onChanged: _submitting
-                                ? null
-                                : (value) => setState(() => _zone = value),
-                          );
-                        },
+                        allowOneOff: true,
+                        initialAddress: context
+                            .read<SelectedAddressController>()
+                            .current,
+                        onChanged: (v) => setState(() => _selection = v),
                       ),
                       const SizedBox(height: 16),
                       TextFormField(
@@ -351,7 +290,7 @@ class _BillFormScreenState extends State<BillFormScreen> {
                       const SizedBox(height: 20),
                       _CashSummary(
                         amount: _normalizeAmount(_amount.text),
-                        fee: _zone?.fee,
+                        fee: _selection?.zone?.fee,
                         isTransfer: _isTransfer,
                       ),
                       if (_error != null) ...[

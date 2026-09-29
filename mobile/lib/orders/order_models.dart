@@ -162,6 +162,15 @@ class DeliveryZoneOption {
   final String name;
   final String fee;
 
+  // By id, so a saved address's zone matches the same zone in a freshly
+  // loaded dropdown list.
+  @override
+  bool operator ==(Object other) =>
+      other is DeliveryZoneOption && other.id == id;
+
+  @override
+  int get hashCode => id.hashCode;
+
   factory DeliveryZoneOption.fromJson(Map<String, dynamic> json) {
     return DeliveryZoneOption(
       id: json['id'] as int,

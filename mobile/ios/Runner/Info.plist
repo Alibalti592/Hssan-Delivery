@@ -63,6 +63,6 @@
 		<key>NSPhotoLibraryUsageDescription</key>
 		<string>Hssan Delivery accède à vos photos pour joindre la facture que le livreur va payer.</string>
 		<key>NSLocationWhenInUseUsageDescription</key>
-		<string>Hssan Delivery utilise votre position pour indiquer votre localisation à l'administrateur pendant une course.</string>
+		<string>Hssan Delivery utilise votre position pour placer vos adresses de livraison sur la carte et, pour les livreurs, pour indiquer leur position pendant une course.</string>
 	</dict>
 </plist>

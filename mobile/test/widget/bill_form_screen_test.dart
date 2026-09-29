@@ -4,6 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/testing.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:mobile/addresses/address_models.dart';
+import 'package:mobile/addresses/address_repository.dart';
+import 'package:mobile/addresses/selected_address.dart';
 import 'package:mobile/bills/bill_form_screen.dart';
 import 'package:mobile/bills/bill_models.dart';
 import 'package:mobile/bills/bills_repository.dart';
@@ -62,6 +65,18 @@ void _useTallViewport(WidgetTester tester) {
   addTearDown(tester.view.reset);
 }
 
+/// The client's current address ("LIVRER À"), which the form starts from.
+final _home = SavedAddress(
+  id: 3,
+  label: 'Maison',
+  addressLine: 'Rue de Marseille',
+  instructions: '2ème étage',
+  isDefault: true,
+  zone: DeliveryZoneOption(id: 1, name: 'Centre-ville', fee: '5.000'),
+  latitude: 37.2744,
+  longitude: 9.8739,
+);
+
 Widget _app(
   MockClient mock,
   BillProvider provider, {
@@ -72,22 +87,20 @@ Widget _app(
     onUnauthorized: () {},
     httpClient: mock,
   );
+  final addresses = AddressRepository(api);
   return MultiProvider(
     providers: [
       Provider<OrdersRepository>.value(value: OrdersRepository(api)),
       Provider<BillsRepository>.value(value: BillsRepository(api)),
+      Provider<AddressRepository>.value(value: addresses),
+      ChangeNotifierProvider(
+        create: (_) => SelectedAddressController(addresses)..select(_home),
+      ),
     ],
     child: MaterialApp(
       home: BillFormScreen(provider: provider, pickPhoto: pickPhoto),
     ),
   );
-}
-
-Future<void> _pickZone(WidgetTester tester) async {
-  await tester.tap(find.byType(DropdownButtonFormField<DeliveryZoneOption>));
-  await tester.pumpAndSettle();
-  await tester.tap(find.text('Centre-ville — 5.000 DT').last);
-  await tester.pumpAndSettle();
 }
 
 void main() {
@@ -140,12 +153,10 @@ void main() {
         find.widgetWithText(TextFormField, 'Montant de la facture'),
         '85,5',
       );
-      await tester.enterText(
-        find.widgetWithText(TextFormField, 'Votre adresse'),
-        'Rue de Marseille',
-      );
-      await _pickZone(tester);
+      await tester.pump();
 
+      // The address card came pre-filled from "LIVRER À", zone included.
+      expect(find.text('Maison'), findsOneWidget);
       expect(find.text('90.500 DT'), findsOneWidget);
 
       await tester.tap(find.text('Caméra'));
@@ -158,8 +169,10 @@ void main() {
       expect(posted, {
         'providerId': 1,
         'amount': '85.5',
-        'address': 'Rue de Marseille',
+        'address': 'Rue de Marseille — 2ème étage',
         'deliveryZoneId': 1,
+        'deliveryLatitude': 37.2744,
+        'deliveryLongitude': 9.8739,
         'reference': '1234567',
       });
       expect(photoUploadPath, '/api/orders/42/bill-photo');
@@ -214,11 +227,6 @@ void main() {
       find.widgetWithText(TextFormField, 'Montant à envoyer'),
       '300',
     );
-    await tester.enterText(
-      find.widgetWithText(TextFormField, 'Votre adresse'),
-      'Rue de Marseille',
-    );
-    await _pickZone(tester);
 
     await tester.tap(find.text('ENVOYER LE MANDAT'));
     await tester.pumpAndSettle();
@@ -226,8 +234,10 @@ void main() {
     expect(posted, {
       'providerId': 6,
       'amount': '300',
-      'address': 'Rue de Marseille',
+      'address': 'Rue de Marseille — 2ème étage',
       'deliveryZoneId': 1,
+      'deliveryLatitude': 37.2744,
+      'deliveryLongitude': 9.8739,
       'recipientName': 'Mohamed',
       'recipientPhone': '98765432',
     });
@@ -258,11 +268,6 @@ void main() {
       find.widgetWithText(TextFormField, 'Montant de la facture'),
       '2500',
     );
-    await tester.enterText(
-      find.widgetWithText(TextFormField, 'Votre adresse'),
-      'Rue de Marseille',
-    );
-    await _pickZone(tester);
 
     await tester.tap(find.text('PAYER LA FACTURE'));
     await tester.pumpAndSettle();

@@ -63,6 +63,10 @@ final class DeliveryResponse
             'deliveryFee' => $order->getDeliveryFee(),
             'totalAmount' => $order->getTotalAmount(),
             'items' => $items,
+            'pickupLatitude' => $order->getPickupLatitude(),
+            'pickupLongitude' => $order->getPickupLongitude(),
+            'deliveryLatitude' => $order->getDeliveryLatitude(),
+            'deliveryLongitude' => $order->getDeliveryLongitude(),
             'bill' => BillSummary::of($order),
         ];
     }

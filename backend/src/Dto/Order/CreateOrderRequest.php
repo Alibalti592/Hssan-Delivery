@@ -2,10 +2,13 @@
 
 namespace App\Dto\Order;
 
+use App\Dto\Geo\DeliveryLocationFields;
 use Symfony\Component\Validator\Constraints as Assert;
 
 final class CreateOrderRequest
 {
+    use DeliveryLocationFields;
+
     #[Assert\NotNull]
     #[Assert\Positive]
     public ?int $restaurantId = null;

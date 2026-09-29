@@ -21,8 +21,12 @@ class OrdersRepository {
     required String deliveryAddress,
     required int deliveryZoneId,
     String? note,
+    double? deliveryLatitude,
+    double? deliveryLongitude,
   }) async {
     final body = await _api.post('/api/orders', {
+      'deliveryLatitude': ?deliveryLatitude,
+      'deliveryLongitude': ?deliveryLongitude,
       'restaurantId': restaurantId,
       'items': items
           .map(
@@ -47,8 +51,16 @@ class OrdersRepository {
     required String recipientPhone,
     required int deliveryZoneId,
     String? note,
+    double? pickupLatitude,
+    double? pickupLongitude,
+    double? deliveryLatitude,
+    double? deliveryLongitude,
   }) async {
     final body = await _api.post('/api/orders/parcels', {
+      'pickupLatitude': ?pickupLatitude,
+      'pickupLongitude': ?pickupLongitude,
+      'deliveryLatitude': ?deliveryLatitude,
+      'deliveryLongitude': ?deliveryLongitude,
       'pickupAddress': pickupAddress,
       'deliveryAddress': deliveryAddress,
       'recipientName': recipientName,

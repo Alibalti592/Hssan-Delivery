@@ -125,6 +125,11 @@ export interface AdminOrder {
   deliveryId: number | null;
   /** Factures orders only. */
   bill: OrderBill | null;
+  /** The pins the client placed on the map; null when only typed. */
+  pickupLatitude: number | null;
+  pickupLongitude: number | null;
+  deliveryLatitude: number | null;
+  deliveryLongitude: number | null;
   createdAt: string;
   updatedAt: string;
 }

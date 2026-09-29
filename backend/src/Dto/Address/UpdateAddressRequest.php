@@ -6,6 +6,8 @@ use Symfony\Component\Validator\Constraints as Assert;
 
 final class UpdateAddressRequest
 {
+    use AddressLocationFields;
+
     #[Assert\NotBlank]
     #[Assert\Length(max: 255)]
     public ?string $label = null;

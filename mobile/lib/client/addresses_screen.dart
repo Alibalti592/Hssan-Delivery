@@ -2,19 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../addresses/address_models.dart';
+import '../addresses/address_picker.dart';
 import '../addresses/address_repository.dart';
+import '../addresses/selected_address.dart';
 import '../core/api_exception.dart';
-import '../theme.dart';
 import '../widgets/dark_header.dart';
 import 'add_address_screen.dart';
 
-/// Saved-address list. Can be used either as a picker (returns the chosen
-/// [SavedAddress] via [Navigator.pop] when [pickMode] is true, for checkout)
-/// or as a plain management screen reached from the profile menu.
+/// The client's saved addresses, from the profile menu or the address
+/// sheet's "Gérer": add one on the map, edit or delete one.
 class AddressesScreen extends StatefulWidget {
-  const AddressesScreen({this.pickMode = false, super.key});
-
-  final bool pickMode;
+  const AddressesScreen({super.key});
 
   @override
   State<AddressesScreen> createState() => _AddressesScreenState();
@@ -33,31 +31,24 @@ class _AddressesScreenState extends State<AddressesScreen> {
     return context.read<AddressRepository>().list();
   }
 
-  // Not `setState(() => _future = _load())`: that arrow body is an
-  // assignment *expression*, which evaluates to the assigned Future — so
-  // the callback itself returns a Future, which setState's own assertion
-  // rejects at runtime (it exists to catch exactly this "did you mean to
-  // await first" mistake). Starting the load outside the callback and only
-  // assigning the already-created Future inside a block body keeps the
-  // callback's return value void.
+  // Not `setState(() => _future = _load())`: that arrow body returns the
+  // Future, which setState's assertion rejects. Start the load outside and
+  // only assign inside a block body.
   void _refresh() {
     final future = _load();
     setState(() {
       _future = future;
     });
+    // "LIVRER À" follows edits and deletions too.
+    context.read<SelectedAddressController>().load().ignore();
   }
 
   Future<void> _addAddress() async {
     final created = await Navigator.of(context).push<SavedAddress>(
       MaterialPageRoute(builder: (_) => const AddAddressScreen()),
     );
-    if (created == null) return;
-    if (!mounted) return;
-    if (widget.pickMode) {
-      Navigator.of(context).pop(created);
-    } else {
-      _refresh();
-    }
+    if (created == null || !mounted) return;
+    _refresh();
   }
 
   Future<void> _editAddress(SavedAddress address) async {
@@ -90,7 +81,7 @@ class _AddressesScreenState extends State<AddressesScreen> {
 
     final messenger = ScaffoldMessenger.of(context);
     try {
-      await context.read<AddressRepository>().delete(address.id);
+      await context.read<AddressRepository>().delete(address.id!);
       if (!mounted) return;
       _refresh();
     } on ApiException catch (e) {
@@ -130,104 +121,48 @@ class _AddressesScreenState extends State<AddressesScreen> {
                     padding: const EdgeInsets.all(16),
                     children: [
                       for (final address in addresses)
-                        Card(
-                          margin: const EdgeInsets.only(bottom: 10),
-                          child: InkWell(
-                            borderRadius: BorderRadius.circular(10),
-                            onTap: widget.pickMode
-                                ? () => Navigator.of(context).pop(address)
-                                : null,
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 14,
-                                vertical: 12,
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    children: [
-                                      Expanded(
-                                        child: Text(
-                                          address.label,
-                                          style: Theme.of(context)
-                                              .textTheme
-                                              .titleSmall
-                                              ?.copyWith(
-                                                fontWeight: FontWeight.w700,
-                                              ),
-                                        ),
-                                      ),
-                                      if (address.isDefault)
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 8,
-                                            vertical: 3,
-                                          ),
-                                          decoration: BoxDecoration(
-                                            color: successBg,
-                                            borderRadius: BorderRadius.circular(
-                                              999,
-                                            ),
-                                          ),
-                                          child: const Text(
-                                            'Par défaut',
-                                            style: TextStyle(
-                                              color: successText,
-                                              fontWeight: FontWeight.w700,
-                                              fontSize: 10,
-                                            ),
-                                          ),
-                                        ),
-                                      if (!widget.pickMode) ...[
-                                        IconButton(
-                                          icon: const Icon(
-                                            Icons.edit_outlined,
-                                            size: 18,
-                                          ),
-                                          visualDensity: VisualDensity.compact,
-                                          onPressed: () =>
-                                              _editAddress(address),
-                                        ),
-                                        IconButton(
-                                          icon: const Icon(
-                                            Icons.delete_outline,
-                                            size: 18,
-                                          ),
-                                          visualDensity: VisualDensity.compact,
-                                          onPressed: () =>
-                                              _deleteAddress(address),
-                                        ),
-                                      ],
-                                    ],
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 10),
+                          child: AddressTile(
+                            address: address,
+                            onTap: () => _editAddress(address),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  tooltip: 'Modifier',
+                                  icon: const Icon(
+                                    Icons.edit_outlined,
+                                    size: 20,
                                   ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    address.instructions == null ||
-                                            address.instructions!.isEmpty
-                                        ? address.addressLine
-                                        : '${address.addressLine} · '
-                                              '${address.instructions}',
-                                    style: Theme.of(
-                                      context,
-                                    ).textTheme.bodySmall,
+                                  visualDensity: VisualDensity.compact,
+                                  onPressed: () => _editAddress(address),
+                                ),
+                                IconButton(
+                                  tooltip: 'Supprimer',
+                                  icon: const Icon(
+                                    Icons.delete_outline,
+                                    size: 20,
                                   ),
-                                ],
-                              ),
+                                  visualDensity: VisualDensity.compact,
+                                  onPressed: () => _deleteAddress(address),
+                                ),
+                              ],
                             ),
                           ),
                         ),
                       if (addresses.isEmpty)
                         const Padding(
-                          padding: EdgeInsets.only(top: 40),
+                          padding: EdgeInsets.only(top: 40, bottom: 20),
                           child: Center(
                             child: Text('Aucune adresse enregistrée.'),
                           ),
                         ),
                       const SizedBox(height: 4),
-                      OutlinedButton(
+                      OutlinedButton.icon(
                         onPressed: _addAddress,
-                        child: const Text('+ AJOUTER UNE ADRESSE'),
+                        icon: const Icon(Icons.add_location_alt_outlined),
+                        label: const Text('AJOUTER UNE ADRESSE'),
                       ),
                     ],
                   );

@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 
 import 'addresses/address_repository.dart';
+import 'addresses/selected_address.dart';
 import 'auth/auth_controller.dart';
 import 'auth/auth_repository.dart';
 import 'auth/login_screen.dart';
@@ -68,6 +69,7 @@ class _HssanDeliveryAppState extends State<HssanDeliveryApp> {
   late final PromotionsRepository _promotions;
   late final CourierLocationService _courierLocation;
   late final CartController _cart;
+  late final SelectedAddressController _selectedAddress;
 
   @override
   void initState() {
@@ -114,8 +116,10 @@ class _HssanDeliveryAppState extends State<HssanDeliveryApp> {
       // Navigator.push, including from a push-notification tap) back to
       // the root route on sign-out, so _Root's home swap to LoginScreen is
       // actually what the user sees instead of a stranded pushed screen.
-      onSessionEnded: () =>
-          _navigatorKey.currentState?.popUntil((route) => route.isFirst),
+      onSessionEnded: () {
+        _navigatorKey.currentState?.popUntil((route) => route.isFirst);
+        _selectedAddress.clear();
+      },
     );
     _deliveries = DeliveriesController(DeliveryRepository(_api));
     _catalogue = CatalogueRepository(_api);
@@ -128,6 +132,7 @@ class _HssanDeliveryAppState extends State<HssanDeliveryApp> {
       _deliveries,
     );
     _cart = CartController();
+    _selectedAddress = SelectedAddressController(_addresses);
 
     _pushNotifications.initialize();
     _auth.bootstrap();
@@ -140,6 +145,7 @@ class _HssanDeliveryAppState extends State<HssanDeliveryApp> {
     _courierLocation.dispose();
     _deliveries.dispose();
     _cart.dispose();
+    _selectedAddress.dispose();
     super.dispose();
   }
 
@@ -150,6 +156,7 @@ class _HssanDeliveryAppState extends State<HssanDeliveryApp> {
         ChangeNotifierProvider.value(value: _auth),
         ChangeNotifierProvider.value(value: _deliveries),
         ChangeNotifierProvider.value(value: _cart),
+        ChangeNotifierProvider.value(value: _selectedAddress),
         Provider.value(value: _catalogue),
         Provider.value(value: _orders),
         Provider.value(value: _bills),

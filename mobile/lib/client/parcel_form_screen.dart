@@ -1,13 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../addresses/address_models.dart';
+import '../addresses/address_picker.dart';
+import '../addresses/selected_address.dart';
 import '../core/api_exception.dart';
 import '../core/phone_format.dart';
-import '../orders/order_models.dart';
 import '../orders/orders_repository.dart';
 import '../widgets/dark_header.dart';
-import 'addresses_screen.dart';
 import 'order_confirmed_screen.dart';
 
 /// A Colis (parcel) request: pickup + drop-off address, who receives it,
@@ -22,57 +21,40 @@ class ParcelFormScreen extends StatefulWidget {
 
 class _ParcelFormScreenState extends State<ParcelFormScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _pickupAddress = TextEditingController();
-  final _deliveryAddress = TextEditingController();
+  AddressSelection? _pickup;
+  AddressSelection? _dropOff;
   final _recipientName = TextEditingController();
   final _recipientPhone = TextEditingController();
   final _note = TextEditingController();
-  late Future<List<DeliveryZoneOption>> _zonesFuture;
-  DeliveryZoneOption? _selectedZone;
   bool _submitting = false;
   String? _error;
 
   @override
-  void initState() {
-    super.initState();
-    _zonesFuture = context.read<OrdersRepository>().listDeliveryZones();
-  }
-
-  @override
   void dispose() {
-    _pickupAddress.dispose();
-    _deliveryAddress.dispose();
     _recipientName.dispose();
     _recipientPhone.dispose();
     _note.dispose();
     super.dispose();
   }
 
-  Future<void> _pickSavedAddress(TextEditingController target) async {
-    final picked = await Navigator.of(context).push<SavedAddress>(
-      MaterialPageRoute(builder: (_) => const AddressesScreen(pickMode: true)),
-    );
-    if (picked != null) {
-      setState(() => target.text = picked.addressLine);
-    }
-  }
-
   Future<void> _submit() async {
     setState(() => _error = null);
     if (!_formKey.currentState!.validate()) return;
-    if (_selectedZone == null) {
-      setState(() => _error = 'Choisissez une zone de livraison.');
-      return;
-    }
+    final pickup = _pickup!.address;
+    final dropOff = _dropOff!;
 
     setState(() => _submitting = true);
     try {
       final order = await context.read<OrdersRepository>().createParcelOrder(
-        pickupAddress: _pickupAddress.text.trim(),
-        deliveryAddress: _deliveryAddress.text.trim(),
+        pickupAddress: pickup.fullText,
+        pickupLatitude: pickup.latitude,
+        pickupLongitude: pickup.longitude,
+        deliveryAddress: dropOff.address.fullText,
+        deliveryLatitude: dropOff.address.latitude,
+        deliveryLongitude: dropOff.address.longitude,
         recipientName: _recipientName.text.trim(),
         recipientPhone: _recipientPhone.text.trim(),
-        deliveryZoneId: _selectedZone!.id,
+        deliveryZoneId: dropOff.zone!.id,
         note: _note.text.trim(),
       );
       if (!mounted) return;
@@ -108,52 +90,25 @@ class _ParcelFormScreenState extends State<ParcelFormScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      TextFormField(
-                        controller: _pickupAddress,
+                      AddressField(
+                        label: 'Récupérer le colis à',
                         enabled: !_submitting,
-                        minLines: 1,
-                        maxLines: 3,
-                        decoration: const InputDecoration(
-                          labelText: 'Adresse de récupération',
-                        ),
-                        validator: (v) => (v == null || v.trim().isEmpty)
-                            ? 'Adresse requise'
-                            : null,
+                        needsZone: false,
+                        allowOneOff: true,
+                        initialAddress: context
+                            .read<SelectedAddressController>()
+                            .current,
+                        onChanged: (v) => setState(() => _pickup = v),
                       ),
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: TextButton.icon(
-                          onPressed: _submitting
-                              ? null
-                              : () => _pickSavedAddress(_pickupAddress),
-                          icon: const Icon(Icons.place_outlined, size: 16),
-                          label: const Text('Choisir une adresse enregistrée'),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      TextFormField(
-                        controller: _deliveryAddress,
+                      const SizedBox(height: 20),
+                      AddressField(
+                        label: 'Livrer le colis à',
                         enabled: !_submitting,
-                        minLines: 1,
-                        maxLines: 3,
-                        decoration: const InputDecoration(
-                          labelText: 'Adresse de livraison',
-                        ),
-                        validator: (v) => (v == null || v.trim().isEmpty)
-                            ? 'Adresse requise'
-                            : null,
+                        allowOneOff: true,
+                        emptyText: "Choisir l'adresse de livraison",
+                        onChanged: (v) => setState(() => _dropOff = v),
                       ),
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: TextButton.icon(
-                          onPressed: _submitting
-                              ? null
-                              : () => _pickSavedAddress(_deliveryAddress),
-                          icon: const Icon(Icons.place_outlined, size: 16),
-                          label: const Text('Choisir une adresse enregistrée'),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 20),
                       TextFormField(
                         controller: _recipientName,
                         enabled: !_submitting,
@@ -173,43 +128,6 @@ class _ParcelFormScreenState extends State<ParcelFormScreen> {
                           labelText: 'Téléphone du destinataire',
                         ),
                         validator: validatePhone,
-                      ),
-                      const SizedBox(height: 16),
-                      FutureBuilder<List<DeliveryZoneOption>>(
-                        future: _zonesFuture,
-                        builder: (context, snapshot) {
-                          if (snapshot.connectionState ==
-                              ConnectionState.waiting) {
-                            return const LinearProgressIndicator();
-                          }
-                          if (snapshot.hasError) {
-                            return Text(
-                              'Impossible de charger les zones de livraison.',
-                              style: TextStyle(
-                                color: Theme.of(context).colorScheme.error,
-                              ),
-                            );
-                          }
-                          final zones = snapshot.data ?? const [];
-                          return DropdownButtonFormField<DeliveryZoneOption>(
-                            initialValue: _selectedZone,
-                            decoration: const InputDecoration(
-                              labelText: 'Zone de livraison',
-                            ),
-                            items: zones
-                                .map(
-                                  (z) => DropdownMenuItem(
-                                    value: z,
-                                    child: Text('${z.name} — ${z.fee} DT'),
-                                  ),
-                                )
-                                .toList(growable: false),
-                            onChanged: _submitting
-                                ? null
-                                : (value) =>
-                                      setState(() => _selectedZone = value),
-                          );
-                        },
                       ),
                       const SizedBox(height: 16),
                       TextFormField(

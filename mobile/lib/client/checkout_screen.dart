@@ -1,13 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../addresses/address_models.dart';
+import '../addresses/address_picker.dart';
+import '../addresses/selected_address.dart';
 import '../cart/cart.dart';
 import '../core/api_exception.dart';
-import '../orders/order_models.dart';
 import '../orders/orders_repository.dart';
 import '../widgets/dark_header.dart';
-import 'addresses_screen.dart';
 import 'order_confirmed_screen.dart';
 
 class CheckoutScreen extends StatefulWidget {
@@ -19,50 +18,39 @@ class CheckoutScreen extends StatefulWidget {
 
 class _CheckoutScreenState extends State<CheckoutScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _address = TextEditingController();
   final _note = TextEditingController();
-  late Future<List<DeliveryZoneOption>> _zonesFuture;
-  DeliveryZoneOption? _selectedZone;
+  AddressSelection? _selection;
   bool _submitting = false;
   String? _error;
 
   @override
-  void initState() {
-    super.initState();
-    _zonesFuture = context.read<OrdersRepository>().listDeliveryZones();
-  }
-
-  @override
   void dispose() {
-    _address.dispose();
     _note.dispose();
     super.dispose();
   }
 
-  Future<void> _pickSavedAddress() async {
-    final picked = await Navigator.of(context).push<SavedAddress>(
-      MaterialPageRoute(builder: (_) => const AddressesScreen(pickMode: true)),
-    );
-    if (picked != null) {
-      setState(() => _address.text = picked.addressLine);
+  void _onAddressChanged(AddressSelection? selection) {
+    setState(() => _selection = selection);
+    // Picking another address here also changes "LIVRER À".
+    if (selection != null) {
+      context.read<SelectedAddressController>().select(selection.address);
     }
   }
 
   Future<void> _submit(CartController cart) async {
     setState(() => _error = null);
     if (!_formKey.currentState!.validate()) return;
-    if (_selectedZone == null) {
-      setState(() => _error = 'Choisissez une zone de livraison.');
-      return;
-    }
+    final selection = _selection!;
 
     setState(() => _submitting = true);
     try {
       final order = await context.read<OrdersRepository>().createOrder(
         restaurantId: cart.restaurantId!,
         items: cart.lines,
-        deliveryAddress: _address.text.trim(),
-        deliveryZoneId: _selectedZone!.id,
+        deliveryAddress: selection.address.fullText,
+        deliveryZoneId: selection.zone!.id,
+        deliveryLatitude: selection.address.latitude,
+        deliveryLongitude: selection.address.longitude,
         note: _note.text.trim(),
       );
       cart.clear();
@@ -102,62 +90,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      TextFormField(
-                        controller: _address,
+                      AddressField(
+                        label: 'Livrer à',
                         enabled: !_submitting,
-                        minLines: 1,
-                        maxLines: 3,
-                        decoration: const InputDecoration(
-                          labelText: 'Adresse de livraison',
-                        ),
-                        validator: (v) => (v == null || v.trim().isEmpty)
-                            ? 'Adresse requise'
-                            : null,
-                      ),
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: TextButton.icon(
-                          onPressed: _submitting ? null : _pickSavedAddress,
-                          icon: const Icon(Icons.place_outlined, size: 16),
-                          label: const Text('Choisir une adresse enregistrée'),
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      FutureBuilder<List<DeliveryZoneOption>>(
-                        future: _zonesFuture,
-                        builder: (context, snapshot) {
-                          if (snapshot.connectionState ==
-                              ConnectionState.waiting) {
-                            return const LinearProgressIndicator();
-                          }
-                          if (snapshot.hasError) {
-                            return Text(
-                              'Impossible de charger les zones de livraison.',
-                              style: TextStyle(
-                                color: Theme.of(context).colorScheme.error,
-                              ),
-                            );
-                          }
-                          final zones = snapshot.data ?? const [];
-                          return DropdownButtonFormField<DeliveryZoneOption>(
-                            initialValue: _selectedZone,
-                            decoration: const InputDecoration(
-                              labelText: 'Zone de livraison',
-                            ),
-                            items: zones
-                                .map(
-                                  (z) => DropdownMenuItem(
-                                    value: z,
-                                    child: Text('${z.name} — ${z.fee} DT'),
-                                  ),
-                                )
-                                .toList(growable: false),
-                            onChanged: _submitting
-                                ? null
-                                : (value) =>
-                                      setState(() => _selectedZone = value),
-                          );
-                        },
+                        initialAddress: context
+                            .read<SelectedAddressController>()
+                            .current,
+                        allowOneOff: true,
+                        onChanged: _onAddressChanged,
                       ),
                       const SizedBox(height: 16),
                       TextFormField(
@@ -182,7 +122,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                               _TotalRow(
                                 label: 'Frais de livraison',
                                 value:
-                                    double.tryParse(_selectedZone?.fee ?? '') ??
+                                    double.tryParse(
+                                      _selection?.zone?.fee ?? '',
+                                    ) ??
                                     0,
                               ),
                               const Divider(height: 20),
@@ -191,7 +133,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                 value:
                                     cart.subtotal +
                                     (double.tryParse(
-                                          _selectedZone?.fee ?? '',
+                                          _selection?.zone?.fee ?? '',
                                         ) ??
                                         0),
                                 bold: true,

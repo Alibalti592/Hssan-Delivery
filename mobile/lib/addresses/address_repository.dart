@@ -18,14 +18,22 @@ class AddressRepository {
     required String addressLine,
     String? instructions,
     bool isDefault = false,
+    int? deliveryZoneId,
+    double? latitude,
+    double? longitude,
   }) async {
-    final body = await _api.post('/api/addresses', {
-      'label': label,
-      'addressLine': addressLine,
-      if (instructions != null && instructions.isNotEmpty)
-        'instructions': instructions,
-      'isDefault': isDefault,
-    });
+    final body = await _api.post(
+      '/api/addresses',
+      _body(
+        label,
+        addressLine,
+        instructions,
+        isDefault,
+        deliveryZoneId,
+        latitude,
+        longitude,
+      ),
+    );
     return SavedAddress.fromJson(body as Map<String, dynamic>);
   }
 
@@ -35,16 +43,43 @@ class AddressRepository {
     required String addressLine,
     String? instructions,
     bool isDefault = false,
+    int? deliveryZoneId,
+    double? latitude,
+    double? longitude,
   }) async {
-    final body = await _api.put('/api/addresses/$id', {
-      'label': label,
-      'addressLine': addressLine,
-      if (instructions != null && instructions.isNotEmpty)
-        'instructions': instructions,
-      'isDefault': isDefault,
-    });
+    final body = await _api.put(
+      '/api/addresses/$id',
+      _body(
+        label,
+        addressLine,
+        instructions,
+        isDefault,
+        deliveryZoneId,
+        latitude,
+        longitude,
+      ),
+    );
     return SavedAddress.fromJson(body as Map<String, dynamic>);
   }
 
   Future<void> delete(int id) => _api.delete('/api/addresses/$id');
+
+  static Map<String, dynamic> _body(
+    String label,
+    String addressLine,
+    String? instructions,
+    bool isDefault,
+    int? deliveryZoneId,
+    double? latitude,
+    double? longitude,
+  ) => {
+    'label': label,
+    'addressLine': addressLine,
+    if (instructions != null && instructions.isNotEmpty)
+      'instructions': instructions,
+    'isDefault': isDefault,
+    'deliveryZoneId': ?deliveryZoneId,
+    'latitude': ?latitude,
+    'longitude': ?longitude,
+  };
 }

@@ -30,8 +30,12 @@ class BillsRepository {
     String? recipientName,
     String? recipientPhone,
     String? note,
+    double? latitude,
+    double? longitude,
   }) async {
     final body = await _api.post('/api/orders/bills', {
+      'deliveryLatitude': ?latitude,
+      'deliveryLongitude': ?longitude,
       'providerId': providerId,
       'amount': amount,
       'address': address,
