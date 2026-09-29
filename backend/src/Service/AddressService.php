@@ -6,7 +6,9 @@ use App\Dto\Address\CreateAddressRequest;
 use App\Dto\Address\UpdateAddressRequest;
 use App\Entity\Address;
 use App\Entity\User;
+use App\Exception\InvalidOperationException;
 use App\Repository\AddressRepository;
+use App\Repository\DeliveryZoneRepository;
 use Doctrine\ORM\EntityManagerInterface;
 
 final class AddressService
@@ -14,6 +16,7 @@ final class AddressService
     public function __construct(
         private readonly EntityManagerInterface $entityManager,
         private readonly AddressRepository $addressRepository,
+        private readonly DeliveryZoneRepository $deliveryZoneRepository,
     ) {
     }
 
@@ -26,6 +29,7 @@ final class AddressService
         $address->setAddressLine(trim($dto->addressLine));
         $address->setInstructions($dto->instructions);
         $address->setDefault($dto->isDefault);
+        $this->applyLocation($address, $dto);
 
         $this->entityManager->persist($address);
         $this->entityManager->flush();
@@ -56,6 +60,7 @@ final class AddressService
         $address->setAddressLine(trim($dto->addressLine));
         $address->setInstructions($dto->instructions);
         $address->setDefault($dto->isDefault);
+        $this->applyLocation($address, $dto);
 
         $this->entityManager->flush();
 
@@ -70,5 +75,21 @@ final class AddressService
     {
         $this->entityManager->remove($address);
         $this->entityManager->flush();
+    }
+
+    private function applyLocation(Address $address, CreateAddressRequest|UpdateAddressRequest $dto): void
+    {
+        $zone = null;
+
+        if (null !== $dto->deliveryZoneId) {
+            $zone = $this->deliveryZoneRepository->find($dto->deliveryZoneId);
+
+            if (null === $zone) {
+                throw new InvalidOperationException('Delivery zone not found.');
+            }
+        }
+
+        $address->setDeliveryZone($zone);
+        $address->setLocation($dto->latitude, $dto->longitude);
     }
 }

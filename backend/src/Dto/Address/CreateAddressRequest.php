@@ -6,6 +6,8 @@ use Symfony\Component\Validator\Constraints as Assert;
 
 final class CreateAddressRequest
 {
+    use AddressLocationFields;
+
     #[Assert\NotBlank]
     #[Assert\Length(max: 255)]
     public ?string $label = null;

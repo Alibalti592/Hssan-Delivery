@@ -74,11 +74,23 @@ class DeliveryDetailScreen extends StatelessWidget {
                     title: order.isParcel || order.isBill
                         ? 'Récupérer à'
                         : 'Récupérer chez',
-                    child: Text(
-                      order.isParcel || order.isBill
-                          ? (order.pickupAddress ?? '')
-                          : (order.restaurantName ?? ''),
-                      style: Theme.of(context).textTheme.bodyLarge,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          order.isParcel || order.isBill
+                              ? (order.pickupAddress ?? '')
+                              : (order.restaurantName ?? ''),
+                          style: Theme.of(context).textTheme.bodyLarge,
+                        ),
+                        // A bill's pickup and drop-off are the same pin,
+                        // offered once under "Rapporter le reçu à".
+                        if (order.hasPickupLocation && !order.isBill)
+                          _OpenInMapsButton(
+                            latitude: order.pickupLatitude!,
+                            longitude: order.pickupLongitude!,
+                          ),
+                      ],
                     ),
                   ),
                   _Section(
@@ -91,6 +103,11 @@ class DeliveryDetailScreen extends StatelessWidget {
                           order.deliveryAddress,
                           style: Theme.of(context).textTheme.bodyLarge,
                         ),
+                        if (order.hasDeliveryLocation)
+                          _OpenInMapsButton(
+                            latitude: order.deliveryLatitude!,
+                            longitude: order.deliveryLongitude!,
+                          ),
                         if (order.note != null &&
                             order.note!.trim().isNotEmpty) ...[
                           const SizedBox(height: 6),
@@ -175,6 +192,40 @@ class DeliveryDetailScreen extends StatelessWidget {
         context,
       ).showSnackBar(SnackBar(content: Text('Impossible d\'appeler $phone')));
     }
+  }
+}
+
+/// Directions to the pin the client placed, in Google Maps (or whatever
+/// the phone opens map links with).
+class _OpenInMapsButton extends StatelessWidget {
+  const _OpenInMapsButton({required this.latitude, required this.longitude});
+
+  final double latitude;
+  final double longitude;
+
+  Future<void> _open(BuildContext context) async {
+    final uri = Uri.https('www.google.com', '/maps/dir/', {
+      'api': '1',
+      'destination': '$latitude,$longitude',
+    });
+    if (!await launchUrl(uri, mode: LaunchMode.externalApplication) &&
+        context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Impossible d\'ouvrir la carte.')),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: OutlinedButton.icon(
+        onPressed: () => _open(context),
+        icon: const Icon(Icons.navigation_outlined),
+        label: const Text('Ouvrir dans Maps'),
+      ),
+    );
   }
 }
 

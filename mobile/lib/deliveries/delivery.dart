@@ -112,6 +112,10 @@ class DeliveryOrder {
     required this.deliveryType,
     required this.items,
     this.bill,
+    this.pickupLatitude,
+    this.pickupLongitude,
+    this.deliveryLatitude,
+    this.deliveryLongitude,
   });
 
   final int id;
@@ -141,6 +145,19 @@ class DeliveryOrder {
   /// provider's counter with the cash collected from the customer.
   final BillInfo? bill;
 
+  /// The pins the client placed on the map, when they did — what "Ouvrir
+  /// dans Maps" navigates to.
+  final double? pickupLatitude;
+  final double? pickupLongitude;
+  final double? deliveryLatitude;
+  final double? deliveryLongitude;
+
+  bool get hasPickupLocation =>
+      pickupLatitude != null && pickupLongitude != null;
+
+  bool get hasDeliveryLocation =>
+      deliveryLatitude != null && deliveryLongitude != null;
+
   bool get isParcel => deliveryType == 'PARCEL';
 
   bool get isBill => bill != null;
@@ -169,6 +186,10 @@ class DeliveryOrder {
           .map((e) => DeliveryItem.fromJson(e as Map<String, dynamic>))
           .toList(growable: false),
       bill: BillInfo.fromJson(json['bill']),
+      pickupLatitude: (json['pickupLatitude'] as num?)?.toDouble(),
+      pickupLongitude: (json['pickupLongitude'] as num?)?.toDouble(),
+      deliveryLatitude: (json['deliveryLatitude'] as num?)?.toDouble(),
+      deliveryLongitude: (json['deliveryLongitude'] as num?)?.toDouble(),
     );
   }
 }

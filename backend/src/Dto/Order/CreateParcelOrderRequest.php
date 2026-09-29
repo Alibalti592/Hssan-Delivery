@@ -2,11 +2,16 @@
 
 namespace App\Dto\Order;
 
+use App\Dto\Geo\DeliveryLocationFields;
+use App\Dto\Geo\PickupLocationFields;
 use App\Validator\PhoneFormat;
 use Symfony\Component\Validator\Constraints as Assert;
 
 final class CreateParcelOrderRequest
 {
+    use DeliveryLocationFields;
+    use PickupLocationFields;
+
     #[Assert\NotBlank]
     #[Assert\Length(max: 1000)]
     public string $pickupAddress = '';

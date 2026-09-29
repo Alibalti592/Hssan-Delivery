@@ -106,6 +106,9 @@ final class BillOrderService
         $order->setDeliveryAddress($dto->address);
         $order->setNote($this->blankToNull($dto->note));
         $order->setDeliveryZone($deliveryZone);
+        // Collected and returned at the same spot.
+        $order->setDeliveryLocation($dto->deliveryLatitude, $dto->deliveryLongitude);
+        $order->setPickupLocation($dto->deliveryLatitude, $dto->deliveryLongitude);
         $order->setStatus(OrderStatus::PENDING);
 
         $feeMillimes = Money::toMillimes($deliveryZone->getFee());

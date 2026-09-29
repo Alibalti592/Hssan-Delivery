@@ -62,6 +62,7 @@ final class OrderService
         $order->setNote($dto->note);
         $order->setDeliveryAddress($dto->deliveryAddress);
         $order->setDeliveryZone($deliveryZone);
+        $order->setDeliveryLocation($dto->deliveryLatitude, $dto->deliveryLongitude);
         $order->setStatus(OrderStatus::PENDING);
         $order->setDeliveryType($restaurant->getType()->toDeliveryType());
 
@@ -182,8 +183,10 @@ final class OrderService
         $order->setRecipientPhone($dto->recipientPhone);
         $order->setNote($dto->note);
         $order->setDeliveryZone($deliveryZone);
+        $order->setDeliveryLocation($dto->deliveryLatitude, $dto->deliveryLongitude);
         $order->setStatus(OrderStatus::PENDING);
         $order->setDeliveryType(DeliveryType::PARCEL);
+        $order->setPickupLocation($dto->pickupLatitude, $dto->pickupLongitude);
 
         $deliveryFeeMillimes = Money::toMillimes($deliveryZone->getFee());
 

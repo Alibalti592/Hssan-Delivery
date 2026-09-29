@@ -30,6 +30,25 @@ class Address
     #[ORM\Column]
     private bool $isDefault = false;
 
+    /**
+     * The zone that prices deliveries here, so picking this address fills
+     * in the fee too. Null for addresses saved before it existed, or once
+     * the zone is gone.
+     */
+    #[ORM\ManyToOne]
+    #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
+    private ?DeliveryZone $deliveryZone = null;
+
+    /**
+     * Where the client put the pin on the map — what the courier navigates
+     * to. Null when they only typed the address.
+     */
+    #[ORM\Column(nullable: true)]
+    private ?float $latitude = null;
+
+    #[ORM\Column(nullable: true)]
+    private ?float $longitude = null;
+
     #[ORM\Column]
     private ?\DateTimeImmutable $createdAt = null;
 
@@ -124,5 +143,35 @@ class Address
     public function getUpdatedAt(): ?\DateTimeImmutable
     {
         return $this->updatedAt;
+    }
+
+    public function getDeliveryZone(): ?DeliveryZone
+    {
+        return $this->deliveryZone;
+    }
+
+    public function setDeliveryZone(?DeliveryZone $deliveryZone): static
+    {
+        $this->deliveryZone = $deliveryZone;
+
+        return $this;
+    }
+
+    public function getLatitude(): ?float
+    {
+        return $this->latitude;
+    }
+
+    public function getLongitude(): ?float
+    {
+        return $this->longitude;
+    }
+
+    public function setLocation(?float $latitude, ?float $longitude): static
+    {
+        $this->latitude = $latitude;
+        $this->longitude = $longitude;
+
+        return $this;
     }
 }

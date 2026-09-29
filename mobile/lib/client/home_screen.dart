@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../addresses/address_models.dart';
-import '../addresses/address_repository.dart';
+import '../addresses/address_picker.dart';
+import '../addresses/selected_address.dart';
 import '../auth/auth_controller.dart';
 import '../bills/bill_providers_screen.dart';
 import '../cart/cart.dart';
@@ -87,26 +87,33 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   late Future<List<Promotion>> _promotionsFuture;
   late Future<List<Restaurant>> _restaurantsFuture;
-  late Future<List<SavedAddress>> _addressesFuture;
 
   @override
   void initState() {
     super.initState();
     _promotionsFuture = context.read<PromotionsRepository>().listActive();
     _restaurantsFuture = context.read<CatalogueRepository>().listRestaurants();
-    _addressesFuture = context.read<AddressRepository>().list();
+    _loadAddress();
+  }
+
+  /// A failure only leaves "Choisir une adresse" in the header.
+  Future<void> _loadAddress() async {
+    try {
+      await context.read<SelectedAddressController>().load();
+    } catch (_) {
+      // Best effort: offline, signed out mid-load or an unexpected
+      // response all just leave "Choisir une adresse" in the header.
+    }
   }
 
   Future<void> _refresh() async {
     final promotions = context.read<PromotionsRepository>().listActive();
     final restaurants = context.read<CatalogueRepository>().listRestaurants();
-    final addresses = context.read<AddressRepository>().list();
     setState(() {
       _promotionsFuture = promotions;
       _restaurantsFuture = restaurants;
-      _addressesFuture = addresses;
     });
-    await Future.wait([promotions, restaurants, addresses]);
+    await Future.wait([promotions, restaurants, _loadAddress()]);
   }
 
   void _openService(_Service service) {
@@ -151,7 +158,7 @@ class _HomeScreenState extends State<HomeScreen> {
       child: ListView(
         padding: const EdgeInsets.only(bottom: 24),
         children: [
-          _TopBar(addressesFuture: _addressesFuture),
+          const _TopBar(),
           const SizedBox(height: 18),
           const _Greeting(),
           const SizedBox(height: 16),
@@ -212,13 +219,23 @@ class _HomeScreenState extends State<HomeScreen> {
 /// Address (left) + cart shortcut (right), full-bleed at the top of the
 /// scrollable home feed.
 class _TopBar extends StatelessWidget {
-  const _TopBar({required this.addressesFuture});
+  const _TopBar();
 
-  final Future<List<SavedAddress>> addressesFuture;
+  Future<void> _changeAddress(BuildContext context) async {
+    final selection = context.read<SelectedAddressController>();
+    final picked = await showAddressSheet(
+      context,
+      selected: selection.current,
+      title: 'Livrer à',
+    );
+    if (picked != null) selection.select(picked);
+  }
 
   @override
   Widget build(BuildContext context) {
     final cart = context.watch<CartController>();
+    final address = context.watch<SelectedAddressController>().current;
+    final textTheme = Theme.of(context).textTheme;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
@@ -226,47 +243,45 @@ class _TopBar extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+            child: InkWell(
+              borderRadius: BorderRadius.circular(10),
+              onTap: () => _changeAddress(context),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Icon(
-                      Icons.location_on_outlined,
-                      size: 14,
-                      color: mutedText,
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.location_on_outlined,
+                          size: 14,
+                          color: mutedText,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          'LIVRER À',
+                          style: textTheme.labelSmall?.copyWith(
+                            color: mutedText,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.6,
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 4),
-                    Text(
-                      'LIVRER À',
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: mutedText,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.6,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 2),
-                FutureBuilder<List<SavedAddress>>(
-                  future: addressesFuture,
-                  builder: (context, snapshot) {
-                    final addresses = snapshot.data ?? const [];
-                    final label = addresses.isEmpty
-                        ? 'Choisir une adresse'
-                        : (addresses.firstWhere(
-                            (a) => a.isDefault,
-                            orElse: () => addresses.first,
-                          )).label;
-                    return Row(
+                    const SizedBox(height: 2),
+                    Row(
                       children: [
                         Flexible(
                           child: Text(
-                            label,
+                            address == null
+                                ? 'Choisir une adresse'
+                                : '${address.label} · ${address.addressLine}',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context).textTheme.titleSmall
-                                ?.copyWith(fontWeight: FontWeight.w800),
+                            style: textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.w800,
+                            ),
                           ),
                         ),
                         const Icon(
@@ -275,10 +290,10 @@ class _TopBar extends StatelessWidget {
                           color: navy,
                         ),
                       ],
-                    );
-                  },
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
           const SizedBox(width: 12),

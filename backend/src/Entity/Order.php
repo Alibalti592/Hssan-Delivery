@@ -88,6 +88,23 @@ class Order
     #[ORM\Column(length: 255, nullable: true)]
     private ?string $billPhotoFilename = null;
 
+    /**
+     * The pins the client placed on the map for deliveryAddress and (Colis
+     * only) pickupAddress — what the courier's "Ouvrir dans Maps" opens.
+     * Null when an address was only typed.
+     */
+    #[ORM\Column(nullable: true)]
+    private ?float $deliveryLatitude = null;
+
+    #[ORM\Column(nullable: true)]
+    private ?float $deliveryLongitude = null;
+
+    #[ORM\Column(nullable: true)]
+    private ?float $pickupLatitude = null;
+
+    #[ORM\Column(nullable: true)]
+    private ?float $pickupLongitude = null;
+
     #[ORM\ManyToOne]
     #[ORM\JoinColumn(nullable: false)]
     private ?DeliveryZone $deliveryZone = null;
@@ -367,6 +384,42 @@ class Order
     public function setBillPhotoFilename(?string $billPhotoFilename): static
     {
         $this->billPhotoFilename = $billPhotoFilename;
+
+        return $this;
+    }
+
+    public function getDeliveryLatitude(): ?float
+    {
+        return $this->deliveryLatitude;
+    }
+
+    public function getDeliveryLongitude(): ?float
+    {
+        return $this->deliveryLongitude;
+    }
+
+    public function setDeliveryLocation(?float $latitude, ?float $longitude): static
+    {
+        $this->deliveryLatitude = $latitude;
+        $this->deliveryLongitude = $longitude;
+
+        return $this;
+    }
+
+    public function getPickupLatitude(): ?float
+    {
+        return $this->pickupLatitude;
+    }
+
+    public function getPickupLongitude(): ?float
+    {
+        return $this->pickupLongitude;
+    }
+
+    public function setPickupLocation(?float $latitude, ?float $longitude): static
+    {
+        $this->pickupLatitude = $latitude;
+        $this->pickupLongitude = $longitude;
 
         return $this;
     }
