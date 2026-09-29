@@ -29,14 +29,21 @@ class OrderConfirmedScreen extends StatelessWidget {
               ),
               const SizedBox(height: 24),
               Text(
-                order.isParcel ? 'Colis envoyé' : 'Commande envoyée',
+                order.isBill
+                    ? 'Demande envoyée'
+                    : order.isParcel
+                    ? 'Colis envoyé'
+                    : 'Commande envoyée',
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                   fontWeight: FontWeight.w800,
                 ),
               ),
               const SizedBox(height: 8),
               Text(
-                order.isParcel
+                order.isBill
+                    ? 'Votre demande #${order.id} a bien été envoyée. Un livreur va passer chez vous récupérer '
+                          '${order.bill!.isTransfer ? "l'argent du mandat" : "la facture et l'argent"}.'
+                    : order.isParcel
                     ? 'Votre demande de course #${order.id} a bien été envoyée. Un livreur va la récupérer.'
                     : 'Votre commande #${order.id} a bien été transmise au restaurant.',
                 textAlign: TextAlign.center,
@@ -52,7 +59,9 @@ class OrderConfirmedScreen extends StatelessWidget {
                   child: Column(
                     children: [
                       Text(
-                        'Total à payer',
+                        order.isBill
+                            ? 'À remettre au livreur'
+                            : 'Total à payer',
                         style: Theme.of(context).textTheme.bodySmall,
                       ),
                       const SizedBox(height: 4),

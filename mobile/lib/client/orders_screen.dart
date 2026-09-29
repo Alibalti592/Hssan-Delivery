@@ -166,8 +166,12 @@ class _OrdersScreenState extends State<OrdersScreen> {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    '${order.items.length} article(s) · '
-                    '${order.totalAmount} DT',
+                    order.isBill
+                        ? '${order.bill!.isTransfer ? 'Mandat' : 'Facture'} '
+                              '${order.bill!.provider.name} · '
+                              '${order.totalAmount} DT'
+                        : '${order.items.length} article(s) · '
+                              '${order.totalAmount} DT',
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                 ],

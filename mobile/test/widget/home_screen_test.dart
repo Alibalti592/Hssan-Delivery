@@ -4,6 +4,8 @@ import 'package:http/testing.dart';
 import 'package:mobile/addresses/address_repository.dart';
 import 'package:mobile/auth/auth_controller.dart';
 import 'package:mobile/auth/auth_repository.dart';
+import 'package:mobile/bills/bill_providers_screen.dart';
+import 'package:mobile/bills/bills_repository.dart';
 import 'package:mobile/cart/cart.dart';
 import 'package:mobile/catalogue/catalogue_models.dart';
 import 'package:mobile/catalogue/catalogue_repository.dart';
@@ -74,6 +76,12 @@ Widget _wrap({
       if (request.url.path == '/api/restaurants') {
         return jsonResponse(pagedBody(restaurants));
       }
+      if (request.url.path == '/api/bill-providers') {
+        return jsonResponse([
+          {'id': 1, 'name': 'STEG', 'kind': 'BILL', 'logoUrl': null},
+          {'id': 5, 'name': 'Wafa Cash', 'kind': 'TRANSFER', 'logoUrl': null},
+        ]);
+      }
       return jsonResponse(promotions);
     }),
   );
@@ -84,6 +92,7 @@ Widget _wrap({
       Provider<CatalogueRepository>.value(value: CatalogueRepository(api)),
       Provider<AddressRepository>.value(value: AddressRepository(api)),
       Provider<OrdersRepository>.value(value: OrdersRepository(api)),
+      Provider<BillsRepository>.value(value: BillsRepository(api)),
       ChangeNotifierProvider<AuthController>.value(
         value: AuthController(
           repository: AuthRepository(api),
@@ -112,21 +121,25 @@ void main() {
     expect(find.text('Pressing'), findsNothing);
   });
 
-  testWidgets('tapping a coming-soon service shows the placeholder dialog', (
+  testWidgets('tapping Factures opens the bill providers, by kind', (
     tester,
   ) async {
+    tester.view.physicalSize = const Size(800, 2000);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
     await tester.pumpWidget(_wrap());
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('Factures'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Service bientôt disponible'), findsOneWidget);
+    expect(find.byType(BillProvidersScreen), findsOneWidget);
+    expect(find.text('Payer une facture'), findsOneWidget);
+    expect(find.text('Envoyer un mandat'), findsOneWidget);
+    expect(find.text('Wafa Cash'), findsOneWidget);
   });
 
-  testWidgets('tapping Colis opens the parcel form, not the placeholder', (
-    tester,
-  ) async {
+  testWidgets('tapping Colis opens the parcel form', (tester) async {
     await tester.pumpWidget(_wrap());
     await tester.pumpAndSettle();
 
@@ -134,7 +147,6 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(ParcelFormScreen), findsOneWidget);
-    expect(find.text('Service bientôt disponible'), findsNothing);
   });
 
   testWidgets(
@@ -272,7 +284,6 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(requestedUrl, contains('type=GROCERY'));
-    expect(find.text('Service bientôt disponible'), findsNothing);
     expect(
       find.text('Aucun magasin disponible pour le moment.'),
       findsOneWidget,

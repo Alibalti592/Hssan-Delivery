@@ -26,9 +26,10 @@ class OrderRepository extends ServiceEntityRepository
             // join them here instead of leaving them to lazy-load one query
             // each. All to-one relations, so this is safe alongside the
             // paginator's fetchJoinCollection: false (see Paginator).
-            ->addSelect('u', 'r', 'dz', 'd', 'c')
+            ->addSelect('u', 'r', 'dz', 'd', 'c', 'bp')
             ->leftJoin('o.user', 'u')
             ->leftJoin('o.restaurant', 'r')
+            ->leftJoin('o.billProvider', 'bp')
             ->leftJoin('o.deliveryZone', 'dz')
             ->leftJoin('o.delivery', 'd')
             ->leftJoin('d.courier', 'c')

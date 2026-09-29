@@ -60,6 +60,34 @@ class Order
     #[ORM\Column(length: 30, nullable: true)]
     private ?string $recipientPhone = null;
 
+    /**
+     * Set only for a Factures order: whose bill the courier pays (or which
+     * service sends the client's mandat — see BillProviderKind). A mandat's
+     * receiver goes in recipientName/recipientPhone.
+     */
+    #[ORM\ManyToOne]
+    #[ORM\JoinColumn(nullable: true)]
+    private ?BillProvider $billProvider = null;
+
+    /**
+     * The bill's reference/contract number; null for a mandat.
+     */
+    #[ORM\Column(length: 100, nullable: true)]
+    private ?string $billReference = null;
+
+    /**
+     * Cash the courier pays at the counter on the client's behalf.
+     */
+    #[ORM\Column(type: 'decimal', precision: 10, scale: 3, nullable: true)]
+    private ?string $billAmount = null;
+
+    /**
+     * Stored filename of the client's photo of the bill — kept outside the
+     * public uploads (see BillPhotoStorage), since it shows their details.
+     */
+    #[ORM\Column(length: 255, nullable: true)]
+    private ?string $billPhotoFilename = null;
+
     #[ORM\ManyToOne]
     #[ORM\JoinColumn(nullable: false)]
     private ?DeliveryZone $deliveryZone = null;
@@ -68,7 +96,7 @@ class Order
     private ?string $deliveryFee = null;
 
     /**
-     * Items total plus deliveryFee.
+     * Items total (or, for Factures, the bill amount) plus deliveryFee.
      */
     #[ORM\Column(type: 'decimal', precision: 10, scale: 3)]
     private ?string $totalAmount = null;
@@ -293,6 +321,54 @@ class Order
     public function getUpdatedAt(): ?\DateTimeImmutable
     {
         return $this->updatedAt;
+    }
+
+    public function getBillProvider(): ?BillProvider
+    {
+        return $this->billProvider;
+    }
+
+    public function setBillProvider(?BillProvider $billProvider): static
+    {
+        $this->billProvider = $billProvider;
+
+        return $this;
+    }
+
+    public function getBillReference(): ?string
+    {
+        return $this->billReference;
+    }
+
+    public function setBillReference(?string $billReference): static
+    {
+        $this->billReference = $billReference;
+
+        return $this;
+    }
+
+    public function getBillAmount(): ?string
+    {
+        return $this->billAmount;
+    }
+
+    public function setBillAmount(?string $billAmount): static
+    {
+        $this->billAmount = $billAmount;
+
+        return $this;
+    }
+
+    public function getBillPhotoFilename(): ?string
+    {
+        return $this->billPhotoFilename;
+    }
+
+    public function setBillPhotoFilename(?string $billPhotoFilename): static
+    {
+        $this->billPhotoFilename = $billPhotoFilename;
+
+        return $this;
     }
 
     public function getDelivery(): ?Delivery

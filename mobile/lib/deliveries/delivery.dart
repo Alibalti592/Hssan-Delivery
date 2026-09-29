@@ -1,3 +1,5 @@
+import '../bills/bill_models.dart';
+
 /// Delivery lifecycle, mirrors the backend `DeliveryStatus` enum.
 enum DeliveryStatus {
   pending('PENDING', 'En attente'),
@@ -109,6 +111,7 @@ class DeliveryOrder {
     required this.totalAmount,
     required this.deliveryType,
     required this.items,
+    this.bill,
   });
 
   final int id;
@@ -134,7 +137,13 @@ class DeliveryOrder {
   final String deliveryType;
   final List<DeliveryItem> items;
 
+  /// Set only for a Factures job: the bill (or mandat) to pay at the
+  /// provider's counter with the cash collected from the customer.
+  final BillInfo? bill;
+
   bool get isParcel => deliveryType == 'PARCEL';
+
+  bool get isBill => bill != null;
 
   /// Who the courier hands the delivery to — the recipient for a Colis
   /// job, the customer for everything else. Unifies the isParcel branch so
@@ -159,6 +168,7 @@ class DeliveryOrder {
       items: ((json['items'] as List<dynamic>?) ?? const [])
           .map((e) => DeliveryItem.fromJson(e as Map<String, dynamic>))
           .toList(growable: false),
+      bill: BillInfo.fromJson(json['bill']),
     );
   }
 }

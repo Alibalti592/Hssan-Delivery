@@ -2,6 +2,8 @@ import { api } from './client';
 import type {
   AdminDelivery,
   AdminOrder,
+  BillProvider,
+  BillProviderKind,
   Category,
   Courier,
   CourierLocationEntry,
@@ -163,6 +165,27 @@ export const promotionsApi = {
   uploadPhoto: (id: number, file: File) =>
     api.upload<Promotion>(`/api/admin/promotions/${id}/photo`, file),
   removePhoto: (id: number) => api.delete<Promotion>(`/api/admin/promotions/${id}/photo`),
+};
+
+// Bill providers (the app's Factures screen). No delete: past orders keep
+// pointing at their provider, so one is hidden instead.
+export interface BillProviderPayload {
+  name: string;
+  kind: BillProviderKind;
+  position: number;
+}
+
+export const billProvidersApi = {
+  list: () => api.get<BillProvider[]>('/api/admin/bill-providers'),
+  create: (data: BillProviderPayload) =>
+    api.post<BillProvider>('/api/admin/bill-providers', data),
+  update: (id: number, data: BillProviderPayload) =>
+    api.put<BillProvider>(`/api/admin/bill-providers/${id}`, data),
+  setActive: (id: number, isActive: boolean) =>
+    api.patch<BillProvider>(`/api/admin/bill-providers/${id}/active`, { isActive }),
+  uploadLogo: (id: number, file: File) =>
+    api.upload<BillProvider>(`/api/admin/bill-providers/${id}/logo`, file, 'logo'),
+  removeLogo: (id: number) => api.delete<BillProvider>(`/api/admin/bill-providers/${id}/logo`),
 };
 
 // Courier map (last known GPS location per courier — see backend

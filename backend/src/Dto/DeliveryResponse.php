@@ -2,6 +2,7 @@
 
 namespace App\Dto;
 
+use App\Dto\Order\BillSummary;
 use App\Entity\Delivery;
 use App\Entity\Order;
 
@@ -62,6 +63,7 @@ final class DeliveryResponse
             'deliveryFee' => $order->getDeliveryFee(),
             'totalAmount' => $order->getTotalAmount(),
             'items' => $items,
+            'bill' => BillSummary::of($order),
         ];
     }
 }

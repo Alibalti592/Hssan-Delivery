@@ -217,8 +217,9 @@ final class OrderService
             // OrderResponse::fromEntity touches all of these per row — join
             // them instead of leaving them to lazy-load one query each. All
             // to-one relations, safe alongside fetchJoinCollection: false.
-            ->addSelect('r', 'dz', 'd', 'c')
+            ->addSelect('r', 'dz', 'd', 'c', 'bp')
             ->leftJoin('o.restaurant', 'r')
+            ->leftJoin('o.billProvider', 'bp')
             ->leftJoin('o.deliveryZone', 'dz')
             ->leftJoin('o.delivery', 'd')
             ->leftJoin('d.courier', 'c')

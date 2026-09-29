@@ -1,3 +1,4 @@
+import '../bills/bill_models.dart';
 import '../deliveries/delivery.dart' show DeliveryStatus;
 
 /// Client order lifecycle, mirrors the backend `OrderStatus` enum.
@@ -76,6 +77,7 @@ class ClientOrder {
     required this.deliveryStatus,
     required this.courierName,
     required this.courierPhone,
+    this.bill,
   });
 
   final int id;
@@ -107,7 +109,12 @@ class ClientOrder {
   final String? courierName;
   final String? courierPhone;
 
+  /// Set only for a Factures order — the bill (or mandat) the courier pays.
+  final BillInfo? bill;
+
   bool get isParcel => deliveryType == 'PARCEL';
+
+  bool get isBill => bill != null;
 
   /// A client can back out while the delivery is unclaimed or just assigned,
   /// but not once a courier has actually accepted it — mirrors the backend's
@@ -143,6 +150,7 @@ class ClientOrder {
           : null,
       courierName: json['courierName'] as String?,
       courierPhone: json['courierPhone'] as String?,
+      bill: BillInfo.fromJson(json['bill']),
     );
   }
 }

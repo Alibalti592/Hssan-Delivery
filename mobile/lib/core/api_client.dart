@@ -40,6 +40,49 @@ class ApiClient {
   Future<dynamic> patch(String path, [Object? body]) =>
       _send('PATCH', path, body);
 
+  /// Uploads one file as multipart/form-data under [field] — for the few
+  /// endpoints that take a photo (see BillsRepository.uploadBillPhoto).
+  Future<dynamic> postFile(
+    String path, {
+    required String field,
+    required List<int> bytes,
+    required String filename,
+  }) async {
+    final request = http.MultipartRequest(
+      'POST',
+      Uri.parse('${AppConfig.apiBaseUrl}$path'),
+    );
+    request.headers.addAll(authHeaders);
+    request.headers['Accept'] = 'application/json';
+    request.files.add(
+      http.MultipartFile.fromBytes(field, bytes, filename: filename),
+    );
+
+    http.Response response;
+    try {
+      // Photos can take a while on a slow connection.
+      final streamed = await _http
+          .send(request)
+          .timeout(const Duration(seconds: 60));
+      response = await http.Response.fromStream(streamed);
+    } on SocketException {
+      throw NetworkException();
+    } on TimeoutException {
+      throw NetworkException('Le serveur met trop de temps à répondre.');
+    } on http.ClientException {
+      throw NetworkException();
+    }
+
+    return _decode(response);
+  }
+
+  /// The bearer header, for loading a protected image with
+  /// Image.network(headers: ...) — the bill photo, which is never public.
+  Map<String, String> get authHeaders {
+    final token = _tokenProvider();
+    return token == null ? const {} : {'Authorization': 'Bearer $token'};
+  }
+
   Future<dynamic> _send(String method, String path, [Object? body]) async {
     final uri = Uri.parse('${AppConfig.apiBaseUrl}$path');
     final request = http.Request(method, uri);

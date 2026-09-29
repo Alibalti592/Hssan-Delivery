@@ -99,6 +99,20 @@ final class PhotoUploader
         }
     }
 
+    /**
+     * Absolute path of a stored photo, or null when it doesn't exist.
+     */
+    public function path(?string $filename, string $subdirectory): ?string
+    {
+        if (null === $filename) {
+            return null;
+        }
+
+        $path = $this->uploadsDir.'/'.$subdirectory.'/'.$filename;
+
+        return is_file($path) ? $path : null;
+    }
+
     public static function url(?string $filename, string $subdirectory): ?string
     {
         return null === $filename

@@ -110,4 +110,15 @@ export const api = {
     body.append(field, file);
     return request<T>(path, { method: 'POST', body });
   },
+  // For a protected image (a client's bill photo): fetched with the auth
+  // cookie like any API call, then handed to <img> as an object URL, since
+  // a plain cross-site <img src> can't be relied on to carry the cookie.
+  // The caller revokes the URL when done with it.
+  blobUrl: async (path: string) => {
+    const response = await fetch(`${API_URL}${path}`, { credentials: 'include' });
+    if (!response.ok) {
+      throw new ApiError(`Request failed (${response.status})`, response.status);
+    }
+    return URL.createObjectURL(await response.blob());
+  },
 };
