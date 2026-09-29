@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../addresses/address_models.dart';
 import '../addresses/address_repository.dart';
 import '../auth/auth_controller.dart';
+import '../bills/bill_providers_screen.dart';
 import '../cart/cart.dart';
 import '../catalogue/catalogue_models.dart' show Restaurant, RestaurantType;
 import '../catalogue/catalogue_repository.dart';
@@ -22,29 +23,31 @@ import 'restaurants_screen.dart';
 /// can currently reach from the home screen. Restaurants, Courses, and Colis
 /// are wired to a real backend (a grocery store is just a Restaurant row
 /// with a different type — see RestaurantType; a Colis order is an Order
-/// with no restaurant — see ParcelFormScreen). Factures remains a UI-only
-/// placeholder since there's no bill-payment backend yet.
+/// with no restaurant — see ParcelFormScreen). Factures sends a courier to
+/// pay a bill or a mandat with the client's cash — see BillProvidersScreen.
 class _Service {
   const _Service({
     required this.title,
     required this.subtitle,
     required this.icon,
-    this.comingSoon = false,
     this.restaurantType,
     this.isParcel = false,
+    this.isBills = false,
   });
 
   final String title;
   final String subtitle;
   final IconData icon;
-  final bool comingSoon;
 
   /// Set when tapping this card should open RestaurantsScreen browsing
-  /// this type — null (and comingSoon true) for a placeholder service.
+  /// this type — null for a service with its own screen (Colis, Factures).
   final RestaurantType? restaurantType;
 
   /// Set when tapping this card should open ParcelFormScreen instead.
   final bool isParcel;
+
+  /// Set when tapping this card should open BillProvidersScreen instead.
+  final bool isBills;
 }
 
 const _services = [
@@ -58,7 +61,7 @@ const _services = [
     title: 'Factures',
     subtitle: 'Paiement rapide',
     icon: Icons.receipt_long,
-    comingSoon: true,
+    isBills: true,
   ),
   _Service(
     title: 'Courses',
@@ -107,19 +110,10 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _openService(_Service service) {
-    if (service.comingSoon) {
-      showDialog<void>(
-        context: context,
-        builder: (context) => AlertDialog(
-          content: const Text('Service bientôt disponible'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('OK'),
-            ),
-          ],
-        ),
-      );
+    if (service.isBills) {
+      Navigator.of(
+        context,
+      ).push(MaterialPageRoute(builder: (_) => const BillProvidersScreen()));
       return;
     }
 
@@ -481,42 +475,15 @@ class _ServiceCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Stack(
-                  children: [
-                    Container(
-                      width: 40,
-                      height: 40,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: fieldFill,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Icon(service.icon, color: navy, size: 20),
-                    ),
-                    if (service.comingSoon)
-                      Positioned(
-                        right: -2,
-                        top: -2,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 5,
-                            vertical: 1,
-                          ),
-                          decoration: BoxDecoration(
-                            color: mutedText,
-                            borderRadius: BorderRadius.circular(999),
-                          ),
-                          child: const Text(
-                            'Bientôt',
-                            style: TextStyle(
-                              fontSize: 8,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                      ),
-                  ],
+                Container(
+                  width: 40,
+                  height: 40,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: fieldFill,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(service.icon, color: navy, size: 20),
                 ),
                 const SizedBox(height: 10),
                 Text(

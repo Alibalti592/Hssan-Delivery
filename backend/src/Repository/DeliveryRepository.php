@@ -91,10 +91,11 @@ class DeliveryRepository extends ServiceEntityRepository
             // per row — join them instead of leaving them to lazy-load one
             // query each. All to-one relations, safe alongside the
             // paginator's fetchJoinCollection: false (see Paginator).
-            ->addSelect('c', 'o', 'r', 'u')
+            ->addSelect('c', 'o', 'r', 'u', 'bp')
             ->leftJoin('d.courier', 'c')
             ->leftJoin('d.order', 'o')
             ->leftJoin('o.restaurant', 'r')
+            ->leftJoin('o.billProvider', 'bp')
             ->leftJoin('o.user', 'u')
             ->andWhere('d.courier = :courier')
             ->setParameter('courier', $courier)
@@ -117,10 +118,11 @@ class DeliveryRepository extends ServiceEntityRepository
     public function paginateAllOrderedByCreatedAtDesc(int $page, int $limit): PaginatedResult
     {
         $qb = $this->createQueryBuilder('d')
-            ->addSelect('c', 'o', 'r', 'u')
+            ->addSelect('c', 'o', 'r', 'u', 'bp')
             ->leftJoin('d.courier', 'c')
             ->leftJoin('d.order', 'o')
             ->leftJoin('o.restaurant', 'r')
+            ->leftJoin('o.billProvider', 'bp')
             ->leftJoin('o.user', 'u')
             ->orderBy('d.createdAt', 'DESC')
             ->addOrderBy('d.id', 'DESC');

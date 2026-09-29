@@ -36,3 +36,12 @@ services:
 
     # add more service definitions when explicit configuration is needed
     # please note that last definitions always *replace* previous ones
+
+    # Photos clients take of their bills (Factures orders) show their name,
+    # address and account numbers, so unlike the catalogue photos they're
+    # stored outside public/ (on the same persistent volume) and only served
+    # through OrderController::billPhoto, which checks who is asking.
+    app.private_photo_uploader:
+        class: App\Service\PhotoUploader
+        arguments:
+            $uploadsDir: '%kernel.project_dir%/var/storage/private'

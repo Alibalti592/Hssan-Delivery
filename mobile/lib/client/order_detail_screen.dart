@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../bills/bill_widgets.dart';
 import '../core/api_exception.dart';
 import '../orders/order_models.dart';
 import '../orders/orders_repository.dart';
@@ -206,6 +207,12 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                           if (order.courierPhone != null &&
                               order.courierPhone!.isNotEmpty)
                             OutlinedButton.icon(
+                              // The theme's full-width minimum would
+                              // squeeze the courier's name to one letter a
+                              // line next to it.
+                              style: OutlinedButton.styleFrom(
+                                minimumSize: const Size(0, 40),
+                              ),
                               onPressed: () => _call(order.courierPhone!),
                               icon: const Icon(Icons.phone, size: 18),
                               label: const Text('Appeler'),
@@ -213,6 +220,14 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                         ],
                       ),
                     ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+                if (order.bill != null) ...[
+                  BillDetailsCard(
+                    bill: order.bill!,
+                    recipientName: order.recipientName,
+                    recipientPhone: order.recipientPhone,
                   ),
                   const SizedBox(height: 16),
                 ],
@@ -281,7 +296,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  order.isParcel ? 'Récapitulatif' : 'Articles',
+                  order.isParcel || order.isBill ? 'Récapitulatif' : 'Articles',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w700,
                   ),
@@ -301,6 +316,24 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                               Text('${item.quantity}x '),
                               Expanded(child: Text(item.displayName)),
                               Text('${item.unitPrice} DT'),
+                            ],
+                          ),
+                        ),
+                      if (order.bill != null)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 10,
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                order.bill!.isTransfer
+                                    ? 'Montant du mandat'
+                                    : 'Montant de la facture',
+                              ),
+                              Text('${order.bill!.amount} DT'),
                             ],
                           ),
                         ),

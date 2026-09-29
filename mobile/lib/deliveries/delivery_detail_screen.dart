@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../bills/bill_widgets.dart';
 import '../widgets/decorative_map.dart';
 import '../widgets/status_chip.dart';
 import 'deliveries_controller.dart';
@@ -53,13 +54,28 @@ class DeliveryDetailScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 16),
                 if (order != null) ...[
+                  if (order.bill != null) ...[
+                    BillDetailsCard(
+                      bill: order.bill!,
+                      recipientName: order.recipientName,
+                      recipientPhone: order.recipientPhone,
+                      onCallRecipient:
+                          order.recipientPhone == null ||
+                              order.recipientPhone!.isEmpty
+                          ? null
+                          : () => _call(context, order.recipientPhone!),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
                   _Section(
                     icon: order.isParcel
                         ? Icons.inventory_2_outlined
                         : Icons.storefront_outlined,
-                    title: order.isParcel ? 'Récupérer à' : 'Récupérer chez',
+                    title: order.isParcel || order.isBill
+                        ? 'Récupérer à'
+                        : 'Récupérer chez',
                     child: Text(
-                      order.isParcel
+                      order.isParcel || order.isBill
                           ? (order.pickupAddress ?? '')
                           : (order.restaurantName ?? ''),
                       style: Theme.of(context).textTheme.bodyLarge,
@@ -67,7 +83,7 @@ class DeliveryDetailScreen extends StatelessWidget {
                   ),
                   _Section(
                     icon: Icons.place_outlined,
-                    title: 'Livrer à',
+                    title: order.isBill ? 'Rapporter le reçu à' : 'Livrer à',
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -111,7 +127,11 @@ class DeliveryDetailScreen extends StatelessWidget {
                   ),
                   _Section(
                     icon: Icons.receipt_long_outlined,
-                    title: order.isParcel ? 'Colis' : 'Commande',
+                    title: order.isBill
+                        ? 'Argent à récupérer'
+                        : order.isParcel
+                        ? 'Colis'
+                        : 'Commande',
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -122,7 +142,15 @@ class DeliveryDetailScreen extends StatelessWidget {
                               '${item.quantity}× ${item.displayName}',
                             ),
                           ),
-                        const Divider(height: 20),
+                        if (order.bill != null)
+                          _MoneyRow(
+                            order.bill!.isTransfer
+                                ? 'Montant du mandat'
+                                : 'Montant de la facture',
+                            order.bill!.amount,
+                          ),
+                        if (order.items.isNotEmpty || order.bill == null)
+                          const Divider(height: 20),
                         _MoneyRow('Frais de livraison', order.deliveryFee),
                         _MoneyRow('Total', order.totalAmount, bold: true),
                       ],

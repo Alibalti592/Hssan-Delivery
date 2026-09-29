@@ -58,6 +58,10 @@
 		     courier's app reports its position while a delivery is active.
 		     No NSLocationAlwaysAndWhenInUseUsageDescription — background
 		     location tracking is not implemented. -->
+		<key>NSCameraUsageDescription</key>
+		<string>Hssan Delivery utilise l'appareil photo pour photographier la facture que le livreur va payer.</string>
+		<key>NSPhotoLibraryUsageDescription</key>
+		<string>Hssan Delivery accède à vos photos pour joindre la facture que le livreur va payer.</string>
 		<key>NSLocationWhenInUseUsageDescription</key>
 		<string>Hssan Delivery utilise votre position pour indiquer votre localisation à l'administrateur pendant une course.</string>
 	</dict>

@@ -206,7 +206,9 @@ class _DeliveryCard extends StatelessWidget {
                 children: [
                   Expanded(
                     child: Text(
-                      order?.restaurantName ?? 'Delivery #${delivery.id}',
+                      order?.bill != null
+                          ? '${order!.bill!.isTransfer ? 'Mandat' : 'Facture'} ${order.bill!.provider.name}'
+                          : order?.restaurantName ?? 'Delivery #${delivery.id}',
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
                   ),

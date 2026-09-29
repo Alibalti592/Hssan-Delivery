@@ -2,6 +2,7 @@
 
 namespace App\Dto\Admin;
 
+use App\Dto\Order\BillSummary;
 use App\Entity\Order;
 
 final class OrderResponse
@@ -41,6 +42,7 @@ final class OrderResponse
             'status' => $order->getStatus()->value,
             'deliveryType' => $order->getDeliveryType()->value,
             'deliveryId' => $order->getDelivery()?->getId(),
+            'bill' => BillSummary::of($order),
             'createdAt' => $order->getCreatedAt()?->format(\DateTimeInterface::ATOM),
             'updatedAt' => $order->getUpdatedAt()?->format(\DateTimeInterface::ATOM),
         ];

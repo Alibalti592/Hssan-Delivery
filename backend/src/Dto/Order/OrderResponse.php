@@ -27,6 +27,7 @@ final class OrderResponse
         public readonly ?string $deliveryStatus,
         public readonly ?string $courierName,
         public readonly ?string $courierPhone,
+        public readonly ?array $bill,
     ) {
     }
 
@@ -72,6 +73,7 @@ final class OrderResponse
             // whoever the platform picks besides this.
             courierName: $courier?->getName(),
             courierPhone: $courier?->getPhone(),
+            bill: BillSummary::of($order),
         );
     }
 }

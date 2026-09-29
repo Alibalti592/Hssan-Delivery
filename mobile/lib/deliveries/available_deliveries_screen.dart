@@ -141,6 +141,8 @@ class _ProposalCard extends StatelessWidget {
                   child: Text(
                     order == null
                         ? 'Course #${delivery.id}'
+                        : order.bill != null
+                        ? '${order.bill!.isTransfer ? 'Mandat' : 'Facture'} ${order.bill!.provider.name}'
                         : order.isParcel
                         ? 'Colis'
                         : (order.restaurantName ?? 'Course #${delivery.id}'),
