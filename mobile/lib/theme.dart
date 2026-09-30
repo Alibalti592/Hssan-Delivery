@@ -98,6 +98,16 @@ ThemeData buildTheme(Brightness brightness) {
         ),
       ),
     ),
+    // Dialogs and sheets otherwise take Material 3's tinted surface, which
+    // comes out pink from the neutral seed (see the scheme above).
+    dialogTheme: DialogThemeData(
+      backgroundColor: scheme.surface,
+      surfaceTintColor: Colors.transparent,
+    ),
+    bottomSheetTheme: BottomSheetThemeData(
+      backgroundColor: scheme.surface,
+      surfaceTintColor: Colors.transparent,
+    ),
     cardTheme: CardThemeData(
       elevation: 0,
       color: scheme.surface,

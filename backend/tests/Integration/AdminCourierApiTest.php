@@ -221,7 +221,7 @@ final class AdminCourierApiTest extends WebTestCase
         self::assertIsArray($response);
 
         self::assertSame(
-            'An account with this phone number already exists.',
+            'Un compte existe déjà avec ce numéro.',
             $response['message']
         );
     }
@@ -295,7 +295,7 @@ final class AdminCourierApiTest extends WebTestCase
         self::assertIsArray($response);
 
         self::assertSame(
-            'An account with this phone number already exists.',
+            'Un compte existe déjà avec ce numéro.',
             $response['message']
         );
     }

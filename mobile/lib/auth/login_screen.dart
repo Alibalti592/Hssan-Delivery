@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../core/phone_format.dart';
+import '../onboarding/splash_screen.dart' show SplashMonogram;
 import '../theme.dart';
 import 'auth_controller.dart';
+import 'auth_widgets.dart';
 import 'register_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -17,8 +18,10 @@ class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _phone = TextEditingController();
   final _password = TextEditingController();
-  bool _obscure = true;
   String? _error;
+
+  /// Once a submit has shown errors, they clear as each field is fixed.
+  bool _submitted = false;
 
   @override
   void dispose() {
@@ -28,11 +31,15 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _submit() async {
-    setState(() => _error = null);
+    setState(() {
+      _error = null;
+      _submitted = true;
+    });
     if (!_formKey.currentState!.validate()) return;
+    FocusScope.of(context).unfocus();
 
     final message = await context.read<AuthController>().signIn(
-      _phone.text,
+      phoneDigits(_phone.text),
       _password.text,
     );
     if (mounted && message != null) {
@@ -43,118 +50,72 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final busy = context.watch<AuthController>().busy;
+    final textTheme = Theme.of(context).textTheme;
 
     return Scaffold(
       backgroundColor: navy,
-      body: SafeArea(
-        child: Column(
-          children: [
-            const Padding(
-              padding: EdgeInsets.fromLTRB(24, 32, 24, 24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'DH',
-                    style: TextStyle(
-                      fontSize: 34,
-                      fontWeight: FontWeight.w800,
-                      color: Colors.white,
+      body: GestureDetector(
+        // Tapping outside a field puts the keyboard away.
+        onTap: () => FocusScope.of(context).unfocus(),
+        child: SafeArea(
+          bottom: false,
+          child: CustomScrollView(
+            slivers: [
+              const SliverToBoxAdapter(child: _BrandHeader()),
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: Container(
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.vertical(
+                      top: Radius.circular(28),
                     ),
                   ),
-                  SizedBox(height: 8),
-                  Text(
-                    'Delivery Hassen',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 22,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  SizedBox(height: 4),
-                  Text(
-                    'Connectez-vous pour continuer',
-                    style: TextStyle(color: Colors.white70, fontSize: 14),
-                  ),
-                ],
-              ),
-            ),
-            Expanded(
-              child: Container(
-                width: double.infinity,
-                decoration: const BoxDecoration(
-                  color: Color(0xFFF2F4F7),
-                  borderRadius: BorderRadius.only(
-                    topLeft: Radius.circular(28),
-                    topRight: Radius.circular(28),
-                  ),
-                ),
-                padding: const EdgeInsets.fromLTRB(24, 32, 24, 24),
-                child: SingleChildScrollView(
-                  child: Form(
-                    key: _formKey,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        TextFormField(
-                          controller: _phone,
-                          keyboardType: TextInputType.phone,
-                          textInputAction: TextInputAction.next,
-                          enabled: !busy,
-                          decoration: const InputDecoration(
-                            labelText: 'Téléphone',
-                            hintText: '+216 22 000 000',
-                          ),
-                          validator: validatePhone,
-                        ),
-                        const SizedBox(height: 16),
-                        TextFormField(
-                          controller: _password,
-                          obscureText: _obscure,
-                          enabled: !busy,
-                          onFieldSubmitted: (_) => _submit(),
-                          decoration: InputDecoration(
-                            labelText: 'Mot de passe',
-                            suffixIcon: IconButton(
-                              icon: Icon(
-                                _obscure
-                                    ? Icons.visibility_outlined
-                                    : Icons.visibility_off_outlined,
-                              ),
-                              onPressed: () =>
-                                  setState(() => _obscure = !_obscure),
-                            ),
-                          ),
-                          validator: (v) => (v == null || v.isEmpty)
-                              ? 'Mot de passe requis'
-                              : null,
-                        ),
-                        if (_error != null) ...[
-                          const SizedBox(height: 16),
+                  padding: const EdgeInsets.fromLTRB(24, 28, 24, 24),
+                  child: AutofillGroup(
+                    child: Form(
+                      key: _formKey,
+                      autovalidateMode: _submitted
+                          ? AutovalidateMode.onUserInteraction
+                          : AutovalidateMode.disabled,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
                           Text(
-                            _error!,
-                            style: TextStyle(
-                              color: Theme.of(context).colorScheme.error,
+                            'Connexion',
+                            style: textTheme.headlineSmall?.copyWith(
+                              fontWeight: FontWeight.w800,
                             ),
                           ),
-                        ],
-                        const SizedBox(height: 24),
-                        FilledButton(
-                          onPressed: busy ? null : _submit,
-                          child: busy
-                              ? const SizedBox(
-                                  height: 22,
-                                  width: 22,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: Colors.white,
-                                  ),
-                                )
-                              : const Text('Se connecter'),
-                        ),
-                        const SizedBox(height: 16),
-                        Center(
-                          child: TextButton(
+                          const SizedBox(height: 4),
+                          Text(
+                            'Heureux de vous revoir !',
+                            style: textTheme.bodyMedium?.copyWith(
+                              color: mutedText,
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+                          PhoneField(controller: _phone, enabled: !busy),
+                          const SizedBox(height: 16),
+                          PasswordField(
+                            controller: _password,
+                            enabled: !busy,
+                            onSubmitted: _submit,
+                          ),
+                          if (_error != null) ...[
+                            const SizedBox(height: 16),
+                            AuthErrorBanner(_error!),
+                          ],
+                          const SizedBox(height: 24),
+                          AuthSubmitButton(
+                            label: 'Se connecter',
+                            busy: busy,
+                            onPressed: _submit,
+                          ),
+                          const SizedBox(height: 24),
+                          const _OrDivider(),
+                          const SizedBox(height: 16),
+                          OutlinedButton(
                             onPressed: busy
                                 ? null
                                 : () => Navigator.of(context).push(
@@ -162,24 +123,99 @@ class _LoginScreenState extends State<LoginScreen> {
                                       builder: (_) => const RegisterScreen(),
                                     ),
                                   ),
-                            child: const Text('Créer un compte client'),
+                            child: const Text('Créer un compte'),
                           ),
-                        ),
-                        Center(
-                          child: Text(
-                            'Compte livreur créé par un administrateur',
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
-                        ),
-                      ],
+                          const Spacer(),
+                          const SizedBox(height: 24),
+                          const _CourierNote(),
+                        ],
+                      ),
                     ),
                   ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
+    );
+  }
+}
+
+/// The monogram, name and tagline, as on the splash screen.
+class _BrandHeader extends StatelessWidget {
+  const _BrandHeader();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Padding(
+      padding: EdgeInsets.fromLTRB(24, 36, 24, 32),
+      child: Column(
+        children: [
+          SplashMonogram(),
+          SizedBox(height: 14),
+          Text(
+            'Delivery Hassen',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 20,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          SizedBox(height: 4),
+          Text(
+            'Aussi rapide que votre pensée',
+            style: TextStyle(color: Color(0xFF9AA5B6), fontSize: 13),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _OrDivider extends StatelessWidget {
+  const _OrDivider();
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        const Expanded(child: Divider(color: cardBorder)),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: Text(
+            'Nouveau sur Delivery Hassen ?',
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: mutedText),
+          ),
+        ),
+        const Expanded(child: Divider(color: cardBorder)),
+      ],
+    );
+  }
+}
+
+class _CourierNote extends StatelessWidget {
+  const _CourierNote();
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        const Icon(Icons.delivery_dining_outlined, size: 18, color: mutedText),
+        const SizedBox(width: 8),
+        Flexible(
+          child: Text(
+            "Livreur ? Votre compte est créé par l'administrateur.",
+            textAlign: TextAlign.center,
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: mutedText),
+          ),
+        ),
+      ],
     );
   }
 }

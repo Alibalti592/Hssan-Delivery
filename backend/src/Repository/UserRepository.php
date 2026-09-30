@@ -5,6 +5,7 @@ namespace App\Repository;
 use App\Entity\User;
 use App\Pagination\PaginatedResult;
 use App\Pagination\Paginator;
+use App\Validator\PhoneFormat;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 use Symfony\Component\Security\Core\Exception\UnsupportedUserException;
@@ -33,6 +34,30 @@ class UserRepository extends ServiceEntityRepository implements PasswordUpgrader
         $user->setPassword($newHashedPassword);
         $this->getEntityManager()->persist($user);
         $this->getEntityManager()->flush();
+    }
+
+    /**
+     * The account for a phone number however it's typed ("+216 22 123 456",
+     * "22123456"...). Accounts created before numbers were normalized may
+     * be stored with spaces or the country code, so when the exact value
+     * isn't there this compares the last 8 digits of every stored number.
+     */
+    public function findOneByPhone(string $phone): ?User
+    {
+        $normalized = PhoneFormat::normalize($phone);
+
+        $user = $this->findOneBy(['phone' => $normalized])
+            ?? $this->findOneBy(['phone' => $phone]);
+        if (null !== $user || 8 !== \strlen($normalized)) {
+            return $user;
+        }
+
+        $id = $this->getEntityManager()->getConnection()->fetchOne(
+            "SELECT id FROM \"user\" WHERE RIGHT(REGEXP_REPLACE(phone, '\\D', '', 'g'), 8) = :digits ORDER BY id LIMIT 1",
+            ['digits' => $normalized],
+        );
+
+        return false === $id ? null : $this->find($id);
     }
 
     /**

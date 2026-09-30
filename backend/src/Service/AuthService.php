@@ -8,12 +8,15 @@ use App\Entity\User;
 use App\Exception\ConflictException;
 use App\Exception\InvalidOperationException;
 use App\Repository\UserRepository;
+use App\Validator\PhoneFormat;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 final class AuthService
 {
+    public const PHONE_TAKEN = 'Un compte existe déjà avec ce numéro.';
+
     public function __construct(
         private readonly UserPasswordHasherInterface $passwordHasher,
         private readonly EntityManagerInterface $entityManager,
@@ -23,20 +26,14 @@ final class AuthService
 
     public function register(RegisterUserRequest $dto): User
     {
-        if (
-            $this->userRepository->findOneBy([
-                'phone' => $dto->phone,
-            ]) !== null
-        ) {
-            throw new ConflictException(
-                'An account with this phone number already exists.'
-            );
+        if (null !== $this->userRepository->findOneByPhone($dto->phone)) {
+            throw new ConflictException(self::PHONE_TAKEN);
         }
 
         $user = new User();
 
         $user->setName($dto->name);
-        $user->setPhone($dto->phone);
+        $user->setPhone(PhoneFormat::normalize($dto->phone));
         $user->setPassword(
             $this->passwordHasher->hashPassword(
                 $user,
@@ -60,9 +57,7 @@ final class AuthService
             // prevents the duplicate; this turns the loser's raw DBAL
             // exception into the same clean 409 the fast path already
             // gives a sequential duplicate.
-            throw new ConflictException(
-                'An account with this phone number already exists.'
-            );
+            throw new ConflictException(self::PHONE_TAKEN);
         }
 
         return $user;
@@ -71,20 +66,14 @@ final class AuthService
     public function createCourier(
         CreateCourierRequest $dto
     ): User {
-        if (
-            $this->userRepository->findOneBy([
-                'phone' => $dto->phone,
-            ]) !== null
-        ) {
-            throw new ConflictException(
-                'An account with this phone number already exists.'
-            );
+        if (null !== $this->userRepository->findOneByPhone($dto->phone)) {
+            throw new ConflictException(self::PHONE_TAKEN);
         }
 
         $courier = new User();
 
         $courier->setName($dto->name);
-        $courier->setPhone($dto->phone);
+        $courier->setPhone(PhoneFormat::normalize($dto->phone));
         $courier->setPassword(
             $this->passwordHasher->hashPassword(
                 $courier,
@@ -106,9 +95,7 @@ final class AuthService
         } catch (UniqueConstraintViolationException) {
             // See the identical comment in register() — same TOCTOU gap
             // between the check above and this flush.
-            throw new ConflictException(
-                'An account with this phone number already exists.'
-            );
+            throw new ConflictException(self::PHONE_TAKEN);
         }
 
         return $courier;

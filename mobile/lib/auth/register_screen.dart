@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../core/phone_format.dart';
+import '../theme.dart';
 import '../widgets/dark_header.dart';
 import 'auth_controller.dart';
+import 'auth_widgets.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -17,8 +18,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _name = TextEditingController();
   final _phone = TextEditingController();
   final _password = TextEditingController();
-  bool _obscure = true;
   String? _error;
+
+  /// Once a submit has shown errors, they clear as each field is fixed.
+  bool _submitted = false;
 
   @override
   void dispose() {
@@ -29,12 +32,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   Future<void> _submit() async {
-    setState(() => _error = null);
+    setState(() {
+      _error = null;
+      _submitted = true;
+    });
     if (!_formKey.currentState!.validate()) return;
+    FocusScope.of(context).unfocus();
 
     final message = await context.read<AuthController>().register(
       name: _name.text.trim(),
-      phone: _phone.text.trim(),
+      phone: phoneDigits(_phone.text),
       password: _password.text,
     );
 
@@ -55,16 +62,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
     final busy = context.watch<AuthController>().busy;
 
     return Scaffold(
-      body: SafeArea(
-        child: Column(
-          children: [
-            DarkHeader(
-              title: 'Créer un compte',
-              subtitle: 'Rejoignez Delivery Hassen',
-              onBack: busy ? null : () => Navigator.of(context).pop(),
-            ),
-            Expanded(child: _form(context, busy)),
-          ],
+      body: GestureDetector(
+        onTap: () => FocusScope.of(context).unfocus(),
+        child: SafeArea(
+          child: Column(
+            children: [
+              DarkHeader(
+                title: 'Créer un compte',
+                subtitle: 'Commandez en quelques secondes',
+                onBack: busy ? null : () => Navigator.of(context).pop(),
+              ),
+              Expanded(child: _form(context, busy)),
+            ],
+          ),
         ),
       ),
     );
@@ -73,77 +83,78 @@ class _RegisterScreenState extends State<RegisterScreen> {
   Widget _form(BuildContext context, bool busy) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
-      child: Form(
-        key: _formKey,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            TextFormField(
-              controller: _name,
-              textInputAction: TextInputAction.next,
-              enabled: !busy,
-              decoration: const InputDecoration(labelText: 'Nom'),
-              validator: (v) =>
-                  (v == null || v.trim().isEmpty) ? 'Nom requis' : null,
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _phone,
-              keyboardType: TextInputType.phone,
-              textInputAction: TextInputAction.next,
-              enabled: !busy,
-              decoration: const InputDecoration(
-                labelText: 'Téléphone',
-                hintText: '+216 22 000 000',
+      child: AutofillGroup(
+        child: Form(
+          key: _formKey,
+          autovalidateMode: _submitted
+              ? AutovalidateMode.onUserInteraction
+              : AutovalidateMode.disabled,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              TextFormField(
+                controller: _name,
+                textInputAction: TextInputAction.next,
+                textCapitalization: TextCapitalization.words,
+                autofillHints: const [AutofillHints.name],
+                enabled: !busy,
+                decoration: const InputDecoration(
+                  labelText: 'Nom et prénom',
+                  prefixIcon: Icon(Icons.person_outline),
+                ),
+                validator: (v) =>
+                    (v == null || v.trim().isEmpty) ? 'Nom requis' : null,
               ),
-              validator: validatePhone,
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _password,
-              obscureText: _obscure,
-              enabled: !busy,
-              onFieldSubmitted: (_) => _submit(),
-              decoration: InputDecoration(
-                labelText: 'Mot de passe',
-                helperText: '8 caractères minimum',
-                suffixIcon: IconButton(
-                  icon: Icon(
-                    _obscure
-                        ? Icons.visibility_outlined
-                        : Icons.visibility_off_outlined,
-                  ),
-                  onPressed: () => setState(() => _obscure = !_obscure),
+              const SizedBox(height: 16),
+              PhoneField(controller: _phone, enabled: !busy),
+              const SizedBox(height: 6),
+              const Padding(
+                padding: EdgeInsets.only(left: 4),
+                child: Text(
+                  'Le livreur vous appellera sur ce numéro.',
+                  style: TextStyle(color: mutedText, fontSize: 12),
                 ),
               ),
-              validator: (v) {
-                if (v == null || v.isEmpty) return 'Mot de passe requis';
-                if (v.length < 8) return '8 caractères minimum';
-                return null;
-              },
-            ),
-            if (_error != null) ...[
               const SizedBox(height: 16),
-              Text(
-                _error!,
-                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              PasswordField(
+                controller: _password,
+                enabled: !busy,
+                showRule: true,
+                isNew: true,
+                onSubmitted: _submit,
+              ),
+              if (_error != null) ...[
+                const SizedBox(height: 16),
+                AuthErrorBanner(_error!),
+              ],
+              const SizedBox(height: 24),
+              AuthSubmitButton(
+                label: 'Créer mon compte',
+                busy: busy,
+                onPressed: _submit,
+              ),
+              const SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    'Déjà un compte ?',
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodyMedium?.copyWith(color: mutedText),
+                  ),
+                  TextButton(
+                    style: TextButton.styleFrom(
+                      minimumSize: const Size(0, 40),
+                      padding: const EdgeInsets.symmetric(horizontal: 6),
+                    ),
+                    onPressed: busy ? null : () => Navigator.of(context).pop(),
+                    child: const Text('Se connecter'),
+                  ),
+                ],
               ),
             ],
-            const SizedBox(height: 24),
-            FilledButton(
-              onPressed: busy ? null : _submit,
-              child: busy
-                  ? const SizedBox(
-                      height: 22,
-                      width: 22,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    )
-                  : const Text('Créer mon compte'),
-            ),
-          ],
+          ),
         ),
       ),
     );

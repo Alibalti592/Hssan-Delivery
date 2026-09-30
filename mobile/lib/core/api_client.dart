@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:http/http.dart' as http;
 
 import '../config.dart';
@@ -134,11 +135,32 @@ class ApiClient {
       onUnauthorized();
     }
 
-    final message = (json is Map && json['message'] is String)
-        ? json['message'] as String
-        : 'La requête a échoué ($status).';
+    throw ApiException(status, errorMessage(status, json));
+  }
 
-    throw ApiException(status, message);
+  /// What to tell the user about a failed request: the first field error
+  /// of a validation failure (the top-level message is a generic
+  /// "Validation failed."), the server's own message otherwise, and plain
+  /// words instead of a status code for a server error or rate limit.
+  @visibleForTesting
+  static String errorMessage(int status, dynamic json) {
+    if (status >= 500) {
+      return 'Le service est momentanément indisponible. Réessayez dans un instant.';
+    }
+    if (status == 429) {
+      return 'Trop de tentatives. Réessayez dans une minute.';
+    }
+    if (json is Map) {
+      final errors = json['errors'];
+      if (errors is List && errors.isNotEmpty) {
+        final first = errors.first;
+        if (first is Map && first['message'] is String) {
+          return first['message'] as String;
+        }
+      }
+      if (json['message'] is String) return json['message'] as String;
+    }
+    return 'La requête a échoué. Réessayez.';
   }
 
   void close() => _http.close();
