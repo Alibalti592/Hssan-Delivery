@@ -191,7 +191,7 @@ void main() {
       );
 
       await tester.pumpWidget(_pumpableApp(auth));
-      await tester.tap(find.text('Créer un compte client'));
+      await tester.tap(find.text('Créer un compte'));
       await tester.pumpAndSettle();
 
       await tester.enterText(

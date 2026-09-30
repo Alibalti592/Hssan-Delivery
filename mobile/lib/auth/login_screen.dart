@@ -123,7 +123,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                       builder: (_) => const RegisterScreen(),
                                     ),
                                   ),
-                            child: const Text('Créer un compte client'),
+                            child: const Text('Créer un compte'),
                           ),
                           const Spacer(),
                           const SizedBox(height: 24),
