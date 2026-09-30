@@ -8,6 +8,7 @@ use App\Dto\Auth\UpdateAvailabilityRequest;
 use App\Dto\Auth\UserResponse;
 use App\Entity\User;
 use App\Service\AuthService;
+use App\Service\RefreshTokenService;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\Cookie;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -26,6 +27,7 @@ class AuthController extends AbstractApiController
         SerializerInterface $serializer,
         ValidatorInterface $validator,
         private readonly AuthService $authService,
+        private readonly RefreshTokenService $refreshTokens,
         private readonly Security $security,
         private readonly RateLimiterFactory $registerLimiter,
         private readonly RateLimiterFactory $passwordChangeLimiter,
@@ -78,9 +80,38 @@ class AuthController extends AbstractApiController
      * server-side for a stateless JWT: the token itself stays technically
      * valid until it expires, this only removes the browser's copy of it.
      */
-    #[Route('/logout', name: 'api_auth_logout', methods: ['POST'])]
-    public function logout(): JsonResponse
+    /**
+     * Trades the mobile app's refresh token for a new JWT and a new refresh
+     * token (see RefreshTokenService). Public: the JWT it replaces has
+     * usually expired, so the app calls this without one.
+     */
+    #[Route('/refresh', name: 'api_auth_refresh', methods: ['POST'])]
+    public function refresh(Request $request): JsonResponse
     {
+        $tokens = $this->refreshTokens->refresh(self::refreshTokenFrom($request) ?? '');
+
+        if (null === $tokens) {
+            return new JsonResponse(
+                ['message' => 'Session expirée. Reconnectez-vous.'],
+                Response::HTTP_UNAUTHORIZED
+            );
+        }
+
+        return new JsonResponse($tokens);
+    }
+
+    /**
+     * Public, like refresh: the app signs out with its refresh token, which
+     * stops working, whether or not its JWT is still valid.
+     */
+    #[Route('/logout', name: 'api_auth_logout', methods: ['POST'])]
+    public function logout(Request $request): JsonResponse
+    {
+        $refreshToken = self::refreshTokenFrom($request);
+        if (null !== $refreshToken) {
+            $this->refreshTokens->revoke($refreshToken);
+        }
+
         $response = new JsonResponse(null, Response::HTTP_NO_CONTENT);
 
         $response->headers->clearCookie(
@@ -130,6 +161,9 @@ class AuthController extends AbstractApiController
         $dto = $this->deserializeAndValidate($request, ChangePasswordRequest::class);
 
         $this->authService->changePassword($user, $dto->currentPassword, $dto->newPassword);
+        // Every other device has to sign in with the new password; this one
+        // (when it sent its refresh token) stays signed in.
+        $this->refreshTokens->revokeAll($user, $dto->refreshToken);
 
         return new JsonResponse(null, Response::HTTP_NO_CONTENT);
     }
@@ -152,5 +186,13 @@ class AuthController extends AbstractApiController
         $this->authService->setAvailability($user, $dto->isAvailable);
 
         return new JsonResponse(UserResponse::fromEntity($user));
+    }
+
+    private static function refreshTokenFrom(Request $request): ?string
+    {
+        $body = json_decode($request->getContent(), true);
+        $token = \is_array($body) ? ($body['refreshToken'] ?? null) : null;
+
+        return \is_string($token) && '' !== $token ? $token : null;
     }
 }

@@ -14,6 +14,7 @@ final class CourierService
         private readonly EntityManagerInterface $entityManager,
         private readonly UserRepository $userRepository,
         private readonly UserPasswordHasherInterface $passwordHasher,
+        private readonly RefreshTokenService $refreshTokens,
     ) {
     }
 
@@ -35,6 +36,11 @@ final class CourierService
         $courier->setActive($isActive);
 
         $this->entityManager->flush();
+
+        // A deactivated courier's app stops being able to renew its session.
+        if (!$isActive) {
+            $this->refreshTokens->revokeAll($courier);
+        }
 
         return $courier;
     }
@@ -71,6 +77,9 @@ final class CourierService
         );
 
         $this->entityManager->flush();
+
+        // Whoever was signed in with the old password is signed out.
+        $this->refreshTokens->revokeAll($courier);
 
         return $courier;
     }

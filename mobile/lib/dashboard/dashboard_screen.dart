@@ -8,6 +8,7 @@ import '../deliveries/deliveries_controller.dart';
 import '../deliveries/deliveries_screen.dart';
 import '../deliveries/delivery.dart';
 import '../deliveries/delivery_detail_screen.dart';
+import '../notifications/notification_prompt.dart';
 import '../theme.dart';
 import '../widgets/dark_header.dart';
 import '../widgets/status_chip.dart';
@@ -27,6 +28,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<DeliveriesController>().refresh();
+      askCourierForNotifications(context);
     });
   }
 

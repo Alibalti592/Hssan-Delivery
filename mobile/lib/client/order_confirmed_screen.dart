@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../notifications/notification_prompt.dart';
 import '../orders/order_models.dart';
 import '../theme.dart';
 import 'client_home_screen.dart';
@@ -96,6 +97,7 @@ class OrderConfirmedScreen extends StatelessWidget {
                   ),
                 ),
               ),
+              const OrderNotificationsCard(),
               const SizedBox(height: 32),
               FilledButton.icon(
                 // Home underneath, so "back" from the tracking page lands

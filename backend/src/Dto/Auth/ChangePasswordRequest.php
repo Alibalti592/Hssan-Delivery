@@ -12,4 +12,7 @@ final class ChangePasswordRequest
     #[Assert\NotBlank(message: 'Nouveau mot de passe requis.')]
     #[Assert\Length(min: 8, max: 4096, minMessage: 'Le mot de passe doit contenir au moins 8 caractères.')]
     public string $newPassword = '';
+
+    /** The mobile app's own refresh token, so it stays signed in. */
+    public ?string $refreshToken = null;
 }

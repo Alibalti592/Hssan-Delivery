@@ -74,7 +74,9 @@ class PushNotificationService {
                 projectId: AppConfig.firebaseProjectId,
               ),
       );
-      await FirebaseMessaging.instance.requestPermission();
+      // Permission is asked later, when the user can see why (see
+      // needsPermission): a courier right after signing in, a client once
+      // they've placed an order.
       FirebaseMessaging.onMessage.listen(_showForegroundMessage);
       // App was backgrounded (not terminated) and the user tapped the push
       // to bring it back to the foreground.
@@ -98,6 +100,32 @@ class PushNotificationService {
       // (google-services.json etc. — see config.dart) — the app works the
       // same either way, it just won't receive pushes this session.
       _initialized = false;
+    }
+  }
+
+  /// Whether notifications could be switched on with the system prompt:
+  /// never asked yet. False when push isn't set up in this build, when
+  /// already allowed, or once refused (the system won't ask again).
+  Future<bool> needsPermission() async {
+    if (!_initialized) return false;
+    try {
+      final settings = await FirebaseMessaging.instance
+          .getNotificationSettings();
+      return settings.authorizationStatus == AuthorizationStatus.notDetermined;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Shows the system prompt; true when notifications are now allowed.
+  Future<bool> requestPermission() async {
+    if (!_initialized) return false;
+    try {
+      final settings = await FirebaseMessaging.instance.requestPermission();
+      return settings.authorizationStatus == AuthorizationStatus.authorized ||
+          settings.authorizationStatus == AuthorizationStatus.provisional;
+    } catch (_) {
+      return false;
     }
   }
 
