@@ -9,6 +9,7 @@ use Kreait\Firebase\Factory;
 use Kreait\Firebase\Messaging\ApnsConfig;
 use Kreait\Firebase\Messaging\CloudMessage;
 use Kreait\Firebase\Messaging\Notification;
+use Kreait\Firebase\Messaging\SendReport;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -72,6 +73,22 @@ class PushNotificationService
             if ([] !== $staleTokens) {
                 $this->deviceTokenRepository->deleteByTokens($staleTokens);
             }
+
+            // Firebase refusing a send (wrong project credentials, revoked
+            // key, a token from another app...) comes back in the report,
+            // not as an exception — without this it would fail in silence.
+            if ($report->hasFailures()) {
+                $this->logger->warning(sprintf(
+                    'Push notification "%s" not delivered to %d of %d device(s) of user #%d: %s',
+                    $title,
+                    $report->failures()->count(),
+                    $report->count(),
+                    $user->getId(),
+                    implode(' | ', array_unique($report->failures()->map(
+                        static fn (SendReport $item): string => $item->error()?->getMessage() ?? 'unknown error'
+                    )))
+                ));
+            }
         } catch (\Throwable $e) {
             $this->logger->warning('Push notification failed.', ['exception' => $e]);
         }
@@ -86,6 +103,8 @@ class PushNotificationService
         $this->triedInit = true;
 
         if ('' === trim($this->firebaseCredentials)) {
+            $this->logger->warning('FIREBASE_CREDENTIALS is empty: push notifications are off.');
+
             return null;
         }
 
