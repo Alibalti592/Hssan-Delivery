@@ -28,6 +28,10 @@ final class OrderResponse
         public readonly ?string $courierName,
         public readonly ?string $courierPhone,
         public readonly ?array $bill,
+        public readonly ?float $pickupLatitude,
+        public readonly ?float $pickupLongitude,
+        public readonly ?float $deliveryLatitude,
+        public readonly ?float $deliveryLongitude,
     ) {
     }
 
@@ -74,6 +78,11 @@ final class OrderResponse
             courierName: $courier?->getName(),
             courierPhone: $courier?->getPhone(),
             bill: BillSummary::of($order),
+            // The pins the client placed, for the map on their order page.
+            pickupLatitude: $order->getPickupLatitude(),
+            pickupLongitude: $order->getPickupLongitude(),
+            deliveryLatitude: $order->getDeliveryLatitude(),
+            deliveryLongitude: $order->getDeliveryLongitude(),
         );
     }
 }

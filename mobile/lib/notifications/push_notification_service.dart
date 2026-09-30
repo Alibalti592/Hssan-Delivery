@@ -20,6 +20,7 @@ class PushNotificationService {
     this._repository, {
     this.onOrderTap,
     this.onDeliveryTap,
+    this.onOrderUpdate,
   });
 
   final NotificationsRepository _repository;
@@ -32,6 +33,10 @@ class PushNotificationService {
   /// Called when the user taps a courier-facing push (a new delivery just
   /// got assigned to them — sent with `data: {deliveryId: ...}`).
   final void Function(int deliveryId)? onDeliveryTap;
+
+  /// Called when a push about an order arrives while the app is open, so
+  /// the screens showing it can reload.
+  final void Function(int orderId)? onOrderUpdate;
 
   /// Attach to MaterialApp(scaffoldMessengerKey: ...) so a foreground push
   /// can surface as a SnackBar regardless of which screen is on top.
@@ -158,6 +163,9 @@ class PushNotificationService {
   }
 
   void _showForegroundMessage(RemoteMessage message) {
+    final orderId = int.tryParse(message.data['orderId'] ?? '');
+    if (orderId != null) onOrderUpdate?.call(orderId);
+
     final title = message.notification?.title;
     final body = message.notification?.body;
     final text = [

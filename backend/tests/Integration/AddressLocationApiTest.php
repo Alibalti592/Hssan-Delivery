@@ -120,7 +120,12 @@ final class AddressLocationApiTest extends WebTestCase
             'deliveryZoneId' => $this->zone->getId(),
         ]));
         self::assertResponseStatusCodeSame(Response::HTTP_CREATED);
-        $orderId = json_decode($this->client->getResponse()->getContent(), true)['id'];
+        $created = json_decode($this->client->getResponse()->getContent(), true);
+        $orderId = $created['id'];
+
+        // The client's own order carries the pins too, for its tracking map.
+        self::assertSame(37.2744, $created['pickupLatitude']);
+        self::assertSame(9.86, $created['deliveryLongitude']);
 
         $courier = $this->createUser('ROLE_LIVREUR');
         $delivery = $this->entityManager->getRepository(Delivery::class)->findOneBy(['order' => $orderId]);

@@ -4,13 +4,16 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../addresses/route_map.dart';
 import '../bills/bill_widgets.dart';
 import '../core/api_exception.dart';
 import '../orders/order_models.dart';
+import '../orders/order_tracking.dart';
 import '../orders/orders_repository.dart';
 import '../theme.dart';
-import '../widgets/decorative_map.dart';
+import '../widgets/cash_payment_note.dart';
 import '../widgets/order_status_chip.dart';
+import 'reorder_action.dart';
 
 class OrderDetailScreen extends StatefulWidget {
   const OrderDetailScreen({required this.orderId, super.key});
@@ -27,16 +30,24 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   bool _cancelling = false;
   String? _error;
   Timer? _pollTimer;
+  StreamSubscription<int>? _pushes;
 
   @override
   void initState() {
     super.initState();
     _load();
+    // A push about this order: show the new status now, not at the next poll.
+    _pushes = context
+        .read<OrdersRepository>()
+        .changes
+        .where((id) => id == widget.orderId)
+        .listen((_) => _load(silent: true));
   }
 
   @override
   void dispose() {
     _pollTimer?.cancel();
+    _pushes?.cancel();
     super.dispose();
   }
 
@@ -158,26 +169,37 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
     final order = _order!;
     final tracking = order.status != OrderStatus.cancelled;
+    // A bill's courier collects and returns to the same door: one pin.
+    final pickup = order.isBill ? null : order.pickupPoint;
+    final dropOff = order.deliveryPoint;
 
     return RefreshIndicator(
       onRefresh: () => _load(silent: true),
       child: Column(
         children: [
-          if (tracking) const DecorativeMap(),
+          if (tracking && RouteMap.canShow(pickup, dropOff))
+            RouteMap(pickup: pickup, dropOff: dropOff),
           Expanded(
             child: ListView(
               padding: const EdgeInsets.all(16),
               children: [
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      'Commande #${order.id}',
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w800,
+                    Icon(order.serviceIcon, color: navy),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        order.title,
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
                     ),
-                    OrderStatusChip(order.status),
+                    const SizedBox(width: 8),
+                    OrderStatusChip(
+                      order.status,
+                      label: orderStatusText(order),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 16),
@@ -185,7 +207,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   Card(
                     child: Padding(
                       padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
-                      child: _StatusTimeline(status: order.status),
+                      child: _StatusTimeline(order: order),
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -369,9 +391,20 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                           ],
                         ),
                       ),
+                      CashPaymentNote(
+                        cardFooter: true,
+                        text: order.isBill
+                            ? 'Paiement en espèces, à remettre au livreur'
+                            : 'Paiement en espèces à la livraison',
+                      ),
                     ],
                   ),
                 ),
+                if (order.status == OrderStatus.completed &&
+                    order.isFromCatalogue) ...[
+                  const SizedBox(height: 16),
+                  ReorderButton(order: order),
+                ],
                 if (order.canCancel) ...[
                   const SizedBox(height: 16),
                   OutlinedButton(
@@ -397,35 +430,28 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   }
 }
 
-/// Progress through the order lifecycle, based purely on the current
-/// [OrderStatus] — the backend doesn't record a timestamp per stage, so this
-/// shows which stages are done/current/upcoming without inventing times.
+/// The order's progress in its service's own words (see trackingSteps) —
+/// the backend doesn't record a time per step, so none is invented here.
 class _StatusTimeline extends StatelessWidget {
-  const _StatusTimeline({required this.status});
+  const _StatusTimeline({required this.order});
 
-  final OrderStatus status;
-
-  static const _stages = [
-    OrderStatus.pending,
-    OrderStatus.confirmed,
-    OrderStatus.preparing,
-    OrderStatus.readyForPickup,
-    OrderStatus.completed,
-  ];
+  final ClientOrder order;
 
   @override
   Widget build(BuildContext context) {
-    final currentIndex = _stages.indexOf(status);
+    final steps = trackingSteps(order);
+    final hint = trackingHint(order);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        for (var i = 0; i < _stages.length; i++)
+        for (var i = 0; i < steps.length; i++)
           _TimelineRow(
-            label: _stages[i].label,
-            isDone: i < currentIndex,
-            isCurrent: i == currentIndex,
-            isLast: i == _stages.length - 1,
+            label: steps[i].label,
+            hint: steps[i].isCurrent ? hint : null,
+            isDone: steps[i].isDone,
+            isCurrent: steps[i].isCurrent,
+            isLast: i == steps.length - 1,
           ),
       ],
     );
@@ -438,9 +464,11 @@ class _TimelineRow extends StatelessWidget {
     required this.isDone,
     required this.isCurrent,
     required this.isLast,
+    this.hint,
   });
 
   final String label;
+  final String? hint;
   final bool isDone;
   final bool isCurrent;
   final bool isLast;
@@ -454,33 +482,56 @@ class _TimelineRow extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Column(
-            children: [
-              Container(
-                width: 11,
-                height: 11,
-                decoration: BoxDecoration(
-                  color: dotColor,
-                  shape: BoxShape.circle,
+          SizedBox(
+            width: 16,
+            child: Column(
+              children: [
+                Container(
+                  width: isDone ? 16 : 12,
+                  height: isDone ? 16 : 12,
+                  margin: EdgeInsets.all(isDone ? 0 : 2),
+                  decoration: BoxDecoration(
+                    color: dotColor,
+                    shape: BoxShape.circle,
+                  ),
+                  child: isDone
+                      ? const Icon(Icons.check, size: 11, color: Colors.white)
+                      : null,
                 ),
-              ),
-              if (!isLast)
-                Expanded(
-                  child: Container(width: 1.4, color: const Color(0xFFE6EAEF)),
-                ),
-            ],
+                if (!isLast)
+                  Expanded(
+                    child: Container(
+                      width: 2,
+                      color: isDone ? successText : const Color(0xFFE6EAEF),
+                    ),
+                  ),
+              ],
+            ),
           ),
           const SizedBox(width: 10),
           Expanded(
             child: Padding(
               padding: const EdgeInsets.only(bottom: 14),
-              child: Text(
-                label,
-                style: TextStyle(
-                  fontWeight: active ? FontWeight.w700 : FontWeight.w400,
-                  color: active ? navy : mutedText,
-                  fontSize: 13,
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontWeight: active ? FontWeight.w700 : FontWeight.w400,
+                      color: active ? navy : mutedText,
+                      fontSize: 13,
+                    ),
+                  ),
+                  if (hint != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Text(
+                        hint!,
+                        style: const TextStyle(color: mutedText, fontSize: 12),
+                      ),
+                    ),
+                ],
               ),
             ),
           ),
