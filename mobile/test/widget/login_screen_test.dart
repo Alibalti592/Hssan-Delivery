@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/testing.dart';
@@ -84,7 +86,7 @@ void main() {
 
       await tester.pumpWidget(_pumpableApp(auth));
       await tester.enterText(
-        find.widgetWithText(TextFormField, 'Téléphone'),
+        find.widgetWithText(TextFormField, 'Numéro de téléphone'),
         '21000001',
       );
       await tester.enterText(
@@ -99,9 +101,11 @@ void main() {
     });
 
     testWidgets('signs a courier in on valid credentials', (tester) async {
+      String? sentPhone;
       final auth = await _controllerWith(
         MockClient((request) async {
           if (request.url.path == '/api/auth/login') {
+            sentPhone = (jsonDecode(request.body) as Map)['phone'] as String;
             return jsonResponse({'token': 'jwt-123'});
           }
           if (request.url.path == '/api/auth/me') {
@@ -118,8 +122,34 @@ void main() {
       );
 
       await tester.pumpWidget(_pumpableApp(auth));
+      // Pasted with the country code: the field keeps the local number.
       await tester.enterText(
-        find.widgetWithText(TextFormField, 'Téléphone'),
+        find.widgetWithText(TextFormField, 'Numéro de téléphone'),
+        '+216 21 000 001',
+      );
+      expect(find.text('21 000 001'), findsOneWidget);
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Mot de passe'),
+        'courier1234',
+      );
+      await tester.tap(find.text('Se connecter'));
+      await tester.pumpAndSettle();
+
+      expect(sentPhone, '21000001');
+      expect(auth.status, AuthStatus.signedIn);
+      expect(auth.account!.name, 'Awa');
+    });
+
+    testWidgets('a server error reads as plain words, not a status code', (
+      tester,
+    ) async {
+      final auth = await _controllerWith(
+        MockClient((request) async => jsonResponse({'detail': 'boom'}, 500)),
+      );
+
+      await tester.pumpWidget(_pumpableApp(auth));
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Numéro de téléphone'),
         '21000001',
       );
       await tester.enterText(
@@ -129,8 +159,72 @@ void main() {
       await tester.tap(find.text('Se connecter'));
       await tester.pumpAndSettle();
 
+      expect(
+        find.text(
+          'Le service est momentanément indisponible. Réessayez dans un instant.',
+        ),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('signs up from the login screen', (tester) async {
+      Map<String, dynamic>? registered;
+      final auth = await _controllerWith(
+        MockClient((request) async {
+          switch (request.url.path) {
+            case '/api/auth/register':
+              registered = jsonDecode(request.body) as Map<String, dynamic>;
+              return jsonResponse({'id': 9}, 201);
+            case '/api/auth/login':
+              return jsonResponse({'token': 'jwt-9'});
+            case '/api/auth/me':
+              return jsonResponse({
+                'id': 9,
+                'name': 'Sami Ben Ali',
+                'phone': '22123456',
+                'roles': ['ROLE_CLIENT'],
+                'isVerified': true,
+              });
+          }
+          return jsonResponse({'message': 'unexpected'}, 404);
+        }),
+      );
+
+      await tester.pumpWidget(_pumpableApp(auth));
+      await tester.tap(find.text('Créer un compte client'));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Nom et prénom'),
+        'Sami Ben Ali',
+      );
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Numéro de téléphone'),
+        '22123456',
+      );
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Mot de passe'),
+        'court',
+      );
+      await tester.tap(find.text('Créer mon compte'));
+      await tester.pump();
+      // Too short: the field says so, nothing is sent.
+      expect(find.text('Au moins 8 caractères'), findsOneWidget);
+      expect(registered, isNull);
+
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Mot de passe'),
+        'assez-long',
+      );
+      await tester.tap(find.text('Créer mon compte'));
+      await tester.pumpAndSettle();
+
+      expect(registered, {
+        'name': 'Sami Ben Ali',
+        'phone': '22123456',
+        'password': 'assez-long',
+      });
       expect(auth.status, AuthStatus.signedIn);
-      expect(auth.account!.name, 'Awa');
     });
   });
 }

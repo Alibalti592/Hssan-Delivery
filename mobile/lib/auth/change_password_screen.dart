@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../theme.dart';
 import '../widgets/dark_header.dart';
 import 'auth_controller.dart';
+import 'auth_widgets.dart';
 
 /// Self-service password change, reached from either the client profile
 /// screen or the courier dashboard menu. Requires the current password —
@@ -22,6 +24,9 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   bool _saving = false;
   String? _error;
 
+  /// Once a submit has shown errors, they clear as each field is fixed.
+  bool _submitted = false;
+
   @override
   void dispose() {
     _currentPassword.dispose();
@@ -30,7 +35,10 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   }
 
   Future<void> _submit() async {
-    setState(() => _error = null);
+    setState(() {
+      _error = null;
+      _submitted = true;
+    });
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _saving = true);
@@ -70,62 +78,42 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                 padding: const EdgeInsets.all(24),
                 child: Form(
                   key: _formKey,
+                  autovalidateMode: _submitted
+                      ? AutovalidateMode.onUserInteraction
+                      : AutovalidateMode.disabled,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      TextFormField(
+                      const Text(
+                        'Choisissez un nouveau mot de passe que vous '
+                        "n'utilisez pas ailleurs.",
+                        style: TextStyle(color: mutedText),
+                      ),
+                      const SizedBox(height: 20),
+                      PasswordField(
                         controller: _currentPassword,
-                        obscureText: true,
+                        label: 'Mot de passe actuel',
                         enabled: !_saving,
                         textInputAction: TextInputAction.next,
-                        decoration: const InputDecoration(
-                          labelText: 'Mot de passe actuel',
-                        ),
-                        validator: (v) => (v == null || v.isEmpty)
-                            ? 'Mot de passe actuel requis'
-                            : null,
                       ),
                       const SizedBox(height: 16),
-                      TextFormField(
+                      PasswordField(
                         controller: _newPassword,
-                        obscureText: true,
+                        label: 'Nouveau mot de passe',
                         enabled: !_saving,
-                        onFieldSubmitted: (_) => _submit(),
-                        decoration: const InputDecoration(
-                          labelText: 'Nouveau mot de passe',
-                        ),
-                        validator: (v) {
-                          if (v == null || v.isEmpty) {
-                            return 'Nouveau mot de passe requis';
-                          }
-                          if (v.length < 8) {
-                            return 'Au moins 8 caractères';
-                          }
-                          return null;
-                        },
+                        showRule: true,
+                        isNew: true,
+                        onSubmitted: _submit,
                       ),
                       if (_error != null) ...[
                         const SizedBox(height: 16),
-                        Text(
-                          _error!,
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.error,
-                          ),
-                        ),
+                        AuthErrorBanner(_error!),
                       ],
                       const SizedBox(height: 24),
-                      FilledButton(
-                        onPressed: _saving ? null : _submit,
-                        child: _saving
-                            ? const SizedBox(
-                                height: 22,
-                                width: 22,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
-                                ),
-                              )
-                            : const Text('ENREGISTRER'),
+                      AuthSubmitButton(
+                        label: 'ENREGISTRER',
+                        busy: _saving,
+                        onPressed: _submit,
                       ),
                     ],
                   ),

@@ -106,6 +106,69 @@ final class AuthApiTest extends WebTestCase
         );
     }
 
+    public function testTheSameNumberTypedDifferentlyIsTheSameAccount(): void
+    {
+        $client = static::createClient();
+        $digits = $this->uniquePhone();
+        $spaced = sprintf('+216 %s %s %s', substr($digits, 0, 2), substr($digits, 2, 3), substr($digits, 5));
+
+        $client->request('POST', '/api/auth/register', server: ['CONTENT_TYPE' => 'application/json'], content: json_encode([
+            'name' => 'Spaced Client',
+            'phone' => $spaced,
+            'password' => 'password123',
+        ]));
+        self::assertResponseStatusCodeSame(Response::HTTP_CREATED);
+        // Stored as the 8 local digits.
+        self::assertSame($digits, json_decode($client->getResponse()->getContent(), true)['phone']);
+
+        foreach ([$digits, '+216'.$digits, $spaced] as $typed) {
+            $client->request('POST', '/api/auth/login', server: ['CONTENT_TYPE' => 'application/json'], content: json_encode([
+                'phone' => $typed,
+                'password' => 'password123',
+            ]));
+            self::assertResponseIsSuccessful("Signing in as \"$typed\"");
+        }
+
+        $client->request('POST', '/api/auth/register', server: ['CONTENT_TYPE' => 'application/json'], content: json_encode([
+            'name' => 'Same Number',
+            'phone' => $digits,
+            'password' => 'password456',
+        ]));
+        self::assertResponseStatusCodeSame(Response::HTTP_CONFLICT);
+
+        // Sign-ups and sign-ins are rate-limited per IP: don't leave this
+        // test's attempts counting against the next ones.
+        self::getContainer()->get('cache.rate_limiter')->clear();
+    }
+
+    public function testAnAccountStoredWithSpacesCanStillSignIn(): void
+    {
+        $client = static::createClient();
+        $this->entityManager = self::getContainer()->get(EntityManagerInterface::class);
+        $digits = $this->uniquePhone();
+
+        // As accounts were stored before numbers were normalized.
+        $user = new User();
+        $user->setName('Legacy Client');
+        $user->setPhone('+216 '.$digits);
+        $user->setRoles(['ROLE_CLIENT']);
+        $user->setVerifiedAt(new \DateTimeImmutable());
+        $user->setPassword(self::getContainer()->get(UserPasswordHasherInterface::class)->hashPassword($user, 'password123'));
+        $this->entityManager->persist($user);
+        $this->entityManager->flush();
+
+        $client->request('POST', '/api/auth/login', server: ['CONTENT_TYPE' => 'application/json'], content: json_encode([
+            'phone' => $digits,
+            'password' => 'password123',
+        ]));
+        self::assertResponseIsSuccessful();
+        $token = json_decode($client->getResponse()->getContent(), true)['token'];
+
+        $client->request('GET', '/api/auth/me', server: ['HTTP_AUTHORIZATION' => 'Bearer '.$token]);
+        self::assertResponseIsSuccessful();
+        self::assertSame('Legacy Client', json_decode($client->getResponse()->getContent(), true)['name']);
+    }
+
     /**
      * Registration previously only checked phone was non-blank — see
      * App\Validator\PhoneFormat, now enforced on RegisterUserRequest.
@@ -429,7 +492,7 @@ final class AuthApiTest extends WebTestCase
         self::assertIsArray($response);
 
         self::assertSame(
-            'An account with this phone number already exists.',
+            'Un compte existe déjà avec ce numéro.',
             $response['message']
         );
     }
@@ -497,7 +560,7 @@ final class AuthApiTest extends WebTestCase
         self::assertIsArray($response);
 
         self::assertSame(
-            'An account with this phone number already exists.',
+            'Un compte existe déjà avec ce numéro.',
             $response['message']
         );
     }

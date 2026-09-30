@@ -16,5 +16,22 @@ final class PhoneFormat
 {
     public const PATTERN = '/^\+?(216)?[ \-]?[2-9](?:[ \-]?\d){7}$/';
 
-    public const MESSAGE = 'Please enter a valid phone number.';
+    public const MESSAGE = 'Numéro de téléphone invalide.';
+
+    /**
+     * The 8 local digits of a number, however it was typed: "+216 22 123
+     * 456", "216-22123456" and "22 123 456" all give "22123456". Accounts
+     * are stored in this form so the same number always finds the same
+     * account.
+     */
+    public static function normalize(string $phone): string
+    {
+        $digits = preg_replace('/\D/', '', $phone) ?? '';
+
+        if (11 === \strlen($digits) && str_starts_with($digits, '216')) {
+            return substr($digits, 3);
+        }
+
+        return $digits;
+    }
 }

@@ -5,11 +5,9 @@ security:
 
     # https://symfony.com/doc/current/security.html#loading-the-user-the-user-provider
     providers:
-        # used to reload user from session & other features (e.g. switch_user)
+        # Finds the account however the number is typed (+216, spaces...).
         app_user_provider:
-            entity:
-                class: App\Entity\User
-                property: phone
+            id: App\Security\PhoneUserProvider
 
     firewalls:
         dev:
