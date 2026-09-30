@@ -37,6 +37,10 @@ class AuthController extends ChangeNotifier {
   AuthStatus _status = AuthStatus.unknown;
   Account? _account;
   String? _token;
+  String? _refreshToken;
+
+  /// The renewal in flight, shared by every request that hit the expiry.
+  Future<bool>? _refreshing;
   bool _busy = false;
 
   AuthStatus get status => _status;
@@ -49,6 +53,7 @@ class AuthController extends ChangeNotifier {
     String? stored;
     try {
       stored = await _storage.read();
+      _refreshToken = await _storage.readRefreshToken();
     } catch (_) {
       // flutter_secure_storage can throw (e.g. a corrupted/reset Android
       // keystore after a device restore). Without this, the exception
@@ -86,27 +91,32 @@ class AuthController extends ChangeNotifier {
     _busy = true;
     notifyListeners();
     try {
-      final token = await _repository.login(phone.trim(), password);
-      _token = token;
+      final session = await _repository.login(phone.trim(), password);
+      _token = session.token;
+      _refreshToken = session.refreshToken;
 
       final account = await _repository.me();
       if (!account.isClient && !account.isCourier) {
         _token = null;
+        _refreshToken = null;
         return "Ce compte n'est ni un compte client, ni un compte livreur.";
       }
 
-      await _storage.write(token);
+      await _storage.write(session.token);
+      await _storage.writeRefreshToken(session.refreshToken);
       _account = account;
       _set(AuthStatus.signedIn);
       unawaited(_pushNotifications?.registerForCurrentUser());
       return null;
     } on ApiException catch (e) {
       _token = null;
+      _refreshToken = null;
       return e.statusCode == 401
           ? 'Numéro ou mot de passe incorrect.'
           : e.message;
     } on NetworkException catch (e) {
       _token = null;
+      _refreshToken = null;
       return e.message;
     } catch (_) {
       // _storage.write() isn't an ApiException/NetworkException source but
@@ -115,6 +125,7 @@ class AuthController extends ChangeNotifier {
       // (login_screen.dart) would show nothing at all: the busy spinner
       // clears via `finally` below with no error message ever set.
       _token = null;
+      _refreshToken = null;
       return "Impossible d'enregistrer la session sur cet appareil.";
     } finally {
       _busy = false;
@@ -160,6 +171,7 @@ class AuthController extends ChangeNotifier {
       await _repository.changePassword(
         currentPassword: currentPassword,
         newPassword: newPassword,
+        refreshToken: _refreshToken,
       );
       return null;
     } on ApiException catch (e) {
@@ -186,7 +198,38 @@ class AuthController extends ChangeNotifier {
     }
   }
 
-  Future<void> signOut() => _discard();
+  Future<void> signOut() async {
+    // Best effort, not awaited: signing out mustn't wait on the network.
+    final refreshToken = _refreshToken;
+    if (refreshToken != null) {
+      unawaited(_repository.logout(refreshToken).catchError((_) {}));
+    }
+    await _discard();
+  }
+
+  /// Renews an expired session with the refresh token, so the user isn't
+  /// sent back to the login screen every hour. Requests that expire at the
+  /// same moment share one renewal. True when there's a new token; throws
+  /// [NetworkException] when offline (the session is kept for later).
+  Future<bool> refreshSession() {
+    return _refreshing ??= _renew().whenComplete(() => _refreshing = null);
+  }
+
+  Future<bool> _renew() async {
+    final refreshToken = _refreshToken;
+    if (refreshToken == null) return false;
+    try {
+      final session = await _repository.refresh(refreshToken);
+      _token = session.token;
+      _refreshToken = session.refreshToken;
+      await _storage.write(session.token);
+      await _storage.writeRefreshToken(session.refreshToken);
+      return true;
+    } on ApiException {
+      // Expired, revoked, or the account was deactivated.
+      return false;
+    }
+  }
 
   /// Called by the API client when any request comes back 401.
   void onUnauthorized() {
@@ -202,6 +245,7 @@ class AuthController extends ChangeNotifier {
     await _pushNotifications?.unregister();
     await _storage.clear();
     _token = null;
+    _refreshToken = null;
     _account = null;
     _set(AuthStatus.signedOut);
     onSessionEnded?.call();

@@ -20,6 +20,7 @@ import 'package:mobile/orders/orders_repository.dart';
 
 class _MemoryTokenStorage extends TokenStorage {
   String? _token;
+  String? refreshToken;
 
   @override
   Future<String?> read() async => _token;
@@ -28,7 +29,16 @@ class _MemoryTokenStorage extends TokenStorage {
   Future<void> write(String token) async => _token = token;
 
   @override
-  Future<void> clear() async => _token = null;
+  Future<String?> readRefreshToken() async => refreshToken;
+
+  @override
+  Future<void> writeRefreshToken(String? token) async => refreshToken = token;
+
+  @override
+  Future<void> clear() async {
+    _token = null;
+    refreshToken = null;
+  }
 }
 
 /// Simulates flutter_secure_storage throwing on read, e.g. a corrupted or
@@ -49,6 +59,9 @@ class _ThrowingReadTokenStorage extends TokenStorage {
 class _ThrowingWriteTokenStorage extends TokenStorage {
   @override
   Future<String?> read() async => null;
+
+  @override
+  Future<String?> readRefreshToken() async => null;
 
   @override
   Future<void> write(String token) => throw Exception('keystore unavailable');
@@ -442,6 +455,187 @@ void main() {
         expect(auth.busy, isFalse);
       },
     );
+  });
+
+  group('Staying signed in', () {
+    Map<String, dynamic> me() => {
+      'id': 5,
+      'name': 'Sami',
+      'phone': '22000001',
+      'roles': ['ROLE_CLIENT', 'ROLE_USER'],
+      'isVerified': true,
+    };
+
+    /// A controller wired like main.dart: the client renews the session
+    /// through the controller when a request comes back 401.
+    AuthController wired(MockClient mock, _MemoryTokenStorage storage) {
+      late final AuthController auth;
+      auth = AuthController(
+        repository: AuthRepository(
+          ApiClient(
+            tokenProvider: () => auth.token,
+            onUnauthorized: () => auth.onUnauthorized(),
+            refreshSession: () => auth.refreshSession(),
+            httpClient: mock,
+          ),
+        ),
+        storage: storage,
+      );
+      return auth;
+    }
+
+    test(
+      'an expired session renews itself and the request goes through',
+      () async {
+        final storage = _MemoryTokenStorage();
+        await storage.write('old-jwt');
+        await storage.writeRefreshToken('refresh-1');
+        String? refreshAuthHeader;
+        var refreshes = 0;
+
+        final auth = wired(
+          MockClient((request) async {
+            switch (request.url.path) {
+              case '/api/auth/refresh':
+                refreshes++;
+                refreshAuthHeader = request.headers['Authorization'];
+                expect(jsonDecode(request.body), {'refreshToken': 'refresh-1'});
+                return _json({'token': 'new-jwt', 'refreshToken': 'refresh-2'});
+              case '/api/auth/me':
+                return request.headers['Authorization'] == 'Bearer new-jwt'
+                    ? _json(me())
+                    : _json({'message': 'Expired JWT Token'}, 401);
+            }
+            return _json({'message': 'unexpected'}, 404);
+          }),
+          storage,
+        );
+
+        await auth.bootstrap();
+
+        expect(auth.status, AuthStatus.signedIn);
+        expect(refreshes, 1);
+        // The expired JWT isn't sent to the refresh endpoint.
+        expect(refreshAuthHeader, isNull);
+        expect(await storage.read(), 'new-jwt');
+        expect(await storage.readRefreshToken(), 'refresh-2');
+      },
+    );
+
+    test('requests that expire together share one renewal', () async {
+      var refreshes = 0;
+      var accepted = 'jwt-1';
+
+      final auth = wired(
+        MockClient((request) async {
+          switch (request.url.path) {
+            case '/api/auth/login':
+              return _json({'token': 'jwt-1', 'refreshToken': 'refresh-1'});
+            case '/api/auth/refresh':
+              refreshes++;
+              // Slow enough that all three requests are waiting on it.
+              await Future<void>.delayed(const Duration(milliseconds: 20));
+              accepted = 'jwt-2';
+              return _json({'token': 'jwt-2', 'refreshToken': 'refresh-2'});
+            case '/api/auth/me':
+            case '/api/auth/availability':
+              return request.headers['Authorization'] == 'Bearer $accepted'
+                  ? _json(me())
+                  : _json({'message': 'Expired JWT Token'}, 401);
+          }
+          return _json({'message': 'unexpected'}, 404);
+        }),
+        _MemoryTokenStorage(),
+      );
+      await auth.signIn('22000001', 'client1234');
+      accepted = 'none'; // jwt-1 has expired.
+
+      final errors = await Future.wait([
+        auth.setAvailability(true),
+        auth.setAvailability(true),
+        auth.setAvailability(true),
+      ]);
+
+      expect(errors, [null, null, null]);
+      expect(refreshes, 1);
+      expect(auth.token, 'jwt-2');
+      expect(auth.status, AuthStatus.signedIn);
+    });
+
+    test('a refused renewal signs the user out', () async {
+      final storage = _MemoryTokenStorage();
+      await storage.write('old-jwt');
+      await storage.writeRefreshToken('revoked');
+
+      final auth = wired(
+        MockClient((request) async {
+          if (request.url.path == '/api/auth/refresh') {
+            return _json({'message': 'Session expirée.'}, 401);
+          }
+          return _json({'message': 'Expired JWT Token'}, 401);
+        }),
+        storage,
+      );
+
+      await auth.bootstrap();
+
+      expect(auth.status, AuthStatus.signedOut);
+      expect(await storage.readRefreshToken(), isNull);
+    });
+
+    test('offline during a renewal keeps the session for later', () async {
+      final storage = _MemoryTokenStorage();
+      final auth = wired(
+        MockClient((request) async {
+          switch (request.url.path) {
+            case '/api/auth/login':
+              return _json({'token': 'jwt-1', 'refreshToken': 'refresh-1'});
+            case '/api/auth/me':
+              return _json(me());
+            case '/api/auth/refresh':
+              throw http.ClientException('offline');
+          }
+          return _json({'message': 'Expired JWT Token'}, 401);
+        }),
+        storage,
+      );
+      await auth.signIn('22000001', 'client1234');
+
+      await expectLater(
+        auth.setAvailability(true),
+        completion('Impossible de contacter le serveur.'),
+      );
+      expect(auth.status, AuthStatus.signedIn);
+      expect(await storage.readRefreshToken(), 'refresh-1');
+    });
+
+    test('signing out ends the session on the server too', () async {
+      final storage = _MemoryTokenStorage();
+      Object? loggedOut;
+      final auth = wired(
+        MockClient((request) async {
+          switch (request.url.path) {
+            case '/api/auth/login':
+              return _json({'token': 'jwt-1', 'refreshToken': 'refresh-1'});
+            case '/api/auth/me':
+              return _json(me());
+            case '/api/auth/logout':
+              loggedOut = jsonDecode(request.body);
+              return http.Response('', 204);
+          }
+          return _json({'message': 'unexpected'}, 404);
+        }),
+        storage,
+      );
+      await auth.signIn('22000001', 'client1234');
+
+      await auth.signOut();
+      await Future<void>.delayed(Duration.zero);
+
+      expect(loggedOut, {'refreshToken': 'refresh-1'});
+      expect(auth.status, AuthStatus.signedOut);
+      expect(await storage.readRefreshToken(), isNull);
+    });
   });
 
   group('DeliveriesController', () {

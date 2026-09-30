@@ -80,6 +80,7 @@ class _HssanDeliveryAppState extends State<HssanDeliveryApp> {
     _api = ApiClient(
       tokenProvider: () => _auth.token,
       onUnauthorized: () => _auth.onUnauthorized(),
+      refreshSession: () => _auth.refreshSession(),
     );
     // Both callbacks close over fields assigned later in this initState
     // (_deliveries below) or never during it (_navigatorKey's Navigator only
@@ -163,6 +164,7 @@ class _HssanDeliveryAppState extends State<HssanDeliveryApp> {
         Provider.value(value: _bills),
         Provider.value(value: _addresses),
         Provider.value(value: _promotions),
+        Provider.value(value: _pushNotifications),
       ],
       child: MaterialApp(
         title: 'Delivery Hassen',

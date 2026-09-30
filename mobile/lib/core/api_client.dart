@@ -12,26 +12,39 @@ import 'api_exception.dart';
 ///
 /// Injects the bearer token, decodes JSON bodies, turns non-2xx responses into
 /// [ApiException] (using the backend's `{"message": ...}` shape), and connection
-/// failures into [NetworkException]. A 401 additionally fires [onUnauthorized]
-/// so the app can drop back to the login screen.
+/// failures into [NetworkException]. When the session has expired (a 401),
+/// [refreshSession] gets one chance to renew it and the request is sent
+/// again; failing that, [onUnauthorized] drops the app back to the login
+/// screen.
 class ApiClient {
   ApiClient({
     required String? Function() tokenProvider,
     required this.onUnauthorized,
+    this.refreshSession,
     http.Client? httpClient,
   }) : _tokenProvider = tokenProvider,
        _http = httpClient ?? http.Client();
 
   final String? Function() _tokenProvider;
   final void Function() onUnauthorized;
+
+  /// Renews an expired session; true when there's a new token to retry
+  /// with. May throw [NetworkException] when offline, which then fails the
+  /// request instead of signing the user out.
+  final Future<bool> Function()? refreshSession;
   final http.Client _http;
 
   static const _timeout = Duration(seconds: 15);
 
   Future<dynamic> get(String path) => _send('GET', path);
 
-  Future<dynamic> post(String path, [Object? body]) =>
-      _send('POST', path, body);
+  /// [authenticated]: false for the calls that manage the session itself
+  /// (refresh, logout), which must not carry an expired token.
+  Future<dynamic> post(
+    String path, [
+    Object? body,
+    bool authenticated = true,
+  ]) => _send('POST', path, body, authenticated);
 
   Future<dynamic> put(String path, [Object? body]) => _send('PUT', path, body);
 
@@ -48,6 +61,7 @@ class ApiClient {
     required String field,
     required List<int> bytes,
     required String filename,
+    bool retried = false,
   }) async {
     final request = http.MultipartRequest(
       'POST',
@@ -74,7 +88,29 @@ class ApiClient {
       throw NetworkException();
     }
 
+    if (await _renewed(response, retried: retried)) {
+      return postFile(
+        path,
+        field: field,
+        bytes: bytes,
+        filename: filename,
+        retried: true,
+      );
+    }
     return _decode(response);
+  }
+
+  /// Whether an expired session was just renewed, so the request is worth
+  /// sending again. Only once per request, and only if it carried a token.
+  Future<bool> _renewed(http.Response response, {required bool retried}) async {
+    final refresh = refreshSession;
+    if (response.statusCode != 401 ||
+        retried ||
+        refresh == null ||
+        _tokenProvider() == null) {
+      return false;
+    }
+    return refresh();
   }
 
   /// The bearer header, for loading a protected image with
@@ -84,13 +120,19 @@ class ApiClient {
     return token == null ? const {} : {'Authorization': 'Bearer $token'};
   }
 
-  Future<dynamic> _send(String method, String path, [Object? body]) async {
+  Future<dynamic> _send(
+    String method,
+    String path, [
+    Object? body,
+    bool authenticated = true,
+    bool retried = false,
+  ]) async {
     final uri = Uri.parse('${AppConfig.apiBaseUrl}$path');
     final request = http.Request(method, uri);
 
     request.headers['Accept'] = 'application/json';
 
-    final token = _tokenProvider();
+    final token = authenticated ? _tokenProvider() : null;
     if (token != null) {
       request.headers['Authorization'] = 'Bearer $token';
     }
@@ -112,10 +154,13 @@ class ApiClient {
       throw NetworkException();
     }
 
-    return _decode(response);
+    if (authenticated && await _renewed(response, retried: retried)) {
+      return _send(method, path, body, authenticated, true);
+    }
+    return _decode(response, signOutOn401: authenticated);
   }
 
-  dynamic _decode(http.Response response) {
+  dynamic _decode(http.Response response, {bool signOutOn401 = true}) {
     final status = response.statusCode;
 
     dynamic json;
@@ -131,7 +176,7 @@ class ApiClient {
       return json;
     }
 
-    if (status == 401) {
+    if (status == 401 && signOutOn401) {
       onUnauthorized();
     }
 

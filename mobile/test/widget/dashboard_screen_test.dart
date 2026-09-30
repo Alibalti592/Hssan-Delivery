@@ -26,6 +26,12 @@ class _MemoryTokenStorage extends TokenStorage {
   Future<void> write(String token) async => _token = token;
 
   @override
+  Future<String?> readRefreshToken() async => null;
+
+  @override
+  Future<void> writeRefreshToken(String? token) async {}
+
+  @override
   Future<void> clear() async => _token = null;
 }
 
