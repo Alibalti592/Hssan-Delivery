@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../addresses/route_map.dart';
 import '../bills/bill_widgets.dart';
-import '../widgets/decorative_map.dart';
 import '../widgets/status_chip.dart';
 import 'deliveries_controller.dart';
 import 'delivery.dart';
@@ -28,16 +29,19 @@ class DeliveryDetailScreen extends StatelessWidget {
 
     final order = delivery.order;
     final busy = controller.actingOnId == delivery.id;
-    final onTheRoad =
-        delivery.status == DeliveryStatus.accepted ||
-        delivery.status == DeliveryStatus.pickedUp ||
-        delivery.status == DeliveryStatus.onTheWay;
+    final pickup = order != null && order.hasPickupLocation && !order.isBill
+        ? LatLng(order.pickupLatitude!, order.pickupLongitude!)
+        : null;
+    final dropOff = order != null && order.hasDeliveryLocation
+        ? LatLng(order.deliveryLatitude!, order.deliveryLongitude!)
+        : null;
 
     return Scaffold(
       appBar: AppBar(title: Text('Course #${delivery.id}')),
       body: Column(
         children: [
-          if (onTheRoad) const DecorativeMap(),
+          if (!delivery.status.isTerminal && RouteMap.canShow(pickup, dropOff))
+            RouteMap(pickup: pickup, dropOff: dropOff),
           Expanded(
             child: ListView(
               padding: const EdgeInsets.all(16),

@@ -6,6 +6,7 @@ import '../addresses/selected_address.dart';
 import '../cart/cart.dart';
 import '../core/api_exception.dart';
 import '../orders/orders_repository.dart';
+import '../widgets/cash_payment_note.dart';
 import '../widgets/dark_header.dart';
 import 'order_confirmed_screen.dart';
 
@@ -142,6 +143,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                           ),
                         ),
                       ),
+                      const SizedBox(height: 12),
+                      const CashPaymentNote(),
                       if (_error != null) ...[
                         const SizedBox(height: 16),
                         Text(

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import '../cart/cart.dart';
 import '../core/api_client.dart';
 import '../core/paged_result.dart';
@@ -7,6 +9,15 @@ class OrdersRepository {
   OrdersRepository(this._api);
 
   final ApiClient _api;
+
+  final _changes = StreamController<int>.broadcast();
+
+  /// Ids of orders that just changed on the server (a push arrived about
+  /// them), so open order screens reload at once instead of on their next
+  /// poll.
+  Stream<int> get changes => _changes.stream;
+
+  void notifyChanged(int orderId) => _changes.add(orderId);
 
   Future<List<DeliveryZoneOption>> listDeliveryZones() async {
     final body = await _api.get('/api/delivery-zones');

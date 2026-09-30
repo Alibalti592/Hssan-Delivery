@@ -145,4 +145,83 @@ void main() {
 
     expect(find.text('Annuler la commande'), findsNothing);
   });
+
+  testWidgets('a push about the order shows its new status at once', (
+    tester,
+  ) async {
+    _useTallViewport(tester);
+    var loads = 0;
+    var courier = 'Sami Courier';
+    final mock = MockClient((request) async {
+      loads++;
+      return jsonResponse(
+        _order(
+          status: 'CONFIRMED',
+          deliveryStatus: 'ACCEPTED',
+          courierName: courier,
+        ),
+      );
+    });
+    final repository = OrdersRepository(
+      ApiClient(
+        tokenProvider: () => 'jwt-123',
+        onUnauthorized: () {},
+        httpClient: mock,
+      ),
+    );
+
+    await tester.pumpWidget(_app(repository));
+    await tester.pumpAndSettle();
+    expect(find.text('Livreur en route vers le restaurant'), findsOneWidget);
+    expect(find.text('Paiement en espèces à la livraison'), findsOneWidget);
+    expect(loads, 1);
+
+    courier = 'Nour Courier';
+    repository.notifyChanged(2); // Another order: ignored.
+    await tester.pumpAndSettle();
+    expect(loads, 1);
+
+    repository.notifyChanged(1);
+    await tester.pumpAndSettle();
+    expect(loads, 2);
+    expect(find.text('Nour Courier'), findsOneWidget);
+  });
+
+  testWidgets('a bill shows the bill steps and how to pay', (tester) async {
+    _useTallViewport(tester);
+    final mock = MockClient(
+      (request) async => jsonResponse({
+        ..._order(status: 'CONFIRMED', deliveryStatus: 'ACCEPTED'),
+        'restaurantId': null,
+        'deliveryType': 'BILL',
+        'items': [],
+        'bill': {
+          'providerId': 1,
+          'providerName': 'STEG',
+          'providerKind': 'BILL',
+          'reference': '123456',
+          'amount': '85.500',
+        },
+      }),
+    );
+    final repository = OrdersRepository(
+      ApiClient(
+        tokenProvider: () => 'jwt-123',
+        onUnauthorized: () {},
+        httpClient: mock,
+      ),
+    );
+
+    await tester.pumpWidget(_app(repository));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Facture STEG'), findsWidgets);
+    expect(find.text('Livreur en route vers vous'), findsOneWidget);
+    expect(find.text('Facture payée · reçu remis'), findsOneWidget);
+    expect(find.text('En préparation'), findsNothing);
+    expect(
+      find.text('Paiement en espèces, à remettre au livreur'),
+      findsOneWidget,
+    );
+  });
 }

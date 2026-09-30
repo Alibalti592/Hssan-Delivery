@@ -34,9 +34,12 @@ Color orderStatusBgColor(OrderStatus status) {
 }
 
 class OrderStatusChip extends StatelessWidget {
-  const OrderStatusChip(this.status, {super.key});
+  const OrderStatusChip(this.status, {this.label, super.key});
 
   final OrderStatus status;
+
+  /// Overrides the status's own label (see orderStatusText).
+  final String? label;
 
   @override
   Widget build(BuildContext context) {
@@ -48,7 +51,7 @@ class OrderStatusChip extends StatelessWidget {
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
-        status.label,
+        label ?? status.label,
         style: TextStyle(
           color: color,
           fontWeight: FontWeight.w700,

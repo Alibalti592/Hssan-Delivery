@@ -1,3 +1,6 @@
+import 'package:flutter/material.dart' show IconData, Icons;
+import 'package:latlong2/latlong.dart';
+
 import '../bills/bill_models.dart';
 import '../deliveries/delivery.dart' show DeliveryStatus;
 
@@ -78,6 +81,10 @@ class ClientOrder {
     required this.courierName,
     required this.courierPhone,
     this.bill,
+    this.pickupLatitude,
+    this.pickupLongitude,
+    this.deliveryLatitude,
+    this.deliveryLongitude,
   });
 
   final int id;
@@ -112,9 +119,50 @@ class ClientOrder {
   /// Set only for a Factures order — the bill (or mandat) the courier pays.
   final BillInfo? bill;
 
+  /// The pins the client placed on the map; null when only typed.
+  final double? pickupLatitude;
+  final double? pickupLongitude;
+  final double? deliveryLatitude;
+  final double? deliveryLongitude;
+
+  LatLng? get pickupPoint => pickupLatitude != null && pickupLongitude != null
+      ? LatLng(pickupLatitude!, pickupLongitude!)
+      : null;
+
+  LatLng? get deliveryPoint =>
+      deliveryLatitude != null && deliveryLongitude != null
+      ? LatLng(deliveryLatitude!, deliveryLongitude!)
+      : null;
+
   bool get isParcel => deliveryType == 'PARCEL';
 
   bool get isBill => bill != null;
+
+  /// A restaurant or grocery order, re-orderable from its menu.
+  bool get isFromCatalogue => restaurantId != null;
+
+  /// What the order is, in a word or two: the restaurant, "Colis",
+  /// "Facture STEG", "Mandat Wafa Cash".
+  String get title {
+    final bill = this.bill;
+    if (bill != null) {
+      return '${bill.isTransfer ? 'Mandat' : 'Facture'} ${bill.provider.name}';
+    }
+    if (isParcel) return 'Colis';
+    return restaurantName ?? 'Commande';
+  }
+
+  IconData get serviceIcon {
+    if (isBill) return Icons.receipt_long_outlined;
+    switch (deliveryType) {
+      case 'PARCEL':
+        return Icons.inventory_2_outlined;
+      case 'GROCERY':
+        return Icons.shopping_basket_outlined;
+      default:
+        return Icons.restaurant_outlined;
+    }
+  }
 
   /// A client can back out while the delivery is unclaimed or just assigned,
   /// but not once a courier has actually accepted it — mirrors the backend's
@@ -151,6 +199,10 @@ class ClientOrder {
       courierName: json['courierName'] as String?,
       courierPhone: json['courierPhone'] as String?,
       bill: BillInfo.fromJson(json['bill']),
+      pickupLatitude: (json['pickupLatitude'] as num?)?.toDouble(),
+      pickupLongitude: (json['pickupLongitude'] as num?)?.toDouble(),
+      deliveryLatitude: (json['deliveryLatitude'] as num?)?.toDouble(),
+      deliveryLongitude: (json['deliveryLongitude'] as num?)?.toDouble(),
     );
   }
 }

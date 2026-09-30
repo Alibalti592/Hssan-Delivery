@@ -1,11 +1,16 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../core/api_exception.dart';
 import '../orders/order_models.dart';
+import '../orders/order_tracking.dart';
 import '../orders/orders_repository.dart';
+import '../theme.dart';
 import '../widgets/order_status_chip.dart';
 import 'order_detail_screen.dart';
+import 'reorder_action.dart';
 
 class OrdersScreen extends StatefulWidget {
   const OrdersScreen({super.key});
@@ -21,35 +26,78 @@ class _OrdersScreenState extends State<OrdersScreen> {
   bool _loading = true;
   bool _loadingMore = false;
   String? _error;
+  Timer? _pollTimer;
+  StreamSubscription<int>? _pushes;
 
   @override
   void initState() {
     super.initState();
     _load();
+    _pushes = context.read<OrdersRepository>().changes.listen(
+      (_) => _load(silent: true),
+    );
   }
 
-  Future<void> _load() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+  @override
+  void dispose() {
+    _pollTimer?.cancel();
+    _pushes?.cancel();
+    super.dispose();
+  }
+
+  /// [silent]: refresh in place (a poll or a push) without the spinner.
+  Future<void> _load({bool silent = false}) async {
+    if (!silent) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
     try {
       final result = await context.read<OrdersRepository>().listOrders();
       if (!mounted) return;
       setState(() {
-        _orders
-          ..clear()
-          ..addAll(result.items);
-        _page = result.page;
-        _pages = result.pages;
+        if (silent && _page > 1) {
+          // Keep the pages already loaded: update what's on page 1 and put
+          // any new order on top.
+          final fresh = {for (final o in result.items) o.id: o};
+          final known = _orders.map((o) => o.id).toSet();
+          final updated = [
+            ...result.items.where((o) => !known.contains(o.id)),
+            ..._orders.map((o) => fresh[o.id] ?? o),
+          ];
+          _orders
+            ..clear()
+            ..addAll(updated);
+        } else {
+          _orders
+            ..clear()
+            ..addAll(result.items);
+          _page = result.page;
+          _pages = result.pages;
+        }
+        _error = null;
       });
     } on ApiException catch (e) {
-      if (mounted) setState(() => _error = e.message);
+      if (mounted && !silent) setState(() => _error = e.message);
     } on NetworkException catch (e) {
-      if (mounted) setState(() => _error = e.message);
+      if (mounted && !silent) setState(() => _error = e.message);
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted) {
+        setState(() => _loading = false);
+        _scheduleNextPoll();
+      }
     }
+  }
+
+  /// While an order is still on its way, its status keeps changing: check
+  /// again in a bit. Nothing to watch once they're all done.
+  void _scheduleNextPoll() {
+    _pollTimer?.cancel();
+    if (_orders.every((o) => o.status.isTerminal)) return;
+    _pollTimer = Timer(const Duration(seconds: 30), () {
+      if (mounted) _load(silent: true);
+    });
   }
 
   Future<void> _loadMore() async {
@@ -84,7 +132,10 @@ class _OrdersScreenState extends State<OrdersScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return RefreshIndicator(onRefresh: _load, child: _body(context));
+    return RefreshIndicator(
+      onRefresh: () => _load(silent: true),
+      child: _body(context),
+    );
   }
 
   Widget _body(BuildContext context) {
@@ -138,48 +189,157 @@ class _OrdersScreenState extends State<OrdersScreen> {
           );
         }
 
-        final order = _orders[index];
-        return Card(
-          child: InkWell(
-            borderRadius: BorderRadius.circular(16),
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => OrderDetailScreen(orderId: order.id),
-              ),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          'Commande #${order.id}',
-                          style: Theme.of(context).textTheme.titleMedium
-                              ?.copyWith(fontWeight: FontWeight.w700),
-                        ),
-                      ),
-                      OrderStatusChip(order.status),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    order.isBill
-                        ? '${order.bill!.isTransfer ? 'Mandat' : 'Facture'} '
-                              '${order.bill!.provider.name} · '
-                              '${order.totalAmount} DT'
-                        : '${order.items.length} article(s) · '
-                              '${order.totalAmount} DT',
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
+        return _OrderCard(order: _orders[index]);
       },
     );
   }
+}
+
+class _OrderCard extends StatelessWidget {
+  const _OrderCard({required this.order});
+
+  final ClientOrder order;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final date = order.createdAt;
+
+    return Card(
+      child: InkWell(
+        borderRadius: BorderRadius.circular(10),
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => OrderDetailScreen(orderId: order.id),
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 14, 14, 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      color: fieldFill,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(order.serviceIcon, color: navy),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          order.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          [
+                            if (date != null) formatOrderDate(date.toLocal()),
+                            '#${order.id}',
+                          ].join(' · '),
+                          style: textTheme.bodySmall?.copyWith(
+                            color: mutedText,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  OrderStatusChip(order.status, label: orderStatusText(order)),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      _summary(order),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: textTheme.bodySmall,
+                    ),
+                  ),
+                  Text(
+                    '${order.totalAmount} DT',
+                    style: textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
+              ),
+              if (order.status == OrderStatus.completed &&
+                  order.isFromCatalogue)
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: ReorderButton(order: order, compact: true),
+                )
+              else
+                const SizedBox(height: 6),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// "2× Pizza Margherita, 1× Coca" / "Pour Sami" / "Réf. 123456".
+  static String _summary(ClientOrder order) {
+    final bill = order.bill;
+    if (bill != null) {
+      if (bill.isTransfer) {
+        return order.recipientName == null
+            ? 'Mandat'
+            : 'Pour ${order.recipientName}';
+      }
+      return bill.reference == null ? 'Facture' : 'Réf. ${bill.reference}';
+    }
+    if (order.isParcel) {
+      return order.recipientName == null
+          ? order.deliveryAddress
+          : 'Pour ${order.recipientName}';
+    }
+    return order.items.map((i) => '${i.quantity}× ${i.displayName}').join(', ');
+  }
+}
+
+const _months = [
+  'janv.',
+  'févr.',
+  'mars',
+  'avr.',
+  'mai',
+  'juin',
+  'juil.',
+  'août',
+  'sept.',
+  'oct.',
+  'nov.',
+  'déc.',
+];
+
+/// "Aujourd'hui, 14:05" / "Hier, 20:30" / "12 sept., 19:45".
+String formatOrderDate(DateTime date, {DateTime? now}) {
+  now ??= DateTime.now();
+  final time =
+      '${date.hour.toString().padLeft(2, '0')}:'
+      '${date.minute.toString().padLeft(2, '0')}';
+  final today = DateTime(now.year, now.month, now.day);
+  final day = DateTime(date.year, date.month, date.day);
+  final daysAgo = today.difference(day).inDays;
+  if (daysAgo == 0) return "Aujourd'hui, $time";
+  if (daysAgo == 1) return 'Hier, $time';
+  final year = date.year == now.year ? '' : ' ${date.year}';
+  return '${date.day} ${_months[date.month - 1]}$year, $time';
 }

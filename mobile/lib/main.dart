@@ -96,6 +96,7 @@ class _HssanDeliveryAppState extends State<HssanDeliveryApp> {
           ),
         );
       },
+      onOrderUpdate: (orderId) => _orders.notifyChanged(orderId),
       onDeliveryTap: (deliveryId) async {
         // Refreshed first so DeliveryDetailScreen's controller.byId lookup
         // (see deliveries_controller.dart) can find it even on a cold start,

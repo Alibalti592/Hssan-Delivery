@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../orders/order_models.dart';
 import '../theme.dart';
 import 'client_home_screen.dart';
+import 'order_detail_screen.dart';
 
 class OrderConfirmedScreen extends StatelessWidget {
   const OrderConfirmedScreen({required this.order, super.key});
@@ -70,12 +71,56 @@ class OrderConfirmedScreen extends StatelessWidget {
                         style: Theme.of(context).textTheme.headlineSmall
                             ?.copyWith(fontWeight: FontWeight.w800),
                       ),
+                      const SizedBox(height: 8),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.payments_outlined,
+                            size: 18,
+                            color: successText,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            order.isBill
+                                ? 'En espèces, au livreur'
+                                : 'En espèces à la livraison',
+                            style: const TextStyle(
+                              color: successText,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
                     ],
                   ),
                 ),
               ),
               const SizedBox(height: 32),
-              FilledButton(
+              FilledButton.icon(
+                // Home underneath, so "back" from the tracking page lands
+                // there rather than on this confirmation.
+                onPressed: () {
+                  final navigator = Navigator.of(context);
+                  navigator.pushAndRemoveUntil(
+                    MaterialPageRoute(builder: (_) => const ClientHomeScreen()),
+                    (route) => false,
+                  );
+                  navigator.push(
+                    MaterialPageRoute(
+                      builder: (_) => OrderDetailScreen(orderId: order.id),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.near_me_outlined),
+                label: Text(
+                  order.isBill || order.isParcel
+                      ? 'Suivre ma demande'
+                      : 'Suivre ma commande',
+                ),
+              ),
+              const SizedBox(height: 12),
+              OutlinedButton(
                 onPressed: () {
                   Navigator.of(context).pushAndRemoveUntil(
                     MaterialPageRoute(builder: (_) => const ClientHomeScreen()),
