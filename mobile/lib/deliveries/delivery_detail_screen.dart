@@ -326,7 +326,7 @@ class _ActionBar extends StatelessWidget {
                         color: Theme.of(context).colorScheme.error,
                       ),
                     ),
-                    child: Text(action.label),
+                    child: Text(action.labelFor(delivery.order)),
                   )
                 : FilledButton(
                     onPressed: busy ? null : () => _run(context, action),
@@ -336,7 +336,7 @@ class _ActionBar extends StatelessWidget {
                             width: 22,
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
-                        : Text(action.label),
+                        : Text(action.labelFor(delivery.order)),
                   ),
           ),
       ],

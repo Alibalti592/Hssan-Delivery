@@ -108,6 +108,38 @@ final class ProductService
         return Paginator::paginate($qb, $page, $limit);
     }
 
+    /**
+     * Available dishes whose name matches, from open restaurants only, with
+     * the same offer rule as the menu (see listAvailableForRestaurant).
+     *
+     * @return Product[]
+     */
+    public function searchAvailable(string $term, int $limit): array
+    {
+        return $this->productRepository->createQueryBuilder('p')
+            ->innerJoin('p.restaurant', 'r')
+            ->addSelect('r')
+            ->leftJoin(Promotion::class, 'offer', 'WITH', 'offer.product = p')
+            ->andWhere('LOWER(p.name) LIKE :term')
+            ->andWhere('p.isAvailable = :available')
+            ->andWhere('r.isAvailable = :available')
+            ->andWhere('offer.id IS NULL OR (offer.isActive = :available AND offer.startAt <= :now AND (offer.endAt IS NULL OR offer.endAt >= :now))')
+            ->setParameter('term', self::likePattern($term))
+            ->setParameter('available', true)
+            ->setParameter('now', new \DateTimeImmutable())
+            ->orderBy('p.name', 'ASC')
+            ->addOrderBy('p.id', 'ASC')
+            ->setMaxResults($limit)
+            ->getQuery()
+            ->getResult();
+    }
+
+    /** "%piz%" for "Piz", with the user's own % and _ taken literally. */
+    public static function likePattern(string $term): string
+    {
+        return '%'.addcslashes(mb_strtolower($term), '%_\\').'%';
+    }
+
     public function get(int $id): ?Product
     {
         return $this->productRepository->find($id);

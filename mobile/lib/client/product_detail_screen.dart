@@ -3,8 +3,8 @@ import 'package:provider/provider.dart';
 
 import '../cart/cart.dart';
 import '../catalogue/catalogue_models.dart';
-import '../config.dart';
 import '../theme.dart';
+import '../widgets/app_photo.dart';
 
 class ProductDetailScreen extends StatefulWidget {
   const ProductDetailScreen({
@@ -88,19 +88,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 SizedBox(
                   height: 200,
                   width: double.infinity,
-                  child: product.photoUrl != null
-                      ? Image.network(
-                          AppConfig.resolvePhotoUrl(product.photoUrl!),
-                          fit: BoxFit.cover,
-                        )
-                      : Container(
-                          color: fieldFill,
-                          child: const Icon(
-                            Icons.restaurant_outlined,
-                            size: 48,
-                            color: Color(0xFF9FB0C4),
-                          ),
-                        ),
+                  child: AppPhoto(
+                    product.photoUrl,
+                    icon: Icons.restaurant_outlined,
+                    iconSize: 48,
+                  ),
                 ),
                 Positioned(
                   top: 8,

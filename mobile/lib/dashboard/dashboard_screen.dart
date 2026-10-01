@@ -348,7 +348,7 @@ class _InProgressCard extends StatelessWidget {
               children: [
                 Expanded(
                   child: Text(
-                    order?.restaurantName ?? 'Course #${delivery.id}',
+                    order?.title ?? 'Course #${delivery.id}',
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w700,
                     ),

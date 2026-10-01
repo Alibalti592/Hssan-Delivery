@@ -152,4 +152,58 @@ void main() {
       },
     );
   });
+  group('DeliveryAction.labelFor', () {
+    DeliveryOrder job(String type, {Map<String, dynamic>? bill}) =>
+        DeliveryOrder.fromJson({
+          'id': 1,
+          'deliveryType': type,
+          'deliveryAddress': 'Rue X',
+          'bill': bill,
+        });
+
+    List<String> steps(DeliveryOrder order) => [
+      DeliveryAction.pickup.labelFor(order),
+      DeliveryAction.onTheWay.labelFor(order),
+      DeliveryAction.delivered.labelFor(order),
+    ];
+
+    test('each service says what the courier just did', () {
+      expect(steps(job('RESTAURANT')), [
+        'Commande récupérée',
+        'En route vers le client',
+        'Commande livrée',
+      ]);
+      expect(steps(job('GROCERY')), [
+        'Courses récupérées',
+        'En route vers le client',
+        'Courses livrées',
+      ]);
+      expect(steps(job('PARCEL')), [
+        'Colis récupéré',
+        'En route vers le destinataire',
+        'Colis remis au destinataire',
+      ]);
+      final bill = {
+        'providerName': 'STEG',
+        'providerKind': 'BILL',
+        'reference': '123',
+        'amount': '50.000',
+      };
+      expect(steps(job('BILL', bill: bill)), [
+        "J'ai reçu la facture et l'argent",
+        'Facture payée, je rapporte le reçu',
+        'Reçu remis au client',
+      ]);
+      expect(steps(job('BILL', bill: {...bill, 'providerKind': 'TRANSFER'})), [
+        "J'ai reçu l'argent du mandat",
+        'Mandat envoyé, je rapporte le reçu',
+        'Reçu remis au client',
+      ]);
+    });
+
+    test('accept, decline and fail keep their words', () {
+      expect(DeliveryAction.accept.labelFor(job('PARCEL')), 'Accepter');
+      expect(DeliveryAction.fail.labelFor(null), 'Signaler un problème');
+    });
+  });
 }

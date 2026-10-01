@@ -59,15 +59,15 @@ List<String> _labels(ClientOrder order) {
             'Demande envoyée',
             'Livreur en route vers vous',
             'Argent remis au livreur',
-            'Envoi du mandat en cours',
-            'Mandat envoyé · reçu remis',
+            'Mandat envoyé · reçu en route',
+            'Reçu remis',
           ]
         : const [
             'Demande envoyée',
             'Livreur en route vers vous',
             'Facture et argent remis au livreur',
-            'Paiement de la facture en cours',
-            'Facture payée · reçu remis',
+            'Facture payée · reçu en route',
+            'Reçu remis',
           ];
   }
   if (order.isParcel) {

@@ -4,10 +4,10 @@ import 'package:provider/provider.dart';
 import '../cart/cart.dart';
 import '../catalogue/catalogue_models.dart';
 import '../catalogue/catalogue_repository.dart';
-import '../config.dart';
 import '../theme.dart';
 import 'cart_screen.dart';
 import 'product_detail_screen.dart';
+import '../widgets/app_photo.dart';
 
 class RestaurantMenuScreen extends StatefulWidget {
   const RestaurantMenuScreen({required this.restaurant, super.key});
@@ -315,23 +315,13 @@ class _ProductRow extends StatelessWidget {
           children: [
             ClipRRect(
               borderRadius: BorderRadius.circular(6),
-              child: product.photoUrl != null
-                  ? Image.network(
-                      AppConfig.resolvePhotoUrl(product.photoUrl!),
-                      width: 44,
-                      height: 44,
-                      fit: BoxFit.cover,
-                    )
-                  : Container(
-                      width: 44,
-                      height: 44,
-                      color: fieldFill,
-                      child: const Icon(
-                        Icons.restaurant_outlined,
-                        size: 18,
-                        color: Color(0xFF9FB0C4),
-                      ),
-                    ),
+              child: AppPhoto(
+                product.photoUrl,
+                icon: Icons.restaurant_outlined,
+                width: 44,
+                height: 44,
+                iconSize: 18,
+              ),
             ),
             const SizedBox(width: 10),
             Expanded(

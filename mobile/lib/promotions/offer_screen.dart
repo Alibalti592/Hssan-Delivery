@@ -3,9 +3,9 @@ import 'package:provider/provider.dart';
 
 import '../cart/cart.dart';
 import '../client/cart_screen.dart';
-import '../config.dart';
 import '../theme.dart';
 import 'promotion_model.dart';
+import '../widgets/app_photo.dart';
 
 /// A fixed-price offer ("2 Sandwiches Chawarma — 11 DT"): the full flyer,
 /// what it includes, and a one-tap order. Ordering puts the offer's product
@@ -81,22 +81,13 @@ class _OfferScreenState extends State<OfferScreen> {
                     child: Stack(
                       children: [
                         // The whole flyer, never cropped: it's the ad.
-                        offer.photoUrl != null
-                            ? Image.network(
-                                AppConfig.resolvePhotoUrl(offer.photoUrl!),
-                                width: double.infinity,
-                                fit: BoxFit.fitWidth,
-                              )
-                            : Container(
-                                height: 200,
-                                color: fieldFill,
-                                alignment: Alignment.center,
-                                child: const Icon(
-                                  Icons.local_offer_outlined,
-                                  size: 48,
-                                  color: Color(0xFF9FB0C4),
-                                ),
-                              ),
+                        AppPhoto(
+                          offer.photoUrl,
+                          icon: Icons.local_offer_outlined,
+                          iconSize: 48,
+                          width: double.infinity,
+                          fit: BoxFit.fitWidth,
+                        ),
                         Positioned(
                           top: 8,
                           left: 8,
