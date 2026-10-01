@@ -4,8 +4,8 @@ import 'package:provider/provider.dart';
 import '../catalogue/catalogue_models.dart';
 import '../catalogue/catalogue_repository.dart';
 import '../theme.dart';
-import 'restaurant_menu_screen.dart';
 import '../widgets/app_photo.dart';
+import 'restaurant_menu_screen.dart';
 
 class RestaurantsScreen extends StatefulWidget {
   const RestaurantsScreen({this.type = RestaurantType.restaurant, super.key});

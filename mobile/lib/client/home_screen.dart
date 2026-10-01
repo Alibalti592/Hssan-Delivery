@@ -1,8 +1,3 @@
-import 'dart:async';
-
-import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-
 import '../addresses/address_picker.dart';
 import '../addresses/selected_address.dart';
 import '../auth/auth_controller.dart';
@@ -17,13 +12,17 @@ import '../promotions/offer_screen.dart';
 import '../promotions/promotion_model.dart';
 import '../promotions/promotions_repository.dart';
 import '../theme.dart';
+import '../widgets/app_photo.dart';
 import 'active_order_banner.dart';
 import 'cart_screen.dart';
+import 'dart:async';
 import 'order_detail_screen.dart';
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'parcel_form_screen.dart';
 import 'restaurant_menu_screen.dart';
 import 'restaurants_screen.dart';
-import '../widgets/app_photo.dart';
+import 'search_screen.dart';
 
 /// Pastel, organic-shaped service cards — the four entry points the client
 /// can currently reach from the home screen. Restaurants, Courses, and Colis
@@ -220,14 +219,9 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           const SizedBox(height: 16),
           _SearchBar(
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => Scaffold(
-                  appBar: AppBar(title: const Text('Restaurants')),
-                  body: const RestaurantsScreen(),
-                ),
-              ),
-            ),
+            onTap: () => Navigator.of(
+              context,
+            ).push(MaterialPageRoute(builder: (_) => const SearchScreen())),
           ),
           const SizedBox(height: 8),
           const _SectionHeader(title: 'Services'),

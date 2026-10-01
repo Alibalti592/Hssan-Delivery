@@ -5,6 +5,7 @@ import '../cart/cart.dart';
 import '../catalogue/catalogue_models.dart';
 import '../theme.dart';
 import '../widgets/app_photo.dart';
+import '../widgets/quantity_stepper.dart';
 
 class ProductDetailScreen extends StatefulWidget {
   const ProductDetailScreen({
@@ -156,32 +157,16 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Row(
-                          children: [
-                            _StepButton(
-                              icon: Icons.remove,
-                              onTap: _quantity > 1
-                                  ? () => setState(() => _quantity--)
-                                  : null,
-                            ),
-                            SizedBox(
-                              width: 36,
-                              child: Text(
-                                '$_quantity',
-                                textAlign: TextAlign.center,
-                                style: Theme.of(context).textTheme.titleMedium
-                                    ?.copyWith(fontWeight: FontWeight.w700),
-                              ),
-                            ),
-                            _StepButton(
-                              icon: Icons.add,
-                              onTap:
-                                  _quantity <
-                                      CartController.maxQuantityPerProduct
-                                  ? () => setState(() => _quantity++)
-                                  : null,
-                            ),
-                          ],
+                        QuantityStepper(
+                          large: true,
+                          quantity: _quantity,
+                          onDecrement: _quantity > 1
+                              ? () => setState(() => _quantity--)
+                              : null,
+                          onIncrement:
+                              _quantity < CartController.maxQuantityPerProduct
+                              ? () => setState(() => _quantity++)
+                              : null,
                         ),
                         Text(
                           '${total.toStringAsFixed(3)} DT',
@@ -205,35 +190,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class _StepButton extends StatelessWidget {
-  const _StepButton({required this.icon, required this.onTap});
-
-  final IconData icon;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(6),
-      child: Container(
-        width: 30,
-        height: 30,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: onTap == null ? const Color(0xFFF2F4F7) : fieldFill,
-          borderRadius: BorderRadius.circular(6),
-        ),
-        child: Icon(
-          icon,
-          size: 16,
-          color: onTap == null ? mutedText : const Color(0xFF4A5462),
         ),
       ),
     );

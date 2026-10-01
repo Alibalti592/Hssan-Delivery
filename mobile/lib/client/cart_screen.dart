@@ -4,7 +4,10 @@ import 'package:provider/provider.dart';
 import '../cart/cart.dart';
 import '../theme.dart';
 import '../widgets/dark_header.dart';
+import '../widgets/empty_state.dart';
+import '../widgets/quantity_stepper.dart';
 import 'checkout_screen.dart';
+import 'restaurants_screen.dart';
 
 /// The cart's content — list + summary/checkout button — with no Scaffold or
 /// header of its own, so it can be reused both as a pushed screen ([CartScreen])
@@ -17,18 +20,20 @@ class CartView extends StatelessWidget {
     final cart = context.watch<CartController>();
 
     if (cart.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.shopping_cart_outlined,
-              size: 56,
-              color: Theme.of(context).colorScheme.outline,
+      return EmptyState(
+        icon: Icons.shopping_bag_outlined,
+        title: 'Votre panier est vide',
+        detail: 'Choisissez un restaurant ou un magasin pour commencer.',
+        actionLabel: 'Voir les restaurants',
+        actionIcon: Icons.restaurant_menu,
+        primaryAction: true,
+        onAction: () => Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => Scaffold(
+              appBar: AppBar(title: const Text('Restaurants')),
+              body: const RestaurantsScreen(),
             ),
-            const SizedBox(height: 16),
-            const Text('Votre panier est vide'),
-          ],
+          ),
         ),
       );
     }
@@ -66,29 +71,12 @@ class CartView extends StatelessWidget {
                               style: Theme.of(context).textTheme.titleSmall
                                   ?.copyWith(fontWeight: FontWeight.w700),
                             ),
-                            const SizedBox(height: 4),
-                            Row(
-                              children: [
-                                _QtyButton(
-                                  icon: Icons.remove,
-                                  onTap: () => cart.decrement(line.key),
-                                ),
-                                SizedBox(
-                                  width: 28,
-                                  child: Text(
-                                    '${line.quantity}',
-                                    textAlign: TextAlign.center,
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .bodyMedium
-                                        ?.copyWith(fontWeight: FontWeight.w700),
-                                  ),
-                                ),
-                                _QtyButton(
-                                  icon: Icons.add,
-                                  onTap: () => cart.increment(line.key),
-                                ),
-                              ],
+                            const SizedBox(height: 8),
+                            QuantityStepper(
+                              quantity: line.quantity,
+                              removesAtOne: true,
+                              onDecrement: () => cart.decrement(line.key),
+                              onIncrement: () => cart.increment(line.key),
                             ),
                           ],
                         ),
@@ -126,31 +114,6 @@ class CartView extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-class _QtyButton extends StatelessWidget {
-  const _QtyButton({required this.icon, required this.onTap});
-
-  final IconData icon;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(4),
-      child: Container(
-        width: 22,
-        height: 22,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: fieldFill,
-          borderRadius: BorderRadius.circular(4),
-        ),
-        child: Icon(icon, size: 14, color: const Color(0xFF4A5462)),
-      ),
     );
   }
 }

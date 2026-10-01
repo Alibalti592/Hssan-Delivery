@@ -40,4 +40,12 @@ class CatalogueRepository {
         .map((e) => Product.fromJson(e as Map<String, dynamic>))
         .toList(growable: false);
   }
+
+  /// Dishes and restaurants whose name contains [query] (2 letters or more).
+  Future<SearchResults> search(String query) async {
+    final body = await _api.get(
+      '/api/search?q=${Uri.encodeQueryComponent(query)}',
+    );
+    return SearchResults.fromJson(body as Map<String, dynamic>);
+  }
 }
