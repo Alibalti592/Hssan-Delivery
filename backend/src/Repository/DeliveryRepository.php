@@ -113,6 +113,32 @@ class DeliveryRepository extends ServiceEntityRepository
     }
 
     /**
+     * Orders no courier has been given yet, oldest first: the admin's
+     * dispatch queue.
+     *
+     * @return Delivery[]
+     */
+    public function findWaitingForCourier(int $limit = 50): array
+    {
+        $deliveries = $this->createQueryBuilder('d')
+            ->addSelect('o', 'r', 'u', 'bp')
+            ->leftJoin('d.order', 'o')
+            ->leftJoin('o.restaurant', 'r')
+            ->leftJoin('o.billProvider', 'bp')
+            ->leftJoin('o.user', 'u')
+            ->andWhere('d.status = :pending')
+            ->setParameter('pending', DeliveryStatus::PENDING)
+            ->orderBy('d.createdAt', 'ASC')
+            ->addOrderBy('d.id', 'ASC')
+            ->setMaxResults($limit)
+            ->getQuery()
+            ->getResult();
+        $this->hydrateOrderItems($deliveries);
+
+        return $deliveries;
+    }
+
+    /**
      * @return PaginatedResult<Delivery>
      */
     public function paginateAllOrderedByCreatedAtDesc(int $page, int $limit): PaginatedResult

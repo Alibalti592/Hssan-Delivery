@@ -86,6 +86,37 @@ final class AdminDeliveryApiTest extends WebTestCase
         self::assertContains($delivery->getId(), $ids);
     }
 
+    public function testTheDispatchQueueListsOnlyOrdersWaitingForACourier(): void
+    {
+        $client = static::createClient();
+        $this->entityManager = self::getContainer()->get(EntityManagerInterface::class);
+        $admin = $this->createTestUser('ROLE_ADMIN', 'Test Admin');
+
+        $waiting = $this->createTestDelivery();
+        $assigned = $this->createTestDelivery();
+        $assigned->setCourier($this->createTestUser('ROLE_LIVREUR', 'Assigned Courier'));
+        $assigned->setStatus(DeliveryStatus::ASSIGNED);
+        $this->entityManager->flush();
+
+        $client->request('GET', '/api/admin/deliveries/waiting', server: [
+            'HTTP_AUTHORIZATION' => 'Bearer '.$this->authenticateClient($client, $admin),
+        ]);
+        self::assertResponseIsSuccessful();
+        $queue = json_decode($client->getResponse()->getContent(), true);
+
+        $ids = array_column($queue, 'id');
+        self::assertContains($waiting->getId(), $ids);
+        self::assertNotContains($assigned->getId(), $ids);
+        $entry = $queue[array_search($waiting->getId(), $ids, true)];
+        self::assertSame('Tunis, Tunisia', $entry['order']['deliveryAddress']);
+
+        $courier = $this->createTestUser('ROLE_LIVREUR', 'Nosy Courier');
+        $client->request('GET', '/api/admin/deliveries/waiting', server: [
+            'HTTP_AUTHORIZATION' => 'Bearer '.$this->authenticateClient($client, $courier),
+        ]);
+        self::assertResponseStatusCodeSame(Response::HTTP_FORBIDDEN);
+    }
+
     public function testNonAdminCannotListDeliveries(): void
     {
         $client = static::createClient();

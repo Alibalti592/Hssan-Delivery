@@ -679,6 +679,47 @@ void main() {
       expect(controller.history.map((d) => d.id), [1]);
     });
 
+    test('an automatic refresh picks up a new proposal without a spinner, '
+        'and keeps the list if the network drops', () async {
+      var online = true;
+      var proposals = <Map<String, dynamic>>[];
+      final mock = MockClient((request) async {
+        if (!online) throw http.ClientException('offline');
+        return _json(_pagedBody(proposals));
+      });
+      final controller = DeliveriesController(
+        DeliveryRepository(
+          ApiClient(
+            tokenProvider: () => 'jwt',
+            onUnauthorized: () {},
+            httpClient: mock,
+          ),
+        ),
+      );
+      await controller.refresh();
+      expect(controller.active, isEmpty);
+
+      proposals = [
+        {
+          'id': 5,
+          'status': 'ASSIGNED',
+          'courierId': 3,
+          'assignedAt': '2026-09-10T09:00:00+00:00',
+          'order': {'id': 12, 'status': 'CONFIRMED', 'items': []},
+        },
+      ];
+      final spinnerShown = <bool>[];
+      controller.addListener(() => spinnerShown.add(controller.loading));
+      await controller.refresh(silent: true);
+      expect(controller.active.map((d) => d.id), [5]);
+      expect(spinnerShown, isNot(contains(true)));
+
+      online = false;
+      await controller.refresh(silent: true);
+      expect(controller.active.map((d) => d.id), [5]);
+      expect(controller.error, isNull);
+    });
+
     test('perform swaps in the updated delivery', () async {
       final mock = MockClient((request) async {
         if (request.method == 'GET') {

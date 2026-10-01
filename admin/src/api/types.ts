@@ -152,6 +152,25 @@ export type DeliveryStatus =
   | 'CANCELLED'
   | 'FAILED';
 
+/** What a delivery carries about its order (backend DeliveryResponse). */
+export interface DeliveryOrderSummary {
+  id: number;
+  status: OrderStatus;
+  deliveryType: DeliveryType;
+  restaurantName: string | null;
+  customerName: string | null;
+  customerPhone: string | null;
+  pickupAddress: string | null;
+  deliveryAddress: string;
+  totalAmount: string;
+  bill: OrderBill | null;
+}
+
+/** An order waiting for the admin to give it to a courier. */
+export interface WaitingDelivery extends AdminDelivery {
+  order: DeliveryOrderSummary | null;
+}
+
 export interface AdminDelivery {
   id: number;
   orderId: number;

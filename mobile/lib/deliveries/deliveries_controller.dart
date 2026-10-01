@@ -35,20 +35,25 @@ class DeliveriesController extends ChangeNotifier {
   List<Delivery> get history =>
       _deliveries.where((d) => d.status.isTerminal).toList(growable: false);
 
-  Future<void> refresh() async {
-    _loading = true;
-    _error = null;
-    notifyListeners();
+  /// [silent]: an automatic refresh (timer, push) that updates the list in
+  /// place without a spinner, and keeps what's shown if it fails.
+  Future<void> refresh({bool silent = false}) async {
+    if (!silent) {
+      _loading = true;
+      _error = null;
+      notifyListeners();
+    }
     try {
       final result = await _repository.listMine();
       _deliveries = _sorted(result.items);
       _page = result.page;
       _pages = result.pages;
       _loadedOnce = true;
+      _error = null;
     } on ApiException catch (e) {
-      _error = e.message;
+      if (!silent) _error = e.message;
     } on NetworkException catch (e) {
-      _error = e.message;
+      if (!silent) _error = e.message;
     } finally {
       _loading = false;
       notifyListeners();

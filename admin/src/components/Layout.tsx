@@ -1,5 +1,6 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
+import { useDispatchAlert, useDispatchSound } from './dispatch';
 
 const NAV_ITEMS = [
   { to: '/', label: 'Dashboard', end: true },
@@ -16,6 +17,8 @@ const NAV_ITEMS = [
 export default function Layout() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const [soundOn, toggleSound] = useDispatchSound();
+  const waiting = useDispatchAlert(soundOn);
 
   function handleLogout() {
     logout();
@@ -38,6 +41,11 @@ export default function Layout() {
               className={({ isActive }) => `sitem${isActive ? ' on' : ''}`}
             >
               {item.label}
+              {item.to === '/' && waiting > 0 && (
+                <span className="snav-count" title="Orders waiting for a courier">
+                  {waiting}
+                </span>
+              )}
             </NavLink>
           ))}
         </nav>
@@ -47,6 +55,10 @@ export default function Layout() {
           <NavLink to="/account/password" className="sfoot-link">
             Change password
           </NavLink>
+          <br />
+          <button type="button" onClick={toggleSound}>
+            New-order sound: {soundOn ? 'on' : 'off'}
+          </button>
           <br />
           <button type="button" onClick={handleLogout}>
             Log out

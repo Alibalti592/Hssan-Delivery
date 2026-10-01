@@ -33,7 +33,20 @@ final class AdminDeliveryController extends AbstractController
         return $this->paginatedJson($result, static fn ($delivery) => DeliveryResponse::fromEntity($delivery));
     }
 
-    #[Route('/{id}', name: 'api_admin_delivery_show', methods: ['GET'])]
+    /**
+     * The dispatch queue: orders waiting for the admin to give them to a
+     * courier, oldest first. Polled by the dashboard to alert on new ones.
+     */
+    #[Route('/waiting', name: 'api_admin_delivery_waiting', methods: ['GET'])]
+    public function waiting(): JsonResponse
+    {
+        return $this->json(array_map(
+            static fn ($delivery) => DeliveryResponse::fromEntity($delivery),
+            $this->deliveryRepository->findWaitingForCourier()
+        ));
+    }
+
+    #[Route('/{id}', name: 'api_admin_delivery_show', methods: ['GET'], requirements: ['id' => '\d+'])]
     public function show(int $id): JsonResponse
     {
         $delivery = $this->deliveryRepository->find($id);
