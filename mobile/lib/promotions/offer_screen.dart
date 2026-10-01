@@ -3,8 +3,9 @@ import 'package:provider/provider.dart';
 
 import '../cart/cart.dart';
 import '../client/cart_screen.dart';
-import '../config.dart';
 import '../theme.dart';
+import '../widgets/app_photo.dart';
+import '../widgets/quantity_stepper.dart';
 import 'promotion_model.dart';
 
 /// A fixed-price offer ("2 Sandwiches Chawarma — 11 DT"): the full flyer,
@@ -81,22 +82,13 @@ class _OfferScreenState extends State<OfferScreen> {
                     child: Stack(
                       children: [
                         // The whole flyer, never cropped: it's the ad.
-                        offer.photoUrl != null
-                            ? Image.network(
-                                AppConfig.resolvePhotoUrl(offer.photoUrl!),
-                                width: double.infinity,
-                                fit: BoxFit.fitWidth,
-                              )
-                            : Container(
-                                height: 200,
-                                color: fieldFill,
-                                alignment: Alignment.center,
-                                child: const Icon(
-                                  Icons.local_offer_outlined,
-                                  size: 48,
-                                  color: Color(0xFF9FB0C4),
-                                ),
-                              ),
+                        AppPhoto(
+                          offer.photoUrl,
+                          icon: Icons.local_offer_outlined,
+                          iconSize: 48,
+                          width: double.infinity,
+                          fit: BoxFit.fitWidth,
+                        ),
                         Positioned(
                           top: 8,
                           left: 8,
@@ -206,25 +198,14 @@ class _OfferScreenState extends State<OfferScreen> {
                 ),
                 child: Row(
                   children: [
-                    _StepButton(
-                      icon: Icons.remove,
-                      onTap: _quantity > 1
+                    QuantityStepper(
+                      large: true,
+                      quantity: _quantity,
+                      onDecrement: _quantity > 1
                           ? () => setState(() => _quantity--)
                           : null,
-                    ),
-                    SizedBox(
-                      width: 36,
-                      child: Text(
-                        '$_quantity',
-                        textAlign: TextAlign.center,
-                        style: textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                    _StepButton(
-                      icon: Icons.add,
-                      onTap: _quantity < CartController.maxQuantityPerProduct
+                      onIncrement:
+                          _quantity < CartController.maxQuantityPerProduct
                           ? () => setState(() => _quantity++)
                           : null,
                     ),
@@ -301,35 +282,6 @@ class _PriceBadge extends StatelessWidget {
             fontSize: 22,
             fontWeight: FontWeight.w800,
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _StepButton extends StatelessWidget {
-  const _StepButton({required this.icon, required this.onTap});
-
-  final IconData icon;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(6),
-      child: Container(
-        width: 34,
-        height: 34,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: onTap == null ? const Color(0xFFF2F4F7) : fieldFill,
-          borderRadius: BorderRadius.circular(6),
-        ),
-        child: Icon(
-          icon,
-          size: 16,
-          color: onTap == null ? mutedText : const Color(0xFF4A5462),
         ),
       ),
     );

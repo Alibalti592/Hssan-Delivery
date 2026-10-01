@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../auth/auth_controller.dart';
 import '../auth/change_password_screen.dart';
+import '../auth/delete_account_screen.dart';
 import '../theme.dart';
 import '../widgets/dark_header.dart';
 import 'addresses_screen.dart';
@@ -150,6 +151,21 @@ class ProfileScreen extends StatelessWidget {
                       ],
                     ),
                   ),
+                ),
+              ),
+              const SizedBox(height: 28),
+              Center(
+                child: TextButton(
+                  style: TextButton.styleFrom(
+                    foregroundColor: dangerText,
+                    minimumSize: const Size(0, 40),
+                  ),
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const DeleteAccountScreen(),
+                    ),
+                  ),
+                  child: const Text('Supprimer mon compte'),
                 ),
               ),
             ],

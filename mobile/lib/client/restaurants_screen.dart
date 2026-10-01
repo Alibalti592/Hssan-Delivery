@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../catalogue/catalogue_models.dart';
-import '../config.dart';
 import '../catalogue/catalogue_repository.dart';
 import '../theme.dart';
+import '../widgets/app_photo.dart';
 import 'restaurant_menu_screen.dart';
 
 class RestaurantsScreen extends StatefulWidget {
@@ -194,23 +194,13 @@ class _RestaurantCard extends StatelessWidget {
           children: [
             AspectRatio(
               aspectRatio: 16 / 9,
-              child: restaurant.photoUrl != null
-                  ? Image.network(
-                      AppConfig.resolvePhotoUrl(restaurant.photoUrl!),
-                      fit: BoxFit.cover,
-                    )
-                  : Container(
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.surfaceContainerHighest,
-                      child: Icon(
-                        restaurant.type == RestaurantType.grocery
-                            ? Icons.shopping_basket_outlined
-                            : Icons.storefront_outlined,
-                        size: 40,
-                        color: Theme.of(context).colorScheme.outline,
-                      ),
-                    ),
+              child: AppPhoto(
+                restaurant.photoUrl,
+                icon: restaurant.type == RestaurantType.grocery
+                    ? Icons.shopping_basket_outlined
+                    : Icons.storefront_outlined,
+                iconSize: 40,
+              ),
             ),
             Padding(
               padding: const EdgeInsets.all(16),

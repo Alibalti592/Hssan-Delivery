@@ -137,7 +137,7 @@ final class DeliveryService
     ): Delivery {
         return $this->transitionWithLock($delivery, function (Delivery $delivery) use ($courier) {
             if (DeliveryStatus::ASSIGNED !== $delivery->getStatus()) {
-                throw new InvalidOperationException('Only assigned deliveries can be accepted.');
+                throw new InvalidOperationException('Cette course n\'est plus à accepter.');
             }
 
             $this->assertAssignedCourier($delivery, $courier);
@@ -155,7 +155,7 @@ final class DeliveryService
     ): Delivery {
         return $this->transitionWithLock($delivery, function (Delivery $delivery) use ($courier) {
             if (DeliveryStatus::ASSIGNED !== $delivery->getStatus()) {
-                throw new InvalidOperationException('Only assigned deliveries can be declined.');
+                throw new InvalidOperationException('Cette course n\'est plus à refuser.');
             }
 
             $this->assertAssignedCourier($delivery, $courier);
@@ -174,7 +174,7 @@ final class DeliveryService
     ): Delivery {
         return $this->transitionWithLock($delivery, function (Delivery $delivery) use ($courier) {
             if (DeliveryStatus::ACCEPTED !== $delivery->getStatus()) {
-                throw new InvalidOperationException('Only accepted deliveries can be marked as picked up.');
+                throw new InvalidOperationException('Acceptez d\'abord la course.');
             }
 
             $this->assertAssignedCourier($delivery, $courier);
@@ -192,7 +192,7 @@ final class DeliveryService
     ): Delivery {
         return $this->transitionWithLock($delivery, function (Delivery $delivery) use ($courier) {
             if (DeliveryStatus::PICKED_UP !== $delivery->getStatus()) {
-                throw new InvalidOperationException('Only picked-up deliveries can be marked as on the way.');
+                throw new InvalidOperationException('Confirmez d\'abord la récupération.');
             }
 
             $this->assertAssignedCourier($delivery, $courier);
@@ -209,7 +209,7 @@ final class DeliveryService
     ): Delivery {
         return $this->transitionWithLock($delivery, function (Delivery $delivery) use ($courier) {
             if (DeliveryStatus::ON_THE_WAY !== $delivery->getStatus()) {
-                throw new InvalidOperationException('Only deliveries that are on the way can be marked as delivered.');
+                throw new InvalidOperationException('Démarrez d\'abord la course.');
             }
 
             $this->assertAssignedCourier($delivery, $courier);
@@ -238,7 +238,7 @@ final class DeliveryService
                 ],
                 true
             )) {
-                throw new InvalidOperationException('This delivery cannot be cancelled at its current status.');
+                throw new InvalidOperationException('Votre commande ne peut plus être annulée : un livreur l\'a déjà prise en charge.');
             }
 
             $delivery->setStatus(DeliveryStatus::CANCELLED);
@@ -295,7 +295,7 @@ final class DeliveryService
                 ],
                 true
             )) {
-                throw new InvalidOperationException('This delivery cannot be marked as failed at its current status.');
+                throw new InvalidOperationException('Cette course ne peut plus être signalée en échec.');
             }
 
             $this->assertAssignedCourier($delivery, $courier);
@@ -346,7 +346,7 @@ final class DeliveryService
         User $courier,
     ): void {
         if ($delivery->getCourier()?->getId() !== $courier->getId()) {
-            throw new InvalidOperationException('You are not assigned to this delivery.');
+            throw new InvalidOperationException('Cette course n\'est plus la vôtre.');
         }
     }
 

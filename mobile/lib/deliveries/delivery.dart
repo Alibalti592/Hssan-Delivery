@@ -1,3 +1,5 @@
+import 'package:flutter/material.dart' show IconData, Icons;
+
 import '../bills/bill_models.dart';
 
 /// Delivery lifecycle, mirrors the backend `DeliveryStatus` enum.
@@ -45,6 +47,42 @@ enum DeliveryAction {
 
   /// Destructive actions get a red outline and a confirmation dialog.
   bool get isDestructive => this == fail || this == decline;
+
+  /// The button's words for this job: what the courier just did, in the
+  /// service's own terms ("Colis récupéré", "Facture payée, je rapporte le
+  /// reçu"). Mirrors the client's tracking steps (orders/order_tracking.dart).
+  String labelFor(DeliveryOrder? order) {
+    if (order == null) return label;
+    final bill = order.bill;
+    switch (this) {
+      case DeliveryAction.pickup:
+        if (bill != null) {
+          return bill.isTransfer
+              ? "J'ai reçu l'argent du mandat"
+              : "J'ai reçu la facture et l'argent";
+        }
+        if (order.isParcel) return 'Colis récupéré';
+        if (order.deliveryType == 'GROCERY') return 'Courses récupérées';
+        return 'Commande récupérée';
+      case DeliveryAction.onTheWay:
+        if (bill != null) {
+          return bill.isTransfer
+              ? 'Mandat envoyé, je rapporte le reçu'
+              : 'Facture payée, je rapporte le reçu';
+        }
+        if (order.isParcel) return 'En route vers le destinataire';
+        return 'En route vers le client';
+      case DeliveryAction.delivered:
+        if (bill != null) return 'Reçu remis au client';
+        if (order.isParcel) return 'Colis remis au destinataire';
+        if (order.deliveryType == 'GROCERY') return 'Courses livrées';
+        return 'Commande livrée';
+      case DeliveryAction.accept:
+      case DeliveryAction.decline:
+      case DeliveryAction.fail:
+        return label;
+    }
+  }
 }
 
 /// Actions offered for a given status. The first entry is the primary step;
@@ -161,6 +199,43 @@ class DeliveryOrder {
   bool get isParcel => deliveryType == 'PARCEL';
 
   bool get isBill => bill != null;
+
+  /// What the job is, in a word or two: the restaurant, "Colis",
+  /// "Facture STEG", "Mandat Wafa Cash" (same words as ClientOrder.title).
+  String get title {
+    final bill = this.bill;
+    if (bill != null) {
+      return '${bill.isTransfer ? 'Mandat' : 'Facture'} ${bill.provider.name}';
+    }
+    if (isParcel) return 'Colis';
+    final name = restaurantName;
+    return name == null || name.isEmpty ? 'Course #$id' : name;
+  }
+
+  IconData get serviceIcon {
+    if (isBill) return Icons.receipt_long_outlined;
+    switch (deliveryType) {
+      case 'PARCEL':
+        return Icons.inventory_2_outlined;
+      case 'GROCERY':
+        return Icons.shopping_basket_outlined;
+      default:
+        return Icons.restaurant_outlined;
+    }
+  }
+
+  /// The one line that matters after the address: what's in the bag, who
+  /// gets the parcel, or how much the bill is.
+  String get summary {
+    final bill = this.bill;
+    if (bill != null) return 'Montant : ${bill.amount} DT';
+    if (isParcel) {
+      final name = recipientName;
+      return name == null || name.isEmpty ? 'Colis à livrer' : 'Pour $name';
+    }
+    final count = items.fold<int>(0, (sum, i) => sum + i.quantity);
+    return '$count article${count > 1 ? 's' : ''} · $totalAmount DT';
+  }
 
   /// Who the courier hands the delivery to — the recipient for a Colis
   /// job, the customer for everything else. Unifies the isParcel branch so

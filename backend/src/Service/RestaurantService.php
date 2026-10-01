@@ -82,6 +82,27 @@ final class RestaurantService
         return Paginator::paginate($qb, $page, $limit);
     }
 
+    /**
+     * Open restaurants and grocery stores whose name matches.
+     *
+     * @return Restaurant[]
+     */
+    public function searchAvailable(string $term, int $limit): array
+    {
+        return $this->entityManager
+            ->getRepository(Restaurant::class)
+            ->createQueryBuilder('r')
+            ->andWhere('LOWER(r.name) LIKE :term')
+            ->andWhere('r.isAvailable = :available')
+            ->setParameter('term', ProductService::likePattern($term))
+            ->setParameter('available', true)
+            ->orderBy('r.name', 'ASC')
+            ->addOrderBy('r.id', 'ASC')
+            ->setMaxResults($limit)
+            ->getQuery()
+            ->getResult();
+    }
+
     public function get(int $id): ?Restaurant
     {
         return $this->entityManager

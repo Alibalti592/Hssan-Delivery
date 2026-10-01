@@ -49,13 +49,13 @@ final class BillOrderService
         $provider = $this->billProviderRepository->find($dto->providerId);
 
         if (null === $provider || !$provider->isActive()) {
-            throw new InvalidOperationException('Bill provider not found.');
+            throw new InvalidOperationException('Ce service n\'est plus proposé.');
         }
 
         $deliveryZone = $this->deliveryZoneRepository->find($dto->deliveryZoneId);
 
         if (null === $deliveryZone) {
-            throw new InvalidOperationException('Delivery zone not found.');
+            throw new InvalidOperationException('Cette zone de livraison n\'existe plus. Choisissez-en une autre.');
         }
 
         $amountMillimes = Money::toMillimes((string) $dto->amount);
@@ -137,13 +137,13 @@ final class BillOrderService
     public function setBillPhoto(Order $order, UploadedFile $file): Order
     {
         if (DeliveryType::BILL !== $order->getDeliveryType()) {
-            throw new InvalidOperationException('Only a bill order can have a bill photo.');
+            throw new InvalidOperationException('Seule une facture peut avoir une photo.');
         }
 
         $deliveryStatus = $order->getDelivery()?->getStatus();
 
         if (!in_array($deliveryStatus, [DeliveryStatus::PENDING, DeliveryStatus::ASSIGNED], true)) {
-            throw new InvalidOperationException('The bill photo can no longer be changed.');
+            throw new InvalidOperationException('La photo de la facture ne peut plus être changée.');
         }
 
         $filename = $this->privatePhotoUploader->store($file, self::PHOTO_SUBDIRECTORY);

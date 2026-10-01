@@ -71,7 +71,9 @@ Map<String, dynamic> _offer() => {
 Widget _wrap({
   List<dynamic> promotions = const [],
   List<dynamic> restaurants = const [],
+  List<dynamic> orders = const [],
   CartController? cart,
+  VoidCallback? onSeeOrders,
 }) {
   final api = ApiClient(
     tokenProvider: () => 'jwt-123',
@@ -79,6 +81,9 @@ Widget _wrap({
     httpClient: MockClient((request) async {
       if (request.url.path == '/api/addresses') {
         return jsonResponse(const []);
+      }
+      if (request.url.path == '/api/orders') {
+        return jsonResponse(pagedBody(orders));
       }
       if (request.url.path == '/api/restaurants') {
         return jsonResponse(pagedBody(restaurants));
@@ -113,11 +118,99 @@ Widget _wrap({
         value: cart ?? CartController(),
       ),
     ],
-    child: MaterialApp(home: Scaffold(body: HomeScreen())),
+    child: MaterialApp(
+      home: Scaffold(body: HomeScreen(onSeeOrders: onSeeOrders)),
+    ),
   );
 }
 
+Map<String, dynamic> _order(
+  int id, {
+  required String status,
+  String? deliveryStatus,
+  String? courierName,
+  String deliveryType = 'RESTAURANT',
+}) => {
+  'id': id,
+  'restaurantId': deliveryType == 'PARCEL' ? null : 1,
+  'restaurantName': deliveryType == 'PARCEL' ? null : 'Pizza Roma',
+  'items': const [],
+  'deliveryAddress': 'Rue de la Paix',
+  'deliveryZoneId': 1,
+  'deliveryZoneName': 'Centre-ville',
+  'deliveryFee': '3.000',
+  'totalAmount': '25.000',
+  'status': status,
+  'deliveryStatus': deliveryStatus,
+  'deliveryType': deliveryType,
+  'courierName': courierName,
+};
+
 void main() {
+  testWidgets('an order on its way shows on top of the home screen', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _wrap(
+        orders: [
+          _order(
+            12,
+            status: 'CONFIRMED',
+            deliveryStatus: 'PICKED_UP',
+            courierName: 'Ahmed',
+          ),
+          _order(9, status: 'COMPLETED', deliveryStatus: 'DELIVERED'),
+        ],
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('COMMANDE EN COURS'), findsOneWidget);
+    expect(find.text('Commande récupérée'), findsOneWidget);
+    expect(find.text('Pizza Roma · Livreur : Ahmed'), findsOneWidget);
+    expect(find.text('#12'), findsOneWidget);
+    // Only one is in progress: nothing more to see.
+    expect(find.text('Voir mes commandes'), findsNothing);
+
+    // Dispose the screen so its 20-second refresh timer goes with it.
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('several orders in progress offer to see them all', (
+    tester,
+  ) async {
+    var openedOrders = false;
+    await tester.pumpWidget(
+      _wrap(
+        orders: [
+          _order(14, status: 'PENDING', deliveryType: 'PARCEL'),
+          _order(13, status: 'CONFIRMED', deliveryStatus: 'ASSIGNED'),
+        ],
+        onSeeOrders: () => openedOrders = true,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('DEMANDE EN COURS'), findsOneWidget);
+    expect(find.text('Demande envoyée'), findsOneWidget);
+    expect(find.text('Colis · Nous cherchons un livreur…'), findsOneWidget);
+    await tester.tap(find.text('Voir mes commandes'));
+    expect(openedOrders, isTrue);
+
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('no banner once everything is delivered', (tester) async {
+    await tester.pumpWidget(
+      _wrap(
+        orders: [_order(9, status: 'COMPLETED', deliveryStatus: 'DELIVERED')],
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('COMMANDE EN COURS'), findsNothing);
+  });
+
   testWidgets('shows exactly the four service cards, Restaurants first', (
     tester,
   ) async {
@@ -286,6 +379,7 @@ void main() {
             ),
           ),
           ChangeNotifierProvider<CartController>.value(value: CartController()),
+          Provider<OrdersRepository>.value(value: OrdersRepository(api)),
         ],
         child: MaterialApp(home: Scaffold(body: HomeScreen())),
       ),

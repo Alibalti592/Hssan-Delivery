@@ -127,3 +127,43 @@ class Product {
     );
   }
 }
+
+/// A dish found by search, with the place that sells it.
+class DishResult {
+  const DishResult({required this.product, required this.restaurant});
+
+  final Product product;
+  final Restaurant restaurant;
+
+  factory DishResult.fromJson(Map<String, dynamic> json) {
+    return DishResult(
+      product: Product.fromJson(json),
+      restaurant: Restaurant.fromJson(
+        json['restaurant'] as Map<String, dynamic>,
+      ),
+    );
+  }
+}
+
+/// What "Rechercher un plat, un restaurant" found.
+class SearchResults {
+  const SearchResults({required this.restaurants, required this.dishes});
+
+  static const empty = SearchResults(restaurants: [], dishes: []);
+
+  final List<Restaurant> restaurants;
+  final List<DishResult> dishes;
+
+  bool get isEmpty => restaurants.isEmpty && dishes.isEmpty;
+
+  factory SearchResults.fromJson(Map<String, dynamic> json) {
+    return SearchResults(
+      restaurants: (json['restaurants'] as List<dynamic>? ?? const [])
+          .map((e) => Restaurant.fromJson(e as Map<String, dynamic>))
+          .toList(growable: false),
+      dishes: (json['products'] as List<dynamic>? ?? const [])
+          .map((e) => DishResult.fromJson(e as Map<String, dynamic>))
+          .toList(growable: false),
+    );
+  }
+}

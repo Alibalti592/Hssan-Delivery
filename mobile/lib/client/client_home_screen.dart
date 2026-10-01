@@ -33,11 +33,11 @@ class ClientHomeScreen extends StatefulWidget {
 class _ClientHomeScreenState extends State<ClientHomeScreen> {
   int _index = 0;
 
-  static const _tabs = [
-    HomeScreen(),
-    OrdersScreen(),
-    _CartTab(),
-    ProfileScreen(),
+  late final List<Widget> _tabs = [
+    HomeScreen(onSeeOrders: () => setState(() => _index = 1)),
+    const OrdersScreen(),
+    const _CartTab(),
+    const ProfileScreen(),
   ];
 
   @override

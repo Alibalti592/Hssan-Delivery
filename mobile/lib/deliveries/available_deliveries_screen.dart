@@ -139,13 +139,7 @@ class _ProposalCard extends StatelessWidget {
               children: [
                 Expanded(
                   child: Text(
-                    order == null
-                        ? 'Course #${delivery.id}'
-                        : order.bill != null
-                        ? '${order.bill!.isTransfer ? 'Mandat' : 'Facture'} ${order.bill!.provider.name}'
-                        : order.isParcel
-                        ? 'Colis'
-                        : (order.restaurantName ?? 'Course #${delivery.id}'),
+                    order?.title ?? 'Course #${delivery.id}',
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w700,
                     ),

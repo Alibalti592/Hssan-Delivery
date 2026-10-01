@@ -39,6 +39,13 @@ security:
                 max_attempts: 5
                 interval: '1 minute'
 
+        # Renewing or ending a session needs no valid JWT (it has usually
+        # expired), and an expired BEARER cookie must not get the request
+        # rejected before the controller can use the refresh token.
+        api_session:
+            pattern: ^/api/auth/(refresh|logout)$
+            security: false
+
         # All other /api/* requests authenticate via a Bearer JWT, no session.
         api:
             pattern: ^/api

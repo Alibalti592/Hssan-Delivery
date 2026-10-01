@@ -1,6 +1,3 @@
-import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-
 import '../addresses/address_picker.dart';
 import '../addresses/selected_address.dart';
 import '../auth/auth_controller.dart';
@@ -8,16 +5,24 @@ import '../bills/bill_providers_screen.dart';
 import '../cart/cart.dart';
 import '../catalogue/catalogue_models.dart' show Restaurant, RestaurantType;
 import '../catalogue/catalogue_repository.dart';
-import '../config.dart';
+import '../orders/order_models.dart';
+import '../orders/orders_repository.dart';
 import '../promotions/auto_carousel.dart';
 import '../promotions/offer_screen.dart';
 import '../promotions/promotion_model.dart';
 import '../promotions/promotions_repository.dart';
 import '../theme.dart';
+import '../widgets/app_photo.dart';
+import 'active_order_banner.dart';
 import 'cart_screen.dart';
+import 'dart:async';
+import 'order_detail_screen.dart';
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'parcel_form_screen.dart';
 import 'restaurant_menu_screen.dart';
 import 'restaurants_screen.dart';
+import 'search_screen.dart';
 
 /// Pastel, organic-shaped service cards — the four entry points the client
 /// can currently reach from the home screen. Restaurants, Courses, and Colis
@@ -78,7 +83,10 @@ const _services = [
 ];
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  const HomeScreen({this.onSeeOrders, super.key});
+
+  /// Switches to the "Commandes" tab (several orders in progress).
+  final VoidCallback? onSeeOrders;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -87,6 +95,9 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   late Future<List<Promotion>> _promotionsFuture;
   late Future<List<Restaurant>> _restaurantsFuture;
+  List<ClientOrder> _activeOrders = const [];
+  Timer? _activePoll;
+  StreamSubscription<int>? _orderChanges;
 
   @override
   void initState() {
@@ -94,6 +105,37 @@ class _HomeScreenState extends State<HomeScreen> {
     _promotionsFuture = context.read<PromotionsRepository>().listActive();
     _restaurantsFuture = context.read<CatalogueRepository>().listRestaurants();
     _loadAddress();
+    _loadActiveOrders();
+    _orderChanges = context.read<OrdersRepository>().changes.listen(
+      (_) => _loadActiveOrders(),
+    );
+  }
+
+  @override
+  void dispose() {
+    _activePoll?.cancel();
+    _orderChanges?.cancel();
+    super.dispose();
+  }
+
+  /// The orders still on their way, for the banner. Checked again every
+  /// 20 seconds while there is one; a failure keeps what was shown.
+  Future<void> _loadActiveOrders() async {
+    _activePoll?.cancel();
+    try {
+      final result = await context.read<OrdersRepository>().listOrders();
+      if (!mounted) return;
+      setState(() {
+        _activeOrders = result.items
+            .where((o) => !o.status.isTerminal)
+            .toList(growable: false);
+      });
+    } catch (_) {
+      // Best effort: the banner is a shortcut, Commandes has the full list.
+    }
+    if (mounted && _activeOrders.isNotEmpty) {
+      _activePoll = Timer(const Duration(seconds: 20), _loadActiveOrders);
+    }
   }
 
   /// A failure only leaves "Choisir une adresse" in the header.
@@ -113,7 +155,12 @@ class _HomeScreenState extends State<HomeScreen> {
       _promotionsFuture = promotions;
       _restaurantsFuture = restaurants;
     });
-    await Future.wait([promotions, restaurants, _loadAddress()]);
+    await Future.wait([
+      promotions,
+      restaurants,
+      _loadAddress(),
+      _loadActiveOrders(),
+    ]);
   }
 
   void _openService(_Service service) {
@@ -161,16 +208,20 @@ class _HomeScreenState extends State<HomeScreen> {
           const _TopBar(),
           const SizedBox(height: 18),
           const _Greeting(),
-          const SizedBox(height: 16),
-          _SearchBar(
-            onTap: () => Navigator.of(context).push(
+          ActiveOrderBanner(
+            orders: _activeOrders,
+            onOpen: (order) => Navigator.of(context).push(
               MaterialPageRoute(
-                builder: (_) => Scaffold(
-                  appBar: AppBar(title: const Text('Restaurants')),
-                  body: const RestaurantsScreen(),
-                ),
+                builder: (_) => OrderDetailScreen(orderId: order.id),
               ),
             ),
+            onSeeAll: widget.onSeeOrders,
+          ),
+          const SizedBox(height: 16),
+          _SearchBar(
+            onTap: () => Navigator.of(
+              context,
+            ).push(MaterialPageRoute(builder: (_) => const SearchScreen())),
           ),
           const SizedBox(height: 8),
           const _SectionHeader(title: 'Services'),
@@ -601,19 +652,11 @@ class _RestaurantPreviewCard extends StatelessWidget {
           children: [
             AspectRatio(
               aspectRatio: 16 / 9,
-              child: restaurant.photoUrl != null
-                  ? Image.network(
-                      AppConfig.resolvePhotoUrl(restaurant.photoUrl!),
-                      fit: BoxFit.cover,
-                    )
-                  : Container(
-                      color: fieldFill,
-                      child: const Icon(
-                        Icons.storefront_outlined,
-                        size: 36,
-                        color: mutedText,
-                      ),
-                    ),
+              child: AppPhoto(
+                restaurant.photoUrl,
+                icon: Icons.storefront_outlined,
+                iconSize: 36,
+              ),
             ),
             Padding(
               padding: const EdgeInsets.all(14),
@@ -788,20 +831,12 @@ class _OfferCard extends StatelessWidget {
           child: Stack(
             fit: StackFit.expand,
             children: [
-              offer.photoUrl != null
-                  ? Image.network(
-                      AppConfig.resolvePhotoUrl(offer.photoUrl!),
-                      fit: BoxFit.cover,
-                      alignment: Alignment.topCenter,
-                    )
-                  : Container(
-                      color: fieldFill,
-                      child: const Icon(
-                        Icons.local_offer_outlined,
-                        size: 40,
-                        color: Color(0xFF9FB0C4),
-                      ),
-                    ),
+              AppPhoto(
+                offer.photoUrl,
+                icon: Icons.local_offer_outlined,
+                iconSize: 40,
+                alignment: Alignment.topCenter,
+              ),
               Positioned.fill(
                 child: DecoratedBox(
                   decoration: BoxDecoration(
@@ -900,12 +935,11 @@ class _PromotionCard extends StatelessWidget {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            promotion.photoUrl != null
-                ? Image.network(
-                    AppConfig.resolvePhotoUrl(promotion.photoUrl!),
-                    fit: BoxFit.cover,
-                  )
-                : Container(color: fieldFill),
+            AppPhoto(
+              promotion.photoUrl,
+              icon: Icons.local_offer_outlined,
+              iconSize: 36,
+            ),
             Positioned.fill(
               child: DecoratedBox(
                 decoration: BoxDecoration(

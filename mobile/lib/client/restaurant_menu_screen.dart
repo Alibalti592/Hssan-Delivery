@@ -4,8 +4,10 @@ import 'package:provider/provider.dart';
 import '../cart/cart.dart';
 import '../catalogue/catalogue_models.dart';
 import '../catalogue/catalogue_repository.dart';
-import '../config.dart';
 import '../theme.dart';
+import '../widgets/app_photo.dart';
+import '../widgets/empty_state.dart';
+import '../widgets/quantity_stepper.dart';
 import 'cart_screen.dart';
 import 'product_detail_screen.dart';
 
@@ -131,11 +133,14 @@ class _RestaurantMenuScreenState extends State<RestaurantMenuScreen> {
             return const Center(child: CircularProgressIndicator());
           }
           if (snapshot.hasError) {
-            return Center(
-              child: Text(
-                'Impossible de charger le menu.',
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
+            return EmptyState(
+              icon: Icons.wifi_off_rounded,
+              title: 'Impossible de charger le menu',
+              detail: 'Vérifiez votre connexion internet.',
+              actionLabel: 'Réessayer',
+              onAction: () => setState(() {
+                _future = _load();
+              }),
             );
           }
 
@@ -160,12 +165,14 @@ class _RestaurantMenuScreenState extends State<RestaurantMenuScreen> {
             children: [
               if (activeCategories.length > 1)
                 SizedBox(
-                  height: 44,
+                  // Room for the chip's own height: at 44 the labels were
+                  // cut off at the bottom.
+                  height: 52,
                   child: ListView(
                     scrollDirection: Axis.horizontal,
                     padding: const EdgeInsets.symmetric(
                       horizontal: 16,
-                      vertical: 8,
+                      vertical: 6,
                     ),
                     children: [
                       _FilterChip(
@@ -315,23 +322,13 @@ class _ProductRow extends StatelessWidget {
           children: [
             ClipRRect(
               borderRadius: BorderRadius.circular(6),
-              child: product.photoUrl != null
-                  ? Image.network(
-                      AppConfig.resolvePhotoUrl(product.photoUrl!),
-                      width: 44,
-                      height: 44,
-                      fit: BoxFit.cover,
-                    )
-                  : Container(
-                      width: 44,
-                      height: 44,
-                      color: fieldFill,
-                      child: const Icon(
-                        Icons.restaurant_outlined,
-                        size: 18,
-                        color: Color(0xFF9FB0C4),
-                      ),
-                    ),
+              child: AppPhoto(
+                product.photoUrl,
+                icon: Icons.restaurant_outlined,
+                width: 44,
+                height: 44,
+                iconSize: 18,
+              ),
             ),
             const SizedBox(width: 10),
             Expanded(
@@ -388,49 +385,14 @@ class _ProductRow extends StatelessWidget {
                           : 'CHOISIR · $quantity',
                     ),
                   )
-                : Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      _QtyButton(icon: Icons.remove, onTap: onDecrement),
-                      SizedBox(
-                        width: 24,
-                        child: Text(
-                          '$quantity',
-                          textAlign: TextAlign.center,
-                          style: Theme.of(context).textTheme.bodyMedium
-                              ?.copyWith(fontWeight: FontWeight.w700),
-                        ),
-                      ),
-                      _QtyButton(icon: Icons.add, onTap: onIncrement),
-                    ],
+                : QuantityStepper(
+                    quantity: quantity,
+                    removesAtOne: true,
+                    onDecrement: onDecrement,
+                    onIncrement: onIncrement,
                   ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _QtyButton extends StatelessWidget {
-  const _QtyButton({required this.icon, required this.onTap});
-
-  final IconData icon;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(4),
-      child: Container(
-        width: 22,
-        height: 22,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: fieldFill,
-          borderRadius: BorderRadius.circular(4),
-        ),
-        child: Icon(icon, size: 14, color: const Color(0xFF4A5462)),
       ),
     );
   }

@@ -1,0 +1,9 @@
+framework:
+    # The app's users read French: Symfony's own validation messages ("Cette
+    # valeur ne doit pas être vide.") come out in French. The admin
+    # dashboard stays in English (see ClientLocaleListener).
+    default_locale: fr
+    translator:
+        default_path: '%kernel.project_dir%/translations'
+        fallbacks:
+            - en

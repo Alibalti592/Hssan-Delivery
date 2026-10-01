@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -23,6 +25,10 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   bool _updatingAvailability = false;
 
+  /// New proposals show up without pulling to refresh, even when a push
+  /// didn't get through.
+  Timer? _autoRefresh;
+
   @override
   void initState() {
     super.initState();
@@ -30,6 +36,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
       context.read<DeliveriesController>().refresh();
       askCourierForNotifications(context);
     });
+    _autoRefresh = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (mounted) {
+        context.read<DeliveriesController>().refresh(silent: true);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _autoRefresh?.cancel();
+    super.dispose();
   }
 
   Future<void> _toggleAvailability(bool value) async {
@@ -331,7 +348,7 @@ class _InProgressCard extends StatelessWidget {
               children: [
                 Expanded(
                   child: Text(
-                    order?.restaurantName ?? 'Course #${delivery.id}',
+                    order?.title ?? 'Course #${delivery.id}',
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w700,
                     ),

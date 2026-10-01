@@ -217,7 +217,7 @@ void main() {
 
     expect(find.text('Facture STEG'), findsWidgets);
     expect(find.text('Livreur en route vers vous'), findsOneWidget);
-    expect(find.text('Facture payée · reçu remis'), findsOneWidget);
+    expect(find.text('Reçu remis'), findsOneWidget);
     expect(find.text('En préparation'), findsNothing);
     expect(
       find.text('Paiement en espèces, à remettre au livreur'),

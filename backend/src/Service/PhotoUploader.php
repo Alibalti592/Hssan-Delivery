@@ -34,15 +34,15 @@ final class PhotoUploader
     public function store(UploadedFile $file, string $subdirectory): string
     {
         if (!$file->isValid()) {
-            throw new InvalidOperationException('The uploaded file could not be read.');
+            throw new InvalidOperationException('La photo n\'a pas pu être lue. Réessayez.');
         }
 
         if ($file->getSize() > self::MAX_SIZE_BYTES) {
-            throw new InvalidOperationException('Image must be smaller than 5 MB.');
+            throw new InvalidOperationException('La photo doit faire moins de 5 Mo.');
         }
 
         if (!in_array($file->getMimeType(), self::ALLOWED_MIME_TYPES, true)) {
-            throw new InvalidOperationException('Only JPEG, PNG or WebP images are allowed.');
+            throw new InvalidOperationException('Seules les photos JPEG, PNG ou WebP sont acceptées.');
         }
 
         $filename = bin2hex(random_bytes(16)).'.'.($file->guessExtension() ?? 'bin');

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../auth/auth_controller.dart';
+import '../theme.dart';
 import 'deliveries_controller.dart';
 import 'delivery.dart';
 import 'delivery_detail_screen.dart';
@@ -188,6 +189,7 @@ class _DeliveryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final order = delivery.order;
+    final textTheme = Theme.of(context).textTheme;
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: InkWell(
@@ -198,44 +200,80 @@ class _DeliveryCard extends StatelessWidget {
           ),
         ),
         child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
+          padding: const EdgeInsets.all(14),
+          child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      order?.bill != null
-                          ? '${order!.bill!.isTransfer ? 'Mandat' : 'Facture'} ${order.bill!.provider.name}'
-                          : order?.restaurantName ?? 'Delivery #${delivery.id}',
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                  ),
-                  StatusChip(delivery.status),
-                ],
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: fieldFill,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  order?.serviceIcon ?? Icons.delivery_dining_outlined,
+                  color: navy,
+                  size: 22,
+                ),
               ),
-              if (order != null) ...[
-                const SizedBox(height: 6),
-                Row(
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Icon(Icons.place_outlined, size: 16),
-                    const SizedBox(width: 4),
-                    Expanded(
-                      child: Text(
-                        order.deliveryAddress,
-                        style: Theme.of(context).textTheme.bodyMedium,
-                      ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            order?.title ?? 'Course #${delivery.id}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        StatusChip(delivery.status),
+                      ],
                     ),
+                    if (order != null) ...[
+                      const SizedBox(height: 6),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Padding(
+                            padding: EdgeInsets.only(top: 1),
+                            child: Icon(
+                              Icons.place_outlined,
+                              size: 16,
+                              color: mutedText,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              order.deliveryAddress,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: textTheme.bodyMedium,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        order.summary,
+                        style: textTheme.bodySmall?.copyWith(
+                          color: mutedText,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  '${order.items.length} article(s) · ${order.totalAmount} DT',
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-              ],
+              ),
             ],
           ),
         ),

@@ -16,6 +16,7 @@ import type {
   Promotion,
   Restaurant,
   RestaurantType,
+  WaitingDelivery,
 } from './types';
 
 export interface PageParams {
@@ -217,6 +218,8 @@ export const ordersApi = {
 export const deliveriesApi = {
   list: (params?: PageParams) => api.get<Paginated<AdminDelivery>>(`/api/admin/deliveries${toQuery(params)}`),
   get: (id: number) => api.get<AdminDelivery>(`/api/admin/deliveries/${id}`),
+  /** The dispatch queue, oldest first. */
+  waiting: () => api.get<WaitingDelivery[]>('/api/admin/deliveries/waiting'),
   assign: (deliveryId: number, courierId: number) =>
     api.post<AdminDelivery>(`/api/deliveries/${deliveryId}/assign/${courierId}`),
   reassign: (deliveryId: number, courierId: number) =>

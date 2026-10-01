@@ -41,10 +41,10 @@ void main() {
       'Demande envoyée',
       'Livreur en route vers vous',
       'Facture et argent remis au livreur',
-      'Paiement de la facture en cours',
-      'Facture payée · reçu remis',
+      'Facture payée · reçu en route',
+      'Reçu remis',
     ]);
-    expect(_current(order), 'Paiement de la facture en cours');
+    expect(_current(order), 'Facture payée · reçu en route');
     expect(order.title, 'Facture STEG');
   });
 
