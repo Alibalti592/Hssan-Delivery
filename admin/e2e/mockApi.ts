@@ -30,6 +30,9 @@ export async function mockLogin(page: Page, roles: string[]) {
     }),
   );
 
+  // No refresh cookie in these tests unless one says otherwise.
+  await page.route('**/api/auth/refresh', (route) => json(route, { message: 'Session expirée.' }, 401));
+
   // Every admin page polls the dispatch queue; empty unless a test says
   // otherwise (a later page.route() for the same URL takes precedence).
   await page.route('**/api/admin/deliveries/waiting', (route) => json(route, []));

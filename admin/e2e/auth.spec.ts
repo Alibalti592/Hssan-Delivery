@@ -47,3 +47,32 @@ test('a 401 on any request mid-session sends the admin back to login', async ({ 
 
   await expect(page).toHaveURL(/\/login$/);
 });
+
+test('an expired session is renewed quietly instead of sending the admin to login', async ({ page }) => {
+  await mockLogin(page, ['ROLE_ADMIN']);
+  let renewed = false;
+  await page.route('**/api/auth/refresh', (route) => {
+    renewed = true;
+    return route.fulfill({ status: 204 });
+  });
+  // The first stats call finds the hour-old session expired; after the
+  // renewal the same call goes through.
+  await page.route('**/api/admin/stats', (route) =>
+    renewed
+      ? route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ restaurants: 4, deliveryZones: 2, couriers: 3, totalOrders: 99, activeOrders: 1 }),
+        })
+      : route.fulfill({ status: 401, contentType: 'application/json', body: '{"message":"Expired JWT Token"}' }),
+  );
+
+  await page.goto('/login');
+  await page.getByLabel('Phone').fill('+21622000000');
+  await page.getByLabel('Password').fill('secret1234');
+  await page.getByRole('button', { name: 'Sign in' }).click();
+
+  await expect(page.getByText('99')).toBeVisible();
+  await expect(page).not.toHaveURL(/\/login/);
+  expect(renewed).toBe(true);
+});

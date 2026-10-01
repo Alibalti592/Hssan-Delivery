@@ -43,6 +43,39 @@ final class RefreshTokenApiTest extends WebTestCase
         self::assertStringNotContainsString('refreshToken', (string) $this->client->getResponse()->getContent());
     }
 
+    public function testTheAdminDashboardRenewsItsSessionWithCookies(): void
+    {
+        $user = $this->createUser();
+        $web = ['CONTENT_TYPE' => 'application/json', 'HTTP_X_CLIENT_PLATFORM' => 'web'];
+
+        $this->client->request('POST', '/api/auth/login', server: $web, content: json_encode([
+            'phone' => $user->getPhone(),
+            'password' => 'password123',
+        ]));
+        self::assertResponseIsSuccessful();
+        $refresh = $this->client->getCookieJar()->get('REFRESH', '/api/auth');
+        self::assertNotNull($refresh, 'The refresh token comes as a cookie.');
+        self::assertTrue($refresh->isHttpOnly());
+        $firstRefresh = $refresh->getValue();
+
+        // The session cookie has expired (any invalid JWT does the same).
+        $this->client->getCookieJar()->set(new \Symfony\Component\BrowserKit\Cookie('BEARER', 'expired.jwt.value'));
+
+        $this->client->request('POST', '/api/auth/refresh', server: $web);
+        self::assertResponseStatusCodeSame(Response::HTTP_NO_CONTENT);
+        self::assertNotSame($firstRefresh, $this->client->getCookieJar()->get('REFRESH', '/api/auth')->getValue());
+
+        $this->client->request('GET', '/api/auth/me', server: $web);
+        self::assertResponseIsSuccessful();
+
+        // Logging out ends it: the cookie is cleared and the token revoked.
+        $current = $this->client->getCookieJar()->get('REFRESH', '/api/auth')->getValue();
+        $this->client->request('POST', '/api/auth/logout', server: $web);
+        self::assertResponseStatusCodeSame(Response::HTTP_NO_CONTENT);
+        $this->refresh($current);
+        self::assertResponseStatusCodeSame(Response::HTTP_UNAUTHORIZED);
+    }
+
     public function testARefreshTokenBuysANewSessionOnce(): void
     {
         $first = $this->login($this->createUser());

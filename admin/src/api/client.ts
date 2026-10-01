@@ -37,9 +37,32 @@ export class ApiError extends Error {
   }
 }
 
+// Calls that manage the session itself: never renewed-and-retried.
+const SESSION_PATHS = new Set(['/api/auth/login', '/api/auth/refresh', '/api/auth/logout']);
+
+// The session cookie lasts an hour; the refresh cookie the backend set at
+// login (httpOnly, so never seen here) renews it. Requests that expire at
+// the same moment share one renewal.
+let renewing: Promise<boolean> | null = null;
+
+function renewSession(): Promise<boolean> {
+  renewing ??= fetch(`${API_URL}/api/auth/refresh`, {
+    method: 'POST',
+    headers: { 'X-Client-Platform': 'web' },
+    credentials: 'include',
+  })
+    .then((response) => response.ok)
+    .catch(() => false)
+    .finally(() => {
+      renewing = null;
+    });
+  return renewing;
+}
+
 async function request<T>(
   path: string,
   options: RequestInit = {},
+  retried = false,
 ): Promise<T> {
   // FormData bodies (photo uploads) must NOT get a Content-Type here: the
   // browser sets multipart/form-data with the correct boundary itself, and
@@ -65,6 +88,12 @@ async function request<T>(
     headers,
     credentials: 'include',
   });
+
+  // An expired session is renewed once, quietly, and the call resent; the
+  // admin is only sent back to /login when that fails too.
+  if (response.status === 401 && !retried && !SESSION_PATHS.has(path) && (await renewSession())) {
+    return request<T>(path, options, true);
+  }
 
   if (response.status === 204) {
     return undefined as T;

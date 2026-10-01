@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { courierLocationsApi, couriersApi, deliveriesApi } from '../api/resources';
@@ -13,6 +13,16 @@ const STATUS_LABEL: Record<CourierMapStatus, string> = {
 };
 
 const STATUS_ORDER: CourierMapStatus[] = ['ONLINE', 'ON_DELIVERY', 'OFFLINE'];
+
+/** The time now, ticking every 30 s so waiting times keep counting up. */
+function useNow(): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(timer);
+  }, []);
+  return now;
+}
 
 /** "4 min", "1 h 05". */
 function waitingFor(createdAt: string | null, now: number): string {
@@ -36,8 +46,20 @@ function describe(delivery: WaitingDelivery): string {
  */
 export function DispatchQueue() {
   const waiting = useWaitingDeliveries();
-  const couriers = useQuery({ queryKey: ['couriers', 'all'], queryFn: () => couriersApi.list({ limit: 100 }) });
-  const locations = useQuery({ queryKey: ['courier-locations'], queryFn: courierLocationsApi.list, refetchInterval: 30_000 });
+  const queue = waiting.data ?? [];
+  // The courier picker only matters while something is waiting.
+  const hasWaiting = queue.length > 0;
+  const couriers = useQuery({
+    queryKey: ['couriers', 'all'],
+    queryFn: () => couriersApi.list({ limit: 100 }),
+    enabled: hasWaiting,
+  });
+  const locations = useQuery({
+    queryKey: ['courier-locations'],
+    queryFn: courierLocationsApi.list,
+    refetchInterval: 30_000,
+    enabled: hasWaiting,
+  });
 
   const statusById = new Map(locations.data?.map((l) => [l.courierId, l.status]) ?? []);
   const assignable = (couriers.data?.items ?? [])
@@ -45,8 +67,7 @@ export function DispatchQueue() {
     .map((c) => ({ courier: c, status: statusById.get(c.id) ?? ('OFFLINE' as CourierMapStatus) }))
     .sort((a, b) => STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status));
 
-  const queue = waiting.data ?? [];
-  const now = Date.now();
+  const now = useNow();
 
   return (
     <section className="dispatch">
