@@ -3,10 +3,12 @@
 namespace App\Controller\Api;
 
 use App\Dto\Auth\ChangePasswordRequest;
+use App\Dto\Auth\DeleteAccountRequest;
 use App\Dto\Auth\RegisterUserRequest;
 use App\Dto\Auth\UpdateAvailabilityRequest;
 use App\Dto\Auth\UserResponse;
 use App\Entity\User;
+use App\Service\AccountDeletionService;
 use App\Service\AuthService;
 use App\Service\RefreshTokenService;
 use Symfony\Bundle\SecurityBundle\Security;
@@ -28,6 +30,7 @@ class AuthController extends AbstractApiController
         ValidatorInterface $validator,
         private readonly AuthService $authService,
         private readonly RefreshTokenService $refreshTokens,
+        private readonly AccountDeletionService $accountDeletion,
         private readonly Security $security,
         private readonly RateLimiterFactory $registerLimiter,
         private readonly RateLimiterFactory $passwordChangeLimiter,
@@ -133,6 +136,32 @@ class AuthController extends AbstractApiController
         $user = $this->security->getUser();
 
         return new JsonResponse(UserResponse::fromEntity($user));
+    }
+
+    /**
+     * "Supprimer mon compte" (see AccountDeletionService): asks for the
+     * password again, and refuses while an order is in progress.
+     */
+    #[Route('/me', name: 'api_auth_delete_account', methods: ['DELETE'])]
+    public function deleteAccount(Request $request): JsonResponse
+    {
+        /** @var User $user */
+        $user = $this->security->getUser();
+
+        $limiter = $this->passwordChangeLimiter->create((string) $user->getId());
+        if (!$limiter->consume()->isAccepted()) {
+            return new JsonResponse(
+                ['message' => 'Trop de tentatives. Réessayez plus tard.'],
+                Response::HTTP_TOO_MANY_REQUESTS
+            );
+        }
+
+        /** @var DeleteAccountRequest $dto */
+        $dto = $this->deserializeAndValidate($request, DeleteAccountRequest::class);
+
+        $this->accountDeletion->delete($user, $dto->password);
+
+        return new JsonResponse(null, Response::HTTP_NO_CONTENT);
     }
 
     /**

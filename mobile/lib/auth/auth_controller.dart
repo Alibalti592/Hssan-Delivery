@@ -198,6 +198,20 @@ class AuthController extends ChangeNotifier {
     }
   }
 
+  /// Deletes the account, then ends the session. Returns an error message
+  /// (wrong password, an order still in progress…), or null once deleted.
+  Future<String?> deleteAccount(String password) async {
+    try {
+      await _repository.deleteAccount(password);
+    } on ApiException catch (e) {
+      return e.message;
+    } on NetworkException catch (e) {
+      return e.message;
+    }
+    await _discard();
+    return null;
+  }
+
   Future<void> signOut() async {
     // Best effort, not awaited: signing out mustn't wait on the network.
     final refreshToken = _refreshToken;

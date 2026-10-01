@@ -77,6 +77,11 @@ class AuthRepository {
   }
 
   /// Self-service password change. Requires the caller's current password.
+  /// Deletes the signed-in account (its past orders stay, anonymous).
+  Future<void> deleteAccount(String password) async {
+    await _api.delete('/api/auth/me', {'password': password});
+  }
+
   /// Other devices are signed out; this one stays signed in by sending its
   /// own [refreshToken].
   Future<void> changePassword({
