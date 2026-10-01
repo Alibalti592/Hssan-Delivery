@@ -1,6 +1,12 @@
 import type { ApiErrorBody } from './types';
 
-export const API_URL = import.meta.env.VITE_API_URL ?? 'http://127.0.0.1:8000';
+/**
+ * Where the backend is. "/" means this same site: the host forwards /api
+ * and /uploads to the backend (see vercel.json), so the login cookie is the
+ * dashboard's own. Phones (Safari, every iPhone browser) refuse a cookie
+ * from another site, which signed admins out right after logging in.
+ */
+export const API_URL = (import.meta.env.VITE_API_URL ?? 'http://127.0.0.1:8000').replace(/\/$/, '');
 
 // Registered once by AuthProvider so a 401 on any authenticated request
 // (the cookie expired or was revoked mid-session, not just the initial
