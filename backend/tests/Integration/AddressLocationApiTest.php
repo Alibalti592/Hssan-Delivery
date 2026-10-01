@@ -156,6 +156,22 @@ final class AddressLocationApiTest extends WebTestCase
         self::assertResponseStatusCodeSame(Response::HTTP_UNPROCESSABLE_ENTITY);
     }
 
+    public function testFormErrorsAreInFrenchForTheAppAndEnglishForTheDashboard(): void
+    {
+        $blank = json_encode(['label' => '', 'addressLine' => 'Rue X']);
+
+        $this->client->request('POST', '/api/addresses', server: $this->headers($this->token), content: $blank);
+        self::assertResponseStatusCodeSame(Response::HTTP_UNPROCESSABLE_ENTITY);
+        $errors = json_decode((string) $this->client->getResponse()->getContent(), true)['errors'];
+        self::assertSame('Cette valeur ne doit pas être vide.', $errors[0]['message']);
+
+        $this->client->request('POST', '/api/addresses', server: $this->headers($this->token) + [
+            'HTTP_X_CLIENT_PLATFORM' => 'web',
+        ], content: $blank);
+        $errors = json_decode((string) $this->client->getResponse()->getContent(), true)['errors'];
+        self::assertSame('This value should not be blank.', $errors[0]['message']);
+    }
+
     /**
      * @return array<string, string>
      */

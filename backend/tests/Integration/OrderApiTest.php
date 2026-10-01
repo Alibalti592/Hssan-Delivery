@@ -354,7 +354,7 @@ final class OrderApiTest extends WebTestCase
         );
 
         self::assertSame(
-            'Restaurant not found.',
+            'Ce restaurant n\'existe plus.',
             $response['message']
         );
     }
@@ -405,7 +405,7 @@ final class OrderApiTest extends WebTestCase
         );
 
         self::assertSame(
-            'Restaurant is currently unavailable.',
+            'Ce restaurant est fermé pour le moment.',
             $response['message']
         );
     }
@@ -452,7 +452,7 @@ final class OrderApiTest extends WebTestCase
         );
 
         self::assertSame(
-            'Product 999999 not found.',
+            'Un article de votre panier n\'existe plus. Mettez votre panier à jour.',
             $response['message']
         );
     }
@@ -507,7 +507,7 @@ final class OrderApiTest extends WebTestCase
         );
 
         self::assertSame(
-            "Product {$product->getId()} does not belong to this restaurant.",
+            'Un article de votre panier ne vient pas de ce restaurant.',
             $response['message']
         );
     }
@@ -561,7 +561,7 @@ final class OrderApiTest extends WebTestCase
         );
 
         self::assertSame(
-            "Product {$product->getId()} is currently unavailable.",
+            "« {$product->getName()} » n'est plus disponible.",
             $response['message']
         );
     }
@@ -697,16 +697,16 @@ final class OrderApiTest extends WebTestCase
 
         self::assertResponseStatusCodeSame(400);
         self::assertSame(
-            sprintf($expectedMessage, $product->getId()),
+            sprintf($expectedMessage, $product->getName()),
             $response['message']
         );
     }
 
     public static function invalidOptionChoices(): iterable
     {
-        yield 'no option chosen' => [true, null, 'Choose an option for product %d.'];
-        yield 'unknown option' => [true, 'XXL', 'Option "XXL" is not available for product %d.'];
-        yield 'option on a single-price product' => [false, 'M', 'Product %d has no options.'];
+        yield 'no option chosen' => [true, null, 'Choisissez une taille pour « %s ».'];
+        yield 'unknown option' => [true, 'XXL', 'La taille « XXL » n\'est plus proposée pour « %s ».'];
+        yield 'option on a single-price product' => [false, 'M', '« %s » n\'a pas de taille à choisir.'];
     }
 
     private function createTestProductWithOptions(Restaurant $restaurant, Category $category): Product
@@ -930,7 +930,7 @@ final class OrderApiTest extends WebTestCase
         );
 
         self::assertSame(
-            'Delivery zone not found.',
+            'Cette zone de livraison n\'existe plus. Choisissez-en une autre.',
             $response['message']
         );
     }
@@ -1226,7 +1226,7 @@ final class OrderApiTest extends WebTestCase
         );
 
         self::assertSame(
-            'This delivery cannot be cancelled at its current status.',
+            'Votre commande ne peut plus être annulée : un livreur l\'a déjà prise en charge.',
             $response['message']
         );
     }

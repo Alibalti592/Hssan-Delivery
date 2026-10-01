@@ -124,7 +124,7 @@ final class CatalogueController extends AbstractController
     private function restaurantNotFound(): JsonResponse
     {
         return $this->json(
-            ['message' => 'Restaurant not found.'],
+            ['message' => 'Restaurant introuvable.'],
             Response::HTTP_NOT_FOUND
         );
     }

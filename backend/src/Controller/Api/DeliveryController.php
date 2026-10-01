@@ -243,7 +243,7 @@ final class DeliveryController extends AbstractController
 
         if (null === $delivery) {
             return $this->json(
-                ['message' => 'Delivery not found.'],
+                ['message' => 'Course introuvable.'],
                 Response::HTTP_NOT_FOUND
             );
         }

@@ -86,7 +86,7 @@ final class AddressController extends AbstractApiController
 
         if (null === $address) {
             return $this->json(
-                ['message' => 'Address not found.'],
+                ['message' => 'Adresse introuvable.'],
                 Response::HTTP_NOT_FOUND
             );
         }
@@ -114,7 +114,7 @@ final class AddressController extends AbstractApiController
 
         if (null === $address) {
             return $this->json(
-                ['message' => 'Address not found.'],
+                ['message' => 'Adresse introuvable.'],
                 Response::HTTP_NOT_FOUND
             );
         }
@@ -145,7 +145,7 @@ final class AddressController extends AbstractApiController
 
         if (null === $address) {
             return $this->json(
-                ['message' => 'Address not found.'],
+                ['message' => 'Adresse introuvable.'],
                 Response::HTTP_NOT_FOUND
             );
         }

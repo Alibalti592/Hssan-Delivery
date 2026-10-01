@@ -73,7 +73,7 @@ final class OrderController extends AbstractApiController
 
         if (null === $order) {
             return $this->json(
-                ['message' => 'Order not found.'],
+                ['message' => 'Commande introuvable.'],
                 Response::HTTP_NOT_FOUND
             );
         }
@@ -199,7 +199,7 @@ final class OrderController extends AbstractApiController
 
         if (null === $order) {
             return $this->json(
-                ['message' => 'Order not found.'],
+                ['message' => 'Commande introuvable.'],
                 Response::HTTP_NOT_FOUND
             );
         }
@@ -207,7 +207,7 @@ final class OrderController extends AbstractApiController
         $file = $request->files->get('photo');
 
         if (null === $file) {
-            throw new InvalidOperationException('No photo was uploaded.');
+            throw new InvalidOperationException('Aucune photo n\'a été envoyée.');
         }
 
         $order = $this->billOrderService->setBillPhoto($order, $file);
@@ -240,7 +240,7 @@ final class OrderController extends AbstractApiController
         // isn't this user's to see.
         if (null === $order || null === $path || !$this->billOrderService->canViewBillPhoto($order, $user)) {
             return $this->json(
-                ['message' => 'Bill photo not found.'],
+                ['message' => 'Photo introuvable.'],
                 Response::HTTP_NOT_FOUND
             );
         }
@@ -269,7 +269,7 @@ final class OrderController extends AbstractApiController
 
         if (null === $order) {
             return $this->json(
-                ['message' => 'Order not found.'],
+                ['message' => 'Commande introuvable.'],
                 Response::HTTP_NOT_FOUND
             );
         }

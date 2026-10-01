@@ -42,17 +42,17 @@ final class OrderService
         $restaurant = $this->restaurantRepository->find($dto->restaurantId);
 
         if (null === $restaurant) {
-            throw new InvalidOperationException('Restaurant not found.');
+            throw new InvalidOperationException('Ce restaurant n\'existe plus.');
         }
 
         if (!$restaurant->isAvailable()) {
-            throw new InvalidOperationException('Restaurant is currently unavailable.');
+            throw new InvalidOperationException('Ce restaurant est fermé pour le moment.');
         }
 
         $deliveryZone = $this->deliveryZoneRepository->find($dto->deliveryZoneId);
 
         if (null === $deliveryZone) {
-            throw new InvalidOperationException('Delivery zone not found.');
+            throw new InvalidOperationException('Cette zone de livraison n\'existe plus. Choisissez-en une autre.');
         }
 
         $order = new Order();
@@ -72,15 +72,15 @@ final class OrderService
             $product = $this->productRepository->find($itemDto->productId);
 
             if (null === $product) {
-                throw new InvalidOperationException("Product {$itemDto->productId} not found.");
+                throw new InvalidOperationException('Un article de votre panier n\'existe plus. Mettez votre panier à jour.');
             }
 
             if ($product->getRestaurant()?->getId() !== $restaurant->getId()) {
-                throw new InvalidOperationException("Product {$itemDto->productId} does not belong to this restaurant.");
+                throw new InvalidOperationException('Un article de votre panier ne vient pas de ce restaurant.');
             }
 
             if (!$product->isAvailable()) {
-                throw new InvalidOperationException("Product {$itemDto->productId} is currently unavailable.");
+                throw new InvalidOperationException("« {$product->getName()} » n'est plus disponible.");
             }
 
             // A fixed-price offer's product sells only while the offer is
@@ -88,7 +88,7 @@ final class OrderService
             $offer = $this->promotionRepository->findOneBy(['product' => $product]);
 
             if (null !== $offer && !$offer->isCurrentlyValid(new \DateTimeImmutable())) {
-                throw new InvalidOperationException("The offer \"{$offer->getTitle()}\" is no longer available.");
+                throw new InvalidOperationException("L'offre « {$offer->getTitle()} » n'est plus disponible.");
             }
 
             $unitPrice = $product->getPrice();
@@ -96,23 +96,23 @@ final class OrderService
 
             if ([] !== $product->getOptions()) {
                 if (null === $itemDto->option) {
-                    throw new InvalidOperationException("Choose an option for product {$itemDto->productId}.");
+                    throw new InvalidOperationException("Choisissez une taille pour « {$product->getName()} ».");
                 }
 
                 $option = $product->findOption($itemDto->option);
 
                 if (null === $option) {
-                    throw new InvalidOperationException("Option \"{$itemDto->option}\" is not available for product {$itemDto->productId}.");
+                    throw new InvalidOperationException("La taille « {$itemDto->option} » n'est plus proposée pour « {$product->getName()} ».");
                 }
 
                 $unitPrice = $option['price'];
                 $optionName = $option['name'];
             } elseif (null !== $itemDto->option) {
-                throw new InvalidOperationException("Product {$itemDto->productId} has no options.");
+                throw new InvalidOperationException("« {$product->getName()} » n'a pas de taille à choisir.");
             }
 
             if (null === $unitPrice) {
-                throw new InvalidOperationException("Product {$itemDto->productId} has no price.");
+                throw new InvalidOperationException("« {$product->getName()} » n'a pas encore de prix.");
             }
 
             $priceMillimes = Money::toMillimes($unitPrice);
@@ -133,7 +133,7 @@ final class OrderService
         }
 
         if ($totalMillimes <= 0) {
-            throw new InvalidOperationException('Order total must be greater than zero.');
+            throw new InvalidOperationException('Votre commande est vide.');
         }
 
         $deliveryFeeMillimes = Money::toMillimes($deliveryZone->getFee());
@@ -171,7 +171,7 @@ final class OrderService
         $deliveryZone = $this->deliveryZoneRepository->find($dto->deliveryZoneId);
 
         if (null === $deliveryZone) {
-            throw new InvalidOperationException('Delivery zone not found.');
+            throw new InvalidOperationException('Cette zone de livraison n\'existe plus. Choisissez-en une autre.');
         }
 
         $order = new Order();

@@ -1520,7 +1520,7 @@ final class AdminProductApiTest extends WebTestCase
         );
 
         self::assertSame(
-            'Only JPEG, PNG or WebP images are allowed.',
+            'Seules les photos JPEG, PNG ou WebP sont acceptées.',
             $response['message']
         );
     }

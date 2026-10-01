@@ -45,7 +45,7 @@ final class PromotionController extends AbstractController
 
         if (null === $promotion) {
             return $this->json(
-                ['message' => 'Promotion not found.'],
+                ['message' => 'Offre introuvable.'],
                 Response::HTTP_NOT_FOUND
             );
         }

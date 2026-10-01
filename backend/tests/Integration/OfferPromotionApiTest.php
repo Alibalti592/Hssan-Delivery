@@ -112,7 +112,7 @@ final class OfferPromotionApiTest extends WebTestCase
         $rejected = $this->postOrder($clientToken, $restaurant, $zone, $offer['productId'], 1);
 
         self::assertResponseStatusCodeSame(Response::HTTP_BAD_REQUEST);
-        self::assertStringContainsString('no longer available', json_encode($rejected));
+        self::assertStringContainsString('plus disponible', json_encode($rejected));
     }
 
     public function testAnExpiredOfferCannotBeOrdered(): void

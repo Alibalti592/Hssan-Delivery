@@ -85,7 +85,7 @@ final class AddressService
             $zone = $this->deliveryZoneRepository->find($dto->deliveryZoneId);
 
             if (null === $zone) {
-                throw new InvalidOperationException('Delivery zone not found.');
+                throw new InvalidOperationException('Cette zone de livraison n\'existe plus. Choisissez-en une autre.');
             }
         }
 

@@ -776,7 +776,7 @@ final class DeliveryApiTest extends WebTestCase
         );
 
         self::assertSame(
-            'You are not assigned to this delivery.',
+            'Cette course n\'est plus la vôtre.',
             $response['message']
         );
     }
@@ -822,7 +822,7 @@ final class DeliveryApiTest extends WebTestCase
         );
 
         self::assertSame(
-            'Only assigned deliveries can be accepted.',
+            'Cette course n\'est plus à accepter.',
             $response['message']
         );
 
@@ -1562,7 +1562,7 @@ final class DeliveryApiTest extends WebTestCase
         );
 
         self::assertSame(
-            'You are not assigned to this delivery.',
+            'Cette course n\'est plus la vôtre.',
             $response['message']
         );
     }
