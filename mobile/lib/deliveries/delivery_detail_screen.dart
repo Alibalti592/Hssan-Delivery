@@ -172,6 +172,11 @@ class DeliveryDetailScreen extends StatelessWidget {
                           ),
                         if (order.items.isNotEmpty || order.bill == null)
                           const Divider(height: 20),
+                        if (order.hasDiscount)
+                          _MoneyRow(
+                            'Réduction · ${order.promotionTitle ?? 'promotion'}',
+                            '-${order.discountAmount}',
+                          ),
                         _MoneyRow('Frais de livraison', order.deliveryFee),
                         _MoneyRow('Total', order.totalAmount, bold: true),
                       ],
@@ -407,7 +412,15 @@ class _MoneyRow extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: style),
+          Flexible(
+            child: Text(
+              label,
+              style: style,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const SizedBox(width: 12),
           Text('$amount DT', style: style),
         ],
       ),

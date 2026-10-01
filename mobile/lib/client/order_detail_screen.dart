@@ -360,6 +360,35 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                           ),
                         ),
                       const Divider(height: 1),
+                      if (order.hasDiscount)
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.local_offer_outlined,
+                                size: 16,
+                                color: successText,
+                              ),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  order.promotionTitle ?? 'Réduction',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(color: successText),
+                                ),
+                              ),
+                              Text(
+                                '-${order.discountAmount} DT',
+                                style: const TextStyle(
+                                  color: successText,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       Padding(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 16,

@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../cart/cart.dart';
 import '../catalogue/catalogue_models.dart';
 import '../catalogue/catalogue_repository.dart';
+import '../promotions/menu_promotions.dart';
 import '../theme.dart';
 import '../widgets/app_photo.dart';
 import '../widgets/empty_state.dart';
@@ -163,6 +164,7 @@ class _RestaurantMenuScreenState extends State<RestaurantMenuScreen> {
 
           return Column(
             children: [
+              MenuPromotions(restaurantId: widget.restaurant.id),
               if (activeCategories.length > 1)
                 SizedBox(
                   // Room for the chip's own height: at 44 the labels were
