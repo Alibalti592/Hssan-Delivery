@@ -120,6 +120,11 @@ export interface AdminOrder {
   deliveryZoneName: string;
   deliveryFee: string;
   totalAmount: string;
+  /** Taken off the items by a promotion ("0.000" without). */
+  discountAmount: string;
+  /** The promotion's title and code as they were when the order was placed. */
+  promotionTitle: string | null;
+  promoCode: string | null;
   status: OrderStatus;
   deliveryType: DeliveryType;
   deliveryId: number | null;
