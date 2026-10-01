@@ -52,7 +52,7 @@ test('lists promotions with discount and status', async ({ page }) => {
   await page.goto('/promotions');
 
   await expect(page.getByText('Summer Sale')).toBeVisible();
-  await expect(page.getByText('15.000%')).toBeVisible();
+  await expect(page.getByText('-15%')).toBeVisible();
   await expect(page.getByText('Inactive Promo')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Hide from app' })).toHaveCount(2);
   await expect(page.getByRole('button', { name: 'Show in app' })).toBeVisible();

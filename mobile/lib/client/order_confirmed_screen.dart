@@ -72,6 +72,16 @@ class OrderConfirmedScreen extends StatelessWidget {
                         style: Theme.of(context).textTheme.headlineSmall
                             ?.copyWith(fontWeight: FontWeight.w800),
                       ),
+                      if (order.hasDiscount) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          'Vous économisez ${order.discountAmount} DT',
+                          style: const TextStyle(
+                            color: successText,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
                       const SizedBox(height: 8),
                       Row(
                         mainAxisSize: MainAxisSize.min,

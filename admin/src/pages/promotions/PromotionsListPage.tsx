@@ -86,7 +86,7 @@ export default function PromotionsListPage() {
                     <td className="rname">{p.title}</td>
                     <td>
                       {p.discountType === 'PERCENTAGE'
-                        ? `${p.discountValue}%`
+                        ? `-${Number(p.discountValue)}%`
                         : p.discountType === 'FIXED_PRICE'
                           ? `Offer · ${p.discountValue} DT`
                           : `-${p.discountValue} DT`}

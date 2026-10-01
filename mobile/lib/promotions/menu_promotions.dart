@@ -32,9 +32,11 @@ class _MenuPromotionsState extends State<MenuPromotions> {
       final all = await context.read<PromotionsRepository>().listActive();
       if (!mounted) return;
       setState(() {
-        _promotions = all
-            .where((p) => p.appliesTo(widget.restaurantId))
-            .toList(growable: false);
+        // The ones that apply by themselves first, then those with a code.
+        _promotions = [
+          ...all.where((p) => p.appliesTo(widget.restaurantId) && !p.hasCode),
+          ...all.where((p) => p.appliesTo(widget.restaurantId) && p.hasCode),
+        ];
       });
     } catch (_) {
       // A nicety: the menu works the same without it.
