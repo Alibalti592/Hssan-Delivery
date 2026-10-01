@@ -113,10 +113,32 @@ class Order
     private ?string $deliveryFee = null;
 
     /**
-     * Items total (or, for Factures, the bill amount) plus deliveryFee.
+     * Items total (or, for Factures, the bill amount), minus discountAmount,
+     * plus deliveryFee.
      */
     #[ORM\Column(type: 'decimal', precision: 10, scale: 3)]
     private ?string $totalAmount = null;
+
+    /**
+     * Taken off the items by a promotion (see PromotionPricing); 0 without.
+     */
+    #[ORM\Column(type: 'decimal', precision: 10, scale: 3, options: ['default' => '0.000'])]
+    private string $discountAmount = '0.000';
+
+    /**
+     * The promotion behind discountAmount. Its title and code are copied
+     * below so the order still reads right once the promotion is edited
+     * or deleted.
+     */
+    #[ORM\ManyToOne]
+    #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
+    private ?Promotion $promotion = null;
+
+    #[ORM\Column(length: 255, nullable: true)]
+    private ?string $promotionTitle = null;
+
+    #[ORM\Column(length: 50, nullable: true)]
+    private ?string $promoCode = null;
 
     #[ORM\Column(length: 50, enumType: OrderStatus::class)]
     private OrderStatus $status = OrderStatus::PENDING;
@@ -302,6 +324,36 @@ class Order
     public function setTotalAmount(string $totalAmount): static
     {
         $this->totalAmount = $totalAmount;
+
+        return $this;
+    }
+
+    public function getDiscountAmount(): string
+    {
+        return $this->discountAmount;
+    }
+
+    public function getPromotion(): ?Promotion
+    {
+        return $this->promotion;
+    }
+
+    public function getPromotionTitle(): ?string
+    {
+        return $this->promotionTitle;
+    }
+
+    public function getPromoCode(): ?string
+    {
+        return $this->promoCode;
+    }
+
+    public function applyDiscount(Promotion $promotion, string $amount): static
+    {
+        $this->promotion = $promotion;
+        $this->promotionTitle = $promotion->getTitle();
+        $this->promoCode = $promotion->getPromoCode();
+        $this->discountAmount = $amount;
 
         return $this;
     }

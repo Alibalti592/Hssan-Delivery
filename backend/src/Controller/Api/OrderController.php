@@ -10,6 +10,7 @@ use App\Exception\InvalidOperationException;
 use App\Repository\OrderRepository;
 use App\Service\BillOrderService;
 use App\Service\OrderService;
+use App\Util\Money;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\ResponseHeaderBag;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -113,6 +114,42 @@ final class OrderController extends AbstractApiController
             OrderResponse::fromEntity($order),
             Response::HTTP_CREATED
         );
+    }
+
+    /**
+     * The checkout's live total: what POST /api/orders would charge for this
+     * cart, address and promo code, without placing the order. Same checks
+     * and same messages as placing it.
+     */
+    #[Route('/quote', name: 'api_orders_quote', methods: ['POST'])]
+    public function quote(Request $request): JsonResponse
+    {
+        $user = $this->getUser();
+
+        if (!$user instanceof \App\Entity\User) {
+            return $this->json(
+                ['message' => 'Authentication required.'],
+                Response::HTTP_UNAUTHORIZED
+            );
+        }
+
+        /** @var CreateOrderRequest $dto */
+        $dto = $this->deserializeAndValidate($request, CreateOrderRequest::class);
+
+        $order = $this->orderService->quoteOrder($dto, $user);
+
+        $total = Money::toMillimes($order->getTotalAmount());
+        $fee = Money::toMillimes($order->getDeliveryFee());
+        $discount = Money::toMillimes($order->getDiscountAmount());
+
+        return $this->json([
+            'subtotal' => Money::fromMillimes($total - $fee + $discount),
+            'discountAmount' => $order->getDiscountAmount(),
+            'deliveryFee' => $order->getDeliveryFee(),
+            'totalAmount' => $order->getTotalAmount(),
+            'promotionTitle' => $order->getPromotionTitle(),
+            'promoCode' => $order->getPromoCode(),
+        ]);
     }
 
     #[Route('/parcels', name: 'api_orders_create_parcel', methods: ['POST'])]
