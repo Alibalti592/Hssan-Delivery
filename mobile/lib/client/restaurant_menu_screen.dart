@@ -165,12 +165,14 @@ class _RestaurantMenuScreenState extends State<RestaurantMenuScreen> {
             children: [
               if (activeCategories.length > 1)
                 SizedBox(
-                  height: 44,
+                  // Room for the chip's own height: at 44 the labels were
+                  // cut off at the bottom.
+                  height: 52,
                   child: ListView(
                     scrollDirection: Axis.horizontal,
                     padding: const EdgeInsets.symmetric(
                       horizontal: 16,
-                      vertical: 8,
+                      vertical: 6,
                     ),
                     children: [
                       _FilterChip(

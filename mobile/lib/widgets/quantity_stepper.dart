@@ -29,9 +29,10 @@ class QuantityStepper extends StatelessWidget {
     final removing = removesAtOne && quantity <= 1;
 
     return Container(
+      padding: const EdgeInsets.all(3),
       decoration: BoxDecoration(
         color: fieldFill,
-        borderRadius: BorderRadius.circular(size / 2),
+        borderRadius: BorderRadius.circular(size / 2 + 3),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
