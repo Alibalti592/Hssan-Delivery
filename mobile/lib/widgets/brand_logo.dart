@@ -1,3 +1,6 @@
+import 'dart:math' as math;
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
 
 /// The Delivery Hassen logo, as the client's artwork: a brushed-silver
@@ -38,26 +41,30 @@ class BrandMonogram extends StatelessWidget {
 
   final double size;
 
+  /// Polished chrome, lit from above like the artwork: bright on top,
+  /// cooler grey towards the bottom, with a faint reflection at the base.
   static const silver = LinearGradient(
     begin: Alignment.topCenter,
     end: Alignment.bottomCenter,
     colors: [
       Color(0xFFFFFFFF),
-      Color(0xFFE4E7EB),
-      Color(0xFF9AA0A8),
-      Color(0xFFF4F5F7),
-      Color(0xFFB9BEC5),
+      Color(0xFFF3F5F7),
+      Color(0xFFCDD2D8),
+      Color(0xFF9AA1A9),
+      Color(0xFFC9CED4),
     ],
-    stops: [0, 0.32, 0.55, 0.78, 1],
+    stops: [0, 0.34, 0.58, 0.82, 1],
   );
 
   @override
   Widget build(BuildContext context) {
-    TextStyle style([Paint? foreground]) => TextStyle(
+    TextStyle style({Paint? foreground, Color? color}) => TextStyle(
       fontFamily: 'AlexBrush',
       fontSize: size,
       height: 1.05,
-      color: foreground == null ? Colors.white : null,
+      // Tucks the H against the D, as on the artwork.
+      letterSpacing: -0.07 * size,
+      color: foreground == null ? (color ?? Colors.white) : null,
       foreground: foreground,
       // Pinned rather than inherited, so the renders made without a theme
       // place the glyphs exactly like the app does.
@@ -65,55 +72,72 @@ class BrandMonogram extends StatelessWidget {
       decoration: TextDecoration.none,
     );
 
-    // Brush strokes are thin at small sizes: a stroke of the same silver
-    // around the fill gives the weight of the artwork.
-    final outline = Paint()
+    // The brush font is thin: a stroke around the letters gives them the
+    // weight of the artwork, and never less than a pixel and a bit, so the
+    // small app-icon tile stays legible.
+    final weight = math.max(size * 0.04, 1.3);
+    Paint stroke(double width, Color color) => Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = size * 0.022
+      ..strokeWidth = width
       ..strokeJoin = StrokeJoin.round
-      ..color = Colors.white;
+      ..strokeCap = StrokeCap.round
+      ..color = color;
+
+    Widget word({Paint? foreground, Color? color}) => Text(
+      'DH',
+      softWrap: false,
+      style: style(foreground: foreground, color: color),
+    );
 
     // The script's H flourish reaches well past the text box on the right:
     // shift the letters so what you see is centred, not the box.
     return Transform.translate(
-      offset: Offset(-0.16 * size, 0.08 * size),
-      child: _letters(style, outline),
-    );
-  }
-
-  Widget _letters(TextStyle Function([Paint?]) style, Paint outline) {
-    return Stack(
-      alignment: Alignment.center,
-      children: [
-        // Soft shadow under the letters, as on the artwork.
-        Transform.translate(
-          offset: Offset(0, size * 0.04),
-          child: Text(
-            'DH',
-            softWrap: false,
-            style: style().copyWith(
-              color: Colors.black.withValues(alpha: 0.55),
-              shadows: [
-                Shadow(
-                  color: Colors.black.withValues(alpha: 0.6),
-                  blurRadius: size * 0.08,
-                ),
+      offset: Offset(-0.12 * size, 0.08 * size),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          // Drop shadow, below and slightly right, as on the artwork.
+          Transform.translate(
+            offset: Offset(size * 0.025, size * 0.07),
+            child: ImageFiltered(
+              imageFilter: ui.ImageFilter.blur(
+                sigmaX: size * 0.035,
+                sigmaY: size * 0.035,
+              ),
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  word(
+                    foreground: stroke(
+                      weight,
+                      Colors.black.withValues(alpha: 0.75),
+                    ),
+                  ),
+                  word(color: Colors.black.withValues(alpha: 0.75)),
+                ],
+              ),
+            ),
+          ),
+          // A darker rim that gives the chrome an edge.
+          word(
+            foreground: stroke(
+              weight + math.max(size * 0.018, 0.8),
+              const Color(0xFF4B5058),
+            ),
+          ),
+          ShaderMask(
+            blendMode: BlendMode.srcIn,
+            shaderCallback: silver.createShader,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                word(foreground: stroke(weight, Colors.white)),
+                word(),
               ],
             ),
           ),
-        ),
-        ShaderMask(
-          blendMode: BlendMode.srcIn,
-          shaderCallback: silver.createShader,
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              Text('DH', softWrap: false, style: style(outline)),
-              Text('DH', softWrap: false, style: style()),
-            ],
-          ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
