@@ -235,7 +235,7 @@ void main() {
         find.text('Votre compte est en cours de création'),
         findsOneWidget,
       );
-      expect(find.text('Vérification de votre numéro'), findsOneWidget);
+      expect(find.text('Vérification de votre numéro…'), findsOneWidget);
       for (var i = 0; i < 8; i++) {
         await tester.pump(const Duration(milliseconds: 500));
       }
@@ -247,12 +247,9 @@ void main() {
       });
       expect(auth.status, AuthStatus.signedIn);
       expect(find.text('Bienvenue, Sami !'), findsOneWidget);
-      expect(
-        find.text('Votre compte est prêt. Bonne commande !'),
-        findsOneWidget,
-      );
+      expect(find.text('Votre compte est prêt.'), findsOneWidget);
 
-      await tester.tap(find.text("C'EST PARTI"));
+      await tester.tap(find.text('Continuer'));
       await tester.pumpAndSettle();
       expect(find.text('Bienvenue, Sami !'), findsNothing);
     });
@@ -296,7 +293,7 @@ void main() {
       );
       expect(auth.status, isNot(AuthStatus.signedIn));
 
-      await tester.tap(find.text('MODIFIER MES INFORMATIONS'));
+      await tester.tap(find.text('Modifier mes informations'));
       await tester.pumpAndSettle();
       // Back on the form, which keeps what was typed and shows why.
       expect(find.text('Créer mon compte'), findsOneWidget);
