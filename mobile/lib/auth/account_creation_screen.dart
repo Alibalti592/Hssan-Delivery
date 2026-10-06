@@ -1,15 +1,16 @@
+import '../theme.dart';
+import '../widgets/brand_logo.dart';
+import 'auth_controller.dart';
+import 'auth_widgets.dart';
 import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-
-import 'auth_controller.dart';
 import 'pizza_painter.dart';
 
-/// Shown while a new client account is created. A white, quiet screen: a
-/// pizza tossed and flipped, one sentence, the current step in grey and a
-/// hairline of progress; then a short welcome. Pops with the
+/// Shown while a new client account is created, in the app's own look:
+/// the app icon, a pizza tossed and flipped over its plate, one sentence,
+/// the current step and a three-part progress bar; then a short welcome. Pops with the
 /// error message when sign-up fails, so the form can show it.
 class AccountCreationScreen extends StatefulWidget {
   const AccountCreationScreen({
@@ -139,6 +140,7 @@ class _AccountCreationScreenState extends State<AccountCreationScreen>
 
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
     final ready = _phase == _Phase.ready;
     final failed = _phase == _Phase.failed;
 
@@ -148,9 +150,7 @@ class _AccountCreationScreenState extends State<AccountCreationScreen>
         ? "Le compte n'a pas pu être créé"
         : 'Votre compte est en cours de création';
     final detail = ready
-        ? 'Votre compte est prêt.'
-        : failed
-        ? _error!
+        ? 'Votre compte est prêt. Bonne commande !'
         : '${_steps[_doneSteps.clamp(0, _steps.length - 1)]}…';
 
     return PopScope(
@@ -167,77 +167,72 @@ class _AccountCreationScreenState extends State<AccountCreationScreen>
                   constraints: BoxConstraints(minHeight: box.maxHeight),
                   child: IntrinsicHeight(
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 32),
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
                       child: Column(
                         children: [
-                          const Spacer(flex: 3),
+                          const SizedBox(height: 20),
+                          const _AppMark(),
+                          const Spacer(flex: 2),
                           SizedBox(
-                            height: 210,
+                            height: 250,
                             child: _Scene(
                               ride: _ride,
                               finish: _finish,
                               stopped: failed,
                             ),
                           ),
-                          const SizedBox(height: 40),
+                          const SizedBox(height: 28),
                           AnimatedSwitcher(
                             duration: const Duration(milliseconds: 300),
                             child: Text(
                               title,
                               key: ValueKey(title),
                               textAlign: TextAlign.center,
-                              style: const TextStyle(
-                                fontFamily: 'Poppins',
-                                fontWeight: FontWeight.w500,
-                                fontSize: 19,
-                                height: 1.3,
-                                color: _ink,
+                              style: textTheme.titleLarge?.copyWith(
+                                fontWeight: FontWeight.w800,
+                                color: navy,
+                                height: 1.25,
                               ),
                             ),
                           ),
                           const SizedBox(height: 10),
-                          AnimatedSwitcher(
-                            duration: const Duration(milliseconds: 300),
-                            child: Text(
-                              detail,
-                              key: ValueKey(detail),
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontSize: 14,
-                                height: 1.4,
-                                color: failed
-                                    ? const Color(0xFFC53030)
-                                    : const Color(0xFF8A9099),
+                          if (failed)
+                            AuthErrorBanner(_error!)
+                          else
+                            AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 300),
+                              child: Text(
+                                detail,
+                                key: ValueKey(detail),
+                                textAlign: TextAlign.center,
+                                style: textTheme.bodyMedium?.copyWith(
+                                  color: mutedText,
+                                ),
                               ),
                             ),
-                          ),
-                          const SizedBox(height: 28),
+                          const SizedBox(height: 26),
                           AnimatedOpacity(
                             duration: const Duration(milliseconds: 300),
                             opacity: failed || ready ? 0 : 1,
-                            child: _Hairline(
-                              value: ((_doneSteps + 0.4) / _steps.length).clamp(
-                                0,
-                                1,
-                              ),
+                            child: _StepBar(
+                              total: _steps.length,
+                              done: _doneSteps,
                             ),
                           ),
-                          const Spacer(flex: 4),
-                          SizedBox(
-                            height: 52,
-                            child: failed
-                                ? _OutlineButton(
-                                    label: 'Modifier mes informations',
-                                    onPressed: () =>
-                                        Navigator.of(context).pop(_error),
-                                  )
-                                : ready
-                                ? _OutlineButton(
-                                    label: 'Continuer',
-                                    onPressed: _continue,
-                                  )
-                                : null,
-                          ),
+                          const Spacer(flex: 3),
+                          if (ready)
+                            FilledButton(
+                              onPressed: _continue,
+                              child: const Text("C'EST PARTI"),
+                            )
+                          else if (failed)
+                            OutlinedButton(
+                              onPressed: () =>
+                                  Navigator.of(context).pop(_error),
+                              child: const Text('MODIFIER MES INFORMATIONS'),
+                            )
+                          else
+                            const SizedBox(height: 50),
                           const SizedBox(height: 24),
                         ],
                       ),
@@ -253,10 +248,35 @@ class _AccountCreationScreenState extends State<AccountCreationScreen>
   }
 }
 
-const _ink = Color(0xFF0B0B0C);
+/// The app icon: the silver script "DH" on its black tile.
+class _AppMark extends StatelessWidget {
+  const _AppMark();
 
-/// The pizza being tossed; once the account is ready it fades and a thin
-/// check takes its place.
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 52,
+      height: 52,
+      decoration: BoxDecoration(
+        color: navy,
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.18),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      alignment: Alignment.center,
+      child: const BrandMonogram(size: 19),
+    );
+  }
+}
+
+/// The pizza tossed over its plate (the app's soft blue-grey, as behind
+/// its icons); once the account is ready it fades, the plate turns green
+/// and the app's check takes its place, as after an order.
 class _Scene extends StatelessWidget {
   const _Scene({
     required this.ride,
@@ -280,31 +300,42 @@ class _Scene extends StatelessWidget {
         );
 
         return Stack(
-          alignment: Alignment.center,
+          alignment: Alignment.bottomCenter,
           children: [
-            Opacity(
-              opacity: (stopped ? 0.35 : 1) * (1 - gone),
-              child: Transform.scale(
-                scale: 1 - 0.2 * gone,
-                child: TossedPizza(t: ride.value, size: 120, height: 62),
+            // The plate: the app's blue-grey, turning its soft green when
+            // the account is ready.
+            Positioned(
+              bottom: 0,
+              child: Container(
+                width: 200,
+                height: 200,
+                decoration: BoxDecoration(
+                  color: Color.lerp(fieldFill, successBg, check.clamp(0, 1)),
+                  shape: BoxShape.circle,
+                ),
+              ),
+            ),
+            Positioned(
+              bottom: 30,
+              child: Opacity(
+                opacity: (stopped ? 0.4 : 1) * (1 - gone),
+                child: Transform.scale(
+                  scale: 1 - 0.2 * gone,
+                  child: TossedPizza(t: ride.value, size: 120, height: 80),
+                ),
               ),
             ),
             if (check > 0)
-              Opacity(
-                opacity: check.clamp(0, 1),
-                child: Transform.scale(
-                  scale: 0.6 + 0.4 * check,
-                  child: Container(
-                    width: 72,
-                    height: 72,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(color: _ink, width: 1.6),
-                    ),
+              Positioned(
+                bottom: 64,
+                child: Opacity(
+                  opacity: check.clamp(0, 1),
+                  child: Transform.scale(
+                    scale: 0.6 + 0.4 * check,
                     child: const Icon(
                       Icons.check_rounded,
-                      color: _ink,
-                      size: 36,
+                      color: successText,
+                      size: 72,
                     ),
                   ),
                 ),
@@ -316,63 +347,38 @@ class _Scene extends StatelessWidget {
   }
 }
 
-/// Progress as a single thin line.
-class _Hairline extends StatelessWidget {
-  const _Hairline({required this.value});
+/// Three segments, one per step, like the order progress on the home
+/// screen: done in black, the current one half-lit.
+class _StepBar extends StatelessWidget {
+  const _StepBar({required this.total, required this.done});
 
-  final double value;
+  final int total;
+  final int done;
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 140,
-      child: TweenAnimationBuilder<double>(
-        tween: Tween(end: value),
-        duration: const Duration(milliseconds: 700),
-        curve: Curves.easeOutCubic,
-        builder: (context, v, _) => ClipRRect(
-          borderRadius: BorderRadius.circular(1),
-          child: Stack(
-            children: [
-              Container(height: 2, color: const Color(0xFFE6E8EB)),
-              FractionallySizedBox(
-                widthFactor: v,
-                child: Container(height: 2, color: _ink),
+      width: 168,
+      child: Row(
+        children: [
+          for (var i = 0; i < total; i++) ...[
+            if (i > 0) const SizedBox(width: 6),
+            Expanded(
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 400),
+                height: 4,
+                decoration: BoxDecoration(
+                  color: i < done
+                      ? navy
+                      : i == done
+                      ? navy.withValues(alpha: 0.35)
+                      : fieldFill,
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _OutlineButton extends StatelessWidget {
-  const _OutlineButton({required this.label, required this.onPressed});
-
-  final String label;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      child: OutlinedButton(
-        style: OutlinedButton.styleFrom(
-          foregroundColor: _ink,
-          side: const BorderSide(color: Color(0xFFD5D8DD)),
-          minimumSize: const Size.fromHeight(52),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          textStyle: const TextStyle(
-            fontFamily: 'Poppins',
-            fontWeight: FontWeight.w500,
-            fontSize: 15,
-          ),
-        ),
-        onPressed: onPressed,
-        child: Text(label),
+            ),
+          ],
+        ],
       ),
     );
   }

@@ -247,9 +247,12 @@ void main() {
       });
       expect(auth.status, AuthStatus.signedIn);
       expect(find.text('Bienvenue, Sami !'), findsOneWidget);
-      expect(find.text('Votre compte est prêt.'), findsOneWidget);
+      expect(
+        find.text('Votre compte est prêt. Bonne commande !'),
+        findsOneWidget,
+      );
 
-      await tester.tap(find.text('Continuer'));
+      await tester.tap(find.text("C'EST PARTI"));
       await tester.pumpAndSettle();
       expect(find.text('Bienvenue, Sami !'), findsNothing);
     });
@@ -293,7 +296,7 @@ void main() {
       );
       expect(auth.status, isNot(AuthStatus.signedIn));
 
-      await tester.tap(find.text('Modifier mes informations'));
+      await tester.tap(find.text('MODIFIER MES INFORMATIONS'));
       await tester.pumpAndSettle();
       // Back on the form, which keeps what was typed and shows why.
       expect(find.text('Créer mon compte'), findsOneWidget);
