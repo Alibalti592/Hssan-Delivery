@@ -1,3 +1,18 @@
+/* ---- brand: the logo's script "DH" and its type (SIL OFL fonts) ---- */
+@font-face { font-family: 'Alex Brush'; src: url('./assets/fonts/AlexBrush-Regular.ttf') format('truetype'); font-display: swap; }
+@font-face { font-family: 'Poppins'; font-weight: 500; src: url('./assets/fonts/Poppins-Medium.ttf') format('truetype'); font-display: swap; }
+@font-face { font-family: 'Poppins'; font-weight: 600; src: url('./assets/fonts/Poppins-SemiBold.ttf') format('truetype'); font-display: swap; }
+.monogram {
+  font-family: 'Alex Brush', cursive; font-weight: 400; line-height: 1; display: inline-block;
+  padding: 0 0.12em 0 0.02em;
+  background: linear-gradient(180deg, #fff 0%, #e4e7eb 32%, #9aa0a8 55%, #f4f5f7 78%, #b9bec5 100%);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  -webkit-text-stroke: 0.015em rgba(255, 255, 255, 0.35);
+  filter: drop-shadow(0 0.04em 0.05em rgba(0, 0, 0, 0.6));
+}
+.brand-name { font-family: 'Poppins', system-ui, sans-serif; font-weight: 600; color: #fff; letter-spacing: 0.2px; }
+.brand-tagline { font-family: 'Poppins', system-ui, sans-serif; font-weight: 500; color: #b4bac2; letter-spacing: 0.3px; }
+
 * { box-sizing: border-box; }
 
 body {
@@ -32,6 +47,9 @@ a { color: inherit; text-decoration: none; }
   letter-spacing: 0.3px;
 }
 .sbrand span { color: #8b93a0; font-weight: 400; display: block; font-size: 9px; margin-top: 2px; }
+.sbrand { display: flex; align-items: center; gap: 8px; }
+.sbrand .monogram { font-size: 30px; }
+.sbrand .brand-name { font-size: 12.5px; white-space: nowrap; }
 
 .snav { flex: 1; }
 .sitem {
@@ -181,9 +199,17 @@ tr.row-link:hover td { background: #fafbfc; }
   min-height: 100vh; display: flex; align-items: center; justify-content: center; background: #eef0f3;
 }
 .login-card { width: 340px; background: #fff; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.08); }
-.login-header { background: #1b2437; padding: 30px 30px 38px 30px; text-align: center; }
-.login-header h1 { color: #fff; font-size: 16px; font-weight: 700; margin: 0; }
-.login-header p { color: #aeb6c4; font-size: 10px; margin: 5px 0 0 0; }
+.login-header {
+  background: radial-gradient(circle at 50% 35%, #2b2b2d 0%, #141415 55%, #070707 100%);
+  padding: 26px 30px 30px 30px; text-align: center;
+}
+.login-header .monogram { font-size: 64px; }
+.login-header h1 { font-size: 18px; margin: 6px 0 0 0; }
+.login-header .brand-tagline { font-size: 10.5px; margin: 3px 0 0 0; }
+.login-header .login-role {
+  display: inline-block; margin-top: 12px; padding: 3px 10px; border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.18); color: #d6dae0; font-size: 9.5px; letter-spacing: 0.6px; text-transform: uppercase;
+}
 .login-body { padding: 24px 30px 30px 30px; }
 
 /* ---- dispatch queue ---- */

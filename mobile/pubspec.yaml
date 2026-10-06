@@ -54,6 +54,17 @@ flutter:
           weight: 700
         - asset: assets/fonts/Roboto-ExtraBold.ttf
           weight: 800
+    # The logo (lib/widgets/brand_logo.dart): the script "DH" and the name
+    # under it. Both SIL Open Font License, see assets/fonts/OFL-*.txt.
+    - family: AlexBrush
+      fonts:
+        - asset: assets/fonts/AlexBrush-Regular.ttf
+    - family: Poppins
+      fonts:
+        - asset: assets/fonts/Poppins-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Poppins-SemiBold.ttf
+          weight: 600
 
 # Native launcher icon, regenerated with `dart run flutter_launcher_icons`.
 # The plain italic "DH" of SplashMonogram (lib/onboarding/splash_screen.dart)

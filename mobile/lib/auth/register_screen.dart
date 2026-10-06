@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../theme.dart';
 import '../widgets/dark_header.dart';
+import 'account_creation_screen.dart';
 import 'auth_controller.dart';
 import 'auth_widgets.dart';
 
@@ -39,22 +40,23 @@ class _RegisterScreenState extends State<RegisterScreen> {
     if (!_formKey.currentState!.validate()) return;
     FocusScope.of(context).unfocus();
 
-    final message = await context.read<AuthController>().register(
-      name: _name.text.trim(),
-      phone: phoneDigits(_phone.text),
-      password: _password.text,
+    // The creation screen signs up (and in), then either leaves for the
+    // client home or comes back here with what went wrong.
+    final message = await Navigator.of(context).push<String>(
+      PageRouteBuilder(
+        transitionDuration: const Duration(milliseconds: 350),
+        pageBuilder: (_, _, _) => AccountCreationScreen(
+          name: _name.text.trim(),
+          phone: phoneDigits(_phone.text),
+          password: _password.text,
+        ),
+        transitionsBuilder: (_, animation, _, child) =>
+            FadeTransition(opacity: animation, child: child),
+      ),
     );
 
-    if (!mounted) return;
-
-    if (message != null) {
-      setState(() => _error = message);
-      return;
-    }
-
-    // signIn() already ran inside register(); the app root will now switch
-    // to the client home on its own once AuthController notifies.
-    Navigator.of(context).pop();
+    if (!mounted || message == null) return;
+    setState(() => _error = message);
   }
 
   @override

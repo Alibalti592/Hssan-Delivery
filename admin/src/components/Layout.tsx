@@ -29,8 +29,13 @@ export default function Layout() {
     <div className="app-shell">
       <div className="side">
         <div className="sbrand">
-          Delivery Hassen
-          <span>Admin</span>
+          <div className="monogram" aria-hidden="true">
+            DH
+          </div>
+          <div className="brand-name">
+            Delivery Hassen
+            <span>Admin</span>
+          </div>
         </div>
         <nav className="snav">
           {NAV_ITEMS.map((item) => (

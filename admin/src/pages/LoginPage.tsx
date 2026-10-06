@@ -23,8 +23,12 @@ export default function LoginPage() {
     <div className="login-page">
       <div className="login-card">
         <div className="login-header">
-          <h1>Delivery Hassen</h1>
-          <p>Administration</p>
+          <div className="monogram" aria-hidden="true">
+            DH
+          </div>
+          <h1 className="brand-name">Delivery Hassen</h1>
+          <p className="brand-tagline">As Fast as you think</p>
+          <span className="login-role">Administration</span>
         </div>
         <div className="login-body">
           <form onSubmit={handleSubmit}>
