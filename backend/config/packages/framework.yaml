@@ -5,6 +5,14 @@ framework:
     # Note that the session will be started ONLY if you read or write from it.
     session: true
 
+    # Railway's edge proxy (on its private 100.64.0.0/10 network) forwards
+    # every request, so without this getClientIp() is the proxy's address,
+    # shared by everyone, and the per-IP limits (sign-up, login throttling)
+    # would count all clients together. Trust what it forwards — the client
+    # address and https — but never a forwarded host.
+    trusted_proxies: '127.0.0.1,100.64.0.0/10'
+    trusted_headers: ['x-forwarded-for', 'x-forwarded-proto', 'x-forwarded-port']
+
     #esi: true
     #fragments: true
 
