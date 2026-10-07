@@ -723,6 +723,55 @@ final class AuthApiTest extends WebTestCase
         self::getContainer()->get('cache.rate_limiter')->clear();
     }
 
+    public function testRegisterLimitIsPerClientBehindRailwaysProxy(): void
+    {
+        $client = static::createClient();
+
+        $this->entityManager = self::getContainer()
+            ->get(EntityManagerInterface::class);
+
+        self::getContainer()->get('cache.rate_limiter')->clear();
+
+        // Every request reaches the app through Railway's edge proxy, with
+        // the client's address in X-Forwarded-For.
+        $register = function (string $forwardedFor) use ($client): void {
+            $client->request(
+                'POST',
+                '/api/auth/register',
+                server: [
+                    'CONTENT_TYPE' => 'application/json',
+                    'REMOTE_ADDR' => '100.64.0.14',
+                    'HTTP_X_FORWARDED_FOR' => $forwardedFor,
+                ],
+                content: json_encode([
+                    'name' => 'Voisin',
+                    'phone' => $this->uniquePhone(),
+                    'password' => 'password123',
+                ])
+            );
+        };
+
+        for ($i = 0; $i < 5; ++$i) {
+            $register('203.0.113.7');
+            self::assertResponseStatusCodeSame(Response::HTTP_CREATED);
+        }
+
+        // That client is out of attempts...
+        $register('203.0.113.7');
+        self::assertResponseStatusCodeSame(Response::HTTP_TOO_MANY_REQUESTS);
+
+        // ...and can't get round it by sending its own X-Forwarded-For,
+        // which the proxy appends the real address to.
+        $register('198.51.100.99, 203.0.113.7');
+        self::assertResponseStatusCodeSame(Response::HTTP_TOO_MANY_REQUESTS);
+
+        // Someone else, through the same proxy, still signs up.
+        $register('203.0.113.8');
+        self::assertResponseStatusCodeSame(Response::HTTP_CREATED);
+
+        self::getContainer()->get('cache.rate_limiter')->clear();
+    }
+
     public function testInvalidRegistrationDataIsRejected(): void
     {
         $client = static::createClient();
