@@ -111,7 +111,7 @@ class _ParcelFormScreenState extends State<ParcelFormScreen> {
                           fontWeight: FontWeight.w700,
                         ),
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 14),
                       TextFormField(
                         controller: _recipientName,
                         enabled: !_submitting,
