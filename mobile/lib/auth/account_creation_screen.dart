@@ -220,19 +220,36 @@ class _AccountCreationScreenState extends State<AccountCreationScreen>
                             ),
                           ),
                           const Spacer(flex: 3),
-                          if (ready)
-                            FilledButton(
-                              onPressed: _continue,
-                              child: const Text("C'EST PARTI"),
-                            )
-                          else if (failed)
-                            OutlinedButton(
-                              onPressed: () =>
-                                  Navigator.of(context).pop(_error),
-                              child: const Text('MODIFIER MES INFORMATIONS'),
-                            )
-                          else
-                            const SizedBox(height: 50),
+                          // Fades in with the new title rather than popping
+                          // up while the old one is still on screen.
+                          AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 300),
+                            child: ready
+                                ? SizedBox(
+                                    key: const ValueKey('ready'),
+                                    width: double.infinity,
+                                    child: FilledButton(
+                                      onPressed: _continue,
+                                      child: const Text("C'EST PARTI"),
+                                    ),
+                                  )
+                                : failed
+                                ? SizedBox(
+                                    key: const ValueKey('failed'),
+                                    width: double.infinity,
+                                    child: OutlinedButton(
+                                      onPressed: () =>
+                                          Navigator.of(context).pop(_error),
+                                      child: const Text(
+                                        'MODIFIER MES INFORMATIONS',
+                                      ),
+                                    ),
+                                  )
+                                : const SizedBox(
+                                    key: ValueKey('creating'),
+                                    height: 50,
+                                  ),
+                          ),
                           const SizedBox(height: 24),
                         ],
                       ),
@@ -269,7 +286,7 @@ class _AppMark extends StatelessWidget {
         ],
       ),
       alignment: Alignment.center,
-      child: const BrandMonogram(width: 38),
+      child: const BrandMonogram(width: 42),
     );
   }
 }

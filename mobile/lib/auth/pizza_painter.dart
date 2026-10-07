@@ -162,18 +162,24 @@ class TossedPizza extends StatelessWidget {
       child: Stack(
         alignment: Alignment.bottomCenter,
         children: [
-          // Shadow on the counter.
+          // Soft shadow on the counter, smaller and fainter as the pizza
+          // rises.
           Positioned(
-            bottom: 0,
-            child: Opacity(
-              opacity: 0.18 * (1 - lift * 0.6),
-              child: Container(
-                width: size * (1 - lift * 0.35),
-                height: 14 * (1 - lift * 0.35),
-                decoration: BoxDecoration(
-                  color: Colors.black,
-                  borderRadius: BorderRadius.circular(size),
-                ),
+            bottom: 4,
+            child: Container(
+              width: size * 0.8 * (1 - lift * 0.35),
+              height: 6,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(size),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(
+                      alpha: 0.28 * (1 - lift * 0.6),
+                    ),
+                    blurRadius: 10,
+                    spreadRadius: 2,
+                  ),
+                ],
               ),
             ),
           ),

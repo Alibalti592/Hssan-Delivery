@@ -554,8 +554,8 @@ class _MonogramPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final scale = size.width / _boxWidth;
     final box = Offset.zero & const Size(_boxWidth, _boxHeight);
-    // Never thinner than a pixel and a half, so tiny icons stay legible.
-    final tube = math.max(_tube, 1.5 / scale);
+    // Never thinner than two pixels, so the small tiles stay legible.
+    final tube = math.max(_tube, 2 / scale);
 
     void inBox(Offset shift, void Function() draw) {
       canvas
