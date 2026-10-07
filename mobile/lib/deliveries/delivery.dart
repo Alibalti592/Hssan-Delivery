@@ -149,6 +149,8 @@ class DeliveryOrder {
     required this.totalAmount,
     required this.deliveryType,
     required this.items,
+    this.discountAmount = '0.000',
+    this.promotionTitle,
     this.bill,
     this.pickupLatitude,
     this.pickupLongitude,
@@ -178,6 +180,13 @@ class DeliveryOrder {
   /// ClientOrder.deliveryType.
   final String deliveryType;
   final List<DeliveryItem> items;
+
+  /// Taken off the items by a promotion: the total to collect already
+  /// accounts for it.
+  final String discountAmount;
+  final String? promotionTitle;
+
+  bool get hasDiscount => (double.tryParse(discountAmount) ?? 0) > 0;
 
   /// Set only for a Factures job: the bill (or mandat) to pay at the
   /// provider's counter with the cash collected from the customer.
@@ -260,6 +269,8 @@ class DeliveryOrder {
       items: ((json['items'] as List<dynamic>?) ?? const [])
           .map((e) => DeliveryItem.fromJson(e as Map<String, dynamic>))
           .toList(growable: false),
+      discountAmount: json['discountAmount'] as String? ?? '0.000',
+      promotionTitle: json['promotionTitle'] as String?,
       bill: BillInfo.fromJson(json['bill']),
       pickupLatitude: (json['pickupLatitude'] as num?)?.toDouble(),
       pickupLongitude: (json['pickupLongitude'] as num?)?.toDouble(),

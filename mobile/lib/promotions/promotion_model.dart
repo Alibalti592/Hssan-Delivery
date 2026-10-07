@@ -38,6 +38,21 @@ class Promotion {
       productId != null &&
       restaurantId != null;
 
+  /// A "-10%" / "-5 DT" promotion that takes money off an order (as
+  /// opposed to an offer, which is a product of its own).
+  bool get isDiscount => discountType != 'FIXED_PRICE';
+
+  /// Whether it takes money off an order from this restaurant: its own,
+  /// or every restaurant's when it has none.
+  bool appliesTo(int restaurantId) =>
+      isDiscount &&
+      (this.restaurantId == null || this.restaurantId == restaurantId);
+
+  bool get hasCode => promoCode != null && promoCode!.isNotEmpty;
+
+  /// "-10 % sur votre commande", "-5 DT sur votre commande".
+  String get discountSentence => '$discountLabel sur votre commande';
+
   /// For an offer, its price. Otherwise the short "-10%" / "-5 DT" label,
   /// matching the discount types the backend supports (see
   /// App\Enum\DiscountType).

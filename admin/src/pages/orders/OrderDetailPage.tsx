@@ -183,6 +183,17 @@ export default function OrderDetailPage() {
                       <td style={{ fontWeight: 700 }}>{money(data.bill.amount)}</td>
                     </tr>
                   )}
+                  {Number(data.discountAmount) > 0 && (
+                    <tr>
+                      <td colSpan={3} style={{ textAlign: 'right', fontWeight: 700 }}>
+                        Discount · {data.promotionTitle ?? 'promotion'}
+                        {data.promoCode ? ` (code ${data.promoCode})` : ''}
+                      </td>
+                      <td className="discount" style={{ fontWeight: 700 }}>
+                        −{money(data.discountAmount)}
+                      </td>
+                    </tr>
+                  )}
                   <tr>
                     <td colSpan={3} style={{ textAlign: 'right', fontWeight: 700 }}>
                       Delivery fee

@@ -33,4 +33,8 @@ final class CreateOrderRequest
     #[Assert\NotNull]
     #[Assert\Positive]
     public ?int $deliveryZoneId = null;
+
+    /** A promotion code the client typed at checkout, if any. */
+    #[Assert\Length(max: 50)]
+    public ?string $promoCode = null;
 }

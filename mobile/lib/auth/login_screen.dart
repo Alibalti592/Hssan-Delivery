@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../onboarding/splash_screen.dart' show SplashMonogram;
 import '../theme.dart';
+import '../widgets/brand_logo.dart';
 import 'auth_controller.dart';
 import 'auth_widgets.dart';
 import 'register_screen.dart';
@@ -54,87 +54,90 @@ class _LoginScreenState extends State<LoginScreen> {
 
     return Scaffold(
       backgroundColor: navy,
-      body: GestureDetector(
-        // Tapping outside a field puts the keyboard away.
-        onTap: () => FocusScope.of(context).unfocus(),
-        child: SafeArea(
-          bottom: false,
-          child: CustomScrollView(
-            slivers: [
-              const SliverToBoxAdapter(child: _BrandHeader()),
-              SliverFillRemaining(
-                hasScrollBody: false,
-                child: Container(
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.vertical(
-                      top: Radius.circular(28),
+      body: BrandBackdrop(
+        center: const Alignment(0, -0.8),
+        child: GestureDetector(
+          // Tapping outside a field puts the keyboard away.
+          onTap: () => FocusScope.of(context).unfocus(),
+          child: SafeArea(
+            bottom: false,
+            child: CustomScrollView(
+              slivers: [
+                const SliverToBoxAdapter(child: _BrandHeader()),
+                SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: Container(
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.vertical(
+                        top: Radius.circular(28),
+                      ),
                     ),
-                  ),
-                  padding: const EdgeInsets.fromLTRB(24, 28, 24, 24),
-                  child: AutofillGroup(
-                    child: Form(
-                      key: _formKey,
-                      autovalidateMode: _submitted
-                          ? AutovalidateMode.onUserInteraction
-                          : AutovalidateMode.disabled,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Text(
-                            'Connexion',
-                            style: textTheme.headlineSmall?.copyWith(
-                              fontWeight: FontWeight.w800,
+                    padding: const EdgeInsets.fromLTRB(24, 28, 24, 24),
+                    child: AutofillGroup(
+                      child: Form(
+                        key: _formKey,
+                        autovalidateMode: _submitted
+                            ? AutovalidateMode.onUserInteraction
+                            : AutovalidateMode.disabled,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Text(
+                              'Connexion',
+                              style: textTheme.headlineSmall?.copyWith(
+                                fontWeight: FontWeight.w800,
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Heureux de vous revoir !',
-                            style: textTheme.bodyMedium?.copyWith(
-                              color: mutedText,
+                            const SizedBox(height: 4),
+                            Text(
+                              'Heureux de vous revoir !',
+                              style: textTheme.bodyMedium?.copyWith(
+                                color: mutedText,
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 24),
-                          PhoneField(controller: _phone, enabled: !busy),
-                          const SizedBox(height: 16),
-                          PasswordField(
-                            controller: _password,
-                            enabled: !busy,
-                            onSubmitted: _submit,
-                          ),
-                          if (_error != null) ...[
+                            const SizedBox(height: 24),
+                            PhoneField(controller: _phone, enabled: !busy),
                             const SizedBox(height: 16),
-                            AuthErrorBanner(_error!),
-                          ],
-                          const SizedBox(height: 24),
-                          AuthSubmitButton(
-                            label: 'Se connecter',
-                            busy: busy,
-                            onPressed: _submit,
-                          ),
-                          const SizedBox(height: 24),
-                          const _OrDivider(),
-                          const SizedBox(height: 16),
-                          OutlinedButton(
-                            onPressed: busy
-                                ? null
-                                : () => Navigator.of(context).push(
-                                    MaterialPageRoute(
-                                      builder: (_) => const RegisterScreen(),
+                            PasswordField(
+                              controller: _password,
+                              enabled: !busy,
+                              onSubmitted: _submit,
+                            ),
+                            if (_error != null) ...[
+                              const SizedBox(height: 16),
+                              AuthErrorBanner(_error!),
+                            ],
+                            const SizedBox(height: 24),
+                            AuthSubmitButton(
+                              label: 'Se connecter',
+                              busy: busy,
+                              onPressed: _submit,
+                            ),
+                            const SizedBox(height: 24),
+                            const _OrDivider(),
+                            const SizedBox(height: 16),
+                            OutlinedButton(
+                              onPressed: busy
+                                  ? null
+                                  : () => Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                        builder: (_) => const RegisterScreen(),
+                                      ),
                                     ),
-                                  ),
-                            child: const Text('Créer un compte'),
-                          ),
-                          const Spacer(),
-                          const SizedBox(height: 24),
-                          const _CourierNote(),
-                        ],
+                              child: const Text('Créer un compte'),
+                            ),
+                            const Spacer(),
+                            const SizedBox(height: 24),
+                            const _CourierNote(),
+                          ],
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -142,33 +145,15 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 }
 
-/// The monogram, name and tagline, as on the splash screen.
+/// The logo, as on the splash screen.
 class _BrandHeader extends StatelessWidget {
   const _BrandHeader();
 
   @override
   Widget build(BuildContext context) {
     return const Padding(
-      padding: EdgeInsets.fromLTRB(24, 36, 24, 32),
-      child: Column(
-        children: [
-          SplashMonogram(),
-          SizedBox(height: 14),
-          Text(
-            'Delivery Hassen',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 20,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          SizedBox(height: 4),
-          Text(
-            'Aussi rapide que votre pensée',
-            style: TextStyle(color: Color(0xFF9AA5B6), fontSize: 13),
-          ),
-        ],
-      ),
+      padding: EdgeInsets.fromLTRB(24, 28, 24, 30),
+      child: BrandLogo(width: 150),
     );
   }
 }

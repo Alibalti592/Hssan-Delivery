@@ -34,26 +34,74 @@ class OrdersRepository {
     String? note,
     double? deliveryLatitude,
     double? deliveryLongitude,
+    String? promoCode,
   }) async {
-    final body = await _api.post('/api/orders', {
-      'deliveryLatitude': ?deliveryLatitude,
-      'deliveryLongitude': ?deliveryLongitude,
-      'restaurantId': restaurantId,
-      'items': items
-          .map(
-            (l) => {
-              'productId': l.product.id,
-              'quantity': l.quantity,
-              if (l.option != null) 'option': l.option!.name,
-            },
-          )
-          .toList(growable: false),
-      'deliveryAddress': deliveryAddress,
-      'deliveryZoneId': deliveryZoneId,
-      if (note != null && note.isNotEmpty) 'note': note,
-    });
+    final body = await _api.post(
+      '/api/orders',
+      _orderBody(
+        restaurantId: restaurantId,
+        items: items,
+        deliveryAddress: deliveryAddress,
+        deliveryZoneId: deliveryZoneId,
+        note: note,
+        deliveryLatitude: deliveryLatitude,
+        deliveryLongitude: deliveryLongitude,
+        promoCode: promoCode,
+      ),
+    );
     return ClientOrder.fromJson(body as Map<String, dynamic>);
   }
+
+  /// What [createOrder] would charge, promotion included, without placing
+  /// the order. Throws the same ApiException (e.g. a wrong promo code).
+  Future<OrderQuote> quoteOrder({
+    required int restaurantId,
+    required List<CartLine> items,
+    required int deliveryZoneId,
+    String? promoCode,
+  }) async {
+    final body = await _api.post(
+      '/api/orders/quote',
+      _orderBody(
+        restaurantId: restaurantId,
+        items: items,
+        // Not priced; the endpoint only needs it to be there.
+        deliveryAddress: '-',
+        deliveryZoneId: deliveryZoneId,
+        promoCode: promoCode,
+      ),
+    );
+    return OrderQuote.fromJson(body as Map<String, dynamic>);
+  }
+
+  Map<String, dynamic> _orderBody({
+    required int restaurantId,
+    required List<CartLine> items,
+    required String deliveryAddress,
+    required int deliveryZoneId,
+    String? note,
+    double? deliveryLatitude,
+    double? deliveryLongitude,
+    String? promoCode,
+  }) => {
+    'deliveryLatitude': ?deliveryLatitude,
+    'deliveryLongitude': ?deliveryLongitude,
+    'restaurantId': restaurantId,
+    'items': items
+        .map(
+          (l) => {
+            'productId': l.product.id,
+            'quantity': l.quantity,
+            if (l.option != null) 'option': l.option!.name,
+          },
+        )
+        .toList(growable: false),
+    'deliveryAddress': deliveryAddress,
+    'deliveryZoneId': deliveryZoneId,
+    if (note != null && note.isNotEmpty) 'note': note,
+    if (promoCode != null && promoCode.trim().isNotEmpty)
+      'promoCode': promoCode.trim(),
+  };
 
   Future<ClientOrder> createParcelOrder({
     required String pickupAddress,

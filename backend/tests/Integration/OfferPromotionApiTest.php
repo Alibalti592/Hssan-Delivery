@@ -20,6 +20,8 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
  */
 final class OfferPromotionApiTest extends WebTestCase
 {
+    use SwitchesOffItsPromotions;
+
     private EntityManagerInterface $entityManager;
     private KernelBrowser $client;
     private string $adminToken;

@@ -308,6 +308,13 @@ export default function PromotionFormPage() {
                   onChange={(e) => setPromoCode(e.target.value)}
                   placeholder="SUMMER10"
                 />
+                <span className="rmeta">
+                  {promoCode.trim()
+                    ? 'Applies when the customer types this code at checkout (any case).'
+                    : 'No code: applies by itself to every order from the restaurant below (or from all restaurants).'}{' '}
+                  Taken off the items only, not the delivery fee or offers. One promotion per order: the customer gets
+                  the best one.
+                </span>
               </div>
             )}
             <div className="field-group">

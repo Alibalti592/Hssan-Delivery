@@ -227,7 +227,18 @@ void main() {
         'assez-long',
       );
       await tester.tap(find.text('Créer mon compte'));
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+
+      // The creation screen, steps ticking off, then the welcome.
+      expect(
+        find.text('Votre compte est en cours de création'),
+        findsOneWidget,
+      );
+      expect(find.text('Vérification de votre numéro…'), findsOneWidget);
+      for (var i = 0; i < 8; i++) {
+        await tester.pump(const Duration(milliseconds: 500));
+      }
 
       expect(registered, {
         'name': 'Sami Ben Ali',
@@ -235,6 +246,64 @@ void main() {
         'password': 'assez-long',
       });
       expect(auth.status, AuthStatus.signedIn);
+      expect(find.text('Bienvenue, Sami !'), findsOneWidget);
+      expect(
+        find.text('Votre compte est prêt. Bonne commande !'),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.text("C'EST PARTI"));
+      await tester.pumpAndSettle();
+      expect(find.text('Bienvenue, Sami !'), findsNothing);
+    });
+
+    testWidgets('a number already registered comes back to the form, '
+        'with the reason', (tester) async {
+      final auth = await _controllerWith(
+        MockClient((request) async {
+          if (request.url.path == '/api/auth/register') {
+            return jsonResponse({'message': 'Déjà pris'}, 409);
+          }
+          return jsonResponse({'message': 'unexpected'}, 404);
+        }),
+      );
+
+      await tester.pumpWidget(_pumpableApp(auth));
+      await tester.tap(find.text('Créer un compte'));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Nom et prénom'),
+        'Sami Ben Ali',
+      );
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Numéro de téléphone'),
+        '22123456',
+      );
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Mot de passe'),
+        'assez-long',
+      );
+      await tester.tap(find.text('Créer mon compte'));
+      await tester.pump();
+      for (var i = 0; i < 8; i++) {
+        await tester.pump(const Duration(milliseconds: 500));
+      }
+
+      expect(find.text("Le compte n'a pas pu être créé"), findsOneWidget);
+      expect(
+        find.text('Un compte existe déjà avec ce numéro.'),
+        findsOneWidget,
+      );
+      expect(auth.status, isNot(AuthStatus.signedIn));
+
+      await tester.tap(find.text('MODIFIER MES INFORMATIONS'));
+      await tester.pumpAndSettle();
+      // Back on the form, which keeps what was typed and shows why.
+      expect(find.text('Créer mon compte'), findsOneWidget);
+      expect(
+        find.text('Un compte existe déjà avec ce numéro.'),
+        findsOneWidget,
+      );
     });
   });
 }

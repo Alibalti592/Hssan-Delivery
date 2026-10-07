@@ -32,6 +32,7 @@ final class OrderService
         private readonly DeliveryZoneRepository $deliveryZoneRepository,
         private readonly DeliveryService $deliveryService,
         private readonly PromotionRepository $promotionRepository,
+        private readonly PromotionPricing $promotionPricing,
     ) {
     }
 
@@ -39,6 +40,38 @@ final class OrderService
         CreateOrderRequest $dto,
         User $user,
     ): Order {
+        $order = $this->priceOrder($dto, $user);
+
+        $delivery = new Delivery();
+
+        $delivery->setOrder($order);
+        $delivery->setStatus(DeliveryStatus::PENDING);
+
+        $order->setDelivery($delivery);
+
+        $this->entityManager->persist($delivery);
+
+        $this->entityManager->persist($order);
+        $this->entityManager->flush();
+
+        return $order;
+    }
+
+    /**
+     * What createOrder would charge, without placing anything: the checkout
+     * screen shows it as the client picks an address or types a code.
+     */
+    public function quoteOrder(CreateOrderRequest $dto, User $user): Order
+    {
+        return $this->priceOrder($dto, $user);
+    }
+
+    /**
+     * Checks the cart and prices it, discount included, as an Order not yet
+     * saved.
+     */
+    private function priceOrder(CreateOrderRequest $dto, User $user): Order
+    {
         $restaurant = $this->restaurantRepository->find($dto->restaurantId);
 
         if (null === $restaurant) {
@@ -67,6 +100,9 @@ final class OrderService
         $order->setDeliveryType($restaurant->getType()->toDeliveryType());
 
         $totalMillimes = 0;
+        // What a promotion may take off: not the fixed-price offers, which
+        // are already discounted.
+        $discountableMillimes = 0;
 
         foreach ($dto->items as $itemDto) {
             $product = $this->productRepository->find($itemDto->productId);
@@ -122,6 +158,10 @@ final class OrderService
 
             $totalMillimes += $itemTotalMillimes;
 
+            if (null === $offer) {
+                $discountableMillimes += $itemTotalMillimes;
+            }
+
             $orderItem = new OrderItem();
 
             $orderItem->setProduct($product);
@@ -136,25 +176,26 @@ final class OrderService
             throw new InvalidOperationException('Votre commande est vide.');
         }
 
+        $discount = $this->promotionPricing->bestDiscount(
+            $restaurant,
+            $discountableMillimes,
+            $dto->promoCode,
+            new \DateTimeImmutable(),
+        );
+        $discountMillimes = $discount['millimes'] ?? 0;
+
+        if (null !== $discount) {
+            $order->applyDiscount($discount['promotion'], Money::fromMillimes($discountMillimes));
+        }
+
         $deliveryFeeMillimes = Money::toMillimes($deliveryZone->getFee());
 
         $order->setDeliveryFee(
             Money::fromMillimes($deliveryFeeMillimes)
         );
         $order->setTotalAmount(
-            Money::fromMillimes($totalMillimes + $deliveryFeeMillimes)
+            Money::fromMillimes($totalMillimes - $discountMillimes + $deliveryFeeMillimes)
         );
-        $delivery = new Delivery();
-
-        $delivery->setOrder($order);
-        $delivery->setStatus(DeliveryStatus::PENDING);
-
-        $order->setDelivery($delivery);
-
-        $this->entityManager->persist($delivery);
-
-        $this->entityManager->persist($order);
-        $this->entityManager->flush();
 
         return $order;
     }

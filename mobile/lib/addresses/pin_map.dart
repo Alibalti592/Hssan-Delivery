@@ -12,12 +12,14 @@ import '../theme.dart';
 const defaultMapCenter = LatLng(37.2744, 9.8739);
 
 /// An OpenStreetMap map with a pin fixed at its centre: the client drags
-/// the map until the pin sits on their door, and [onMoved] reports where it
-/// points. "Ma position" jumps to the phone's GPS fix.
+/// the map, or taps where their door is, and [onMoved] reports where the
+/// pin points; [onSettled] once it comes to rest there. "Ma position" jumps
+/// to the phone's GPS fix.
 class PinMap extends StatefulWidget {
   const PinMap({
     required this.initial,
     required this.onMoved,
+    this.onSettled,
     this.locateOnStart = false,
     this.height = 280,
     super.key,
@@ -25,6 +27,10 @@ class PinMap extends StatefulWidget {
 
   final LatLng initial;
   final ValueChanged<LatLng> onMoved;
+
+  /// The pin came to rest: a drag or fling ended, the map was tapped, or
+  /// "Ma position" found the phone. Not called for the starting point.
+  final ValueChanged<LatLng>? onSettled;
 
   /// Jump to the GPS fix as soon as the map opens (a new address).
   final bool locateOnStart;
@@ -77,6 +83,7 @@ class _PinMapState extends State<PinMap> {
       final point = LatLng(position.latitude, position.longitude);
       _controller.move(point, 17);
       widget.onMoved(point);
+      widget.onSettled?.call(point);
     } finally {
       if (mounted) setState(() => _locating = false);
     }
@@ -127,10 +134,17 @@ class _PinMapState extends State<PinMap> {
                 }
                 widget.onMoved(camera.center);
               },
+              // A tap puts the pin there.
+              onTap: (_, point) {
+                _controller.move(point, _controller.camera.zoom);
+                widget.onMoved(point);
+                widget.onSettled?.call(point);
+              },
               onMapEvent: (event) {
                 if (event is MapEventMoveEnd ||
                     event is MapEventFlingAnimationEnd) {
                   if (_dragging) setState(() => _dragging = false);
+                  widget.onSettled?.call(event.camera.center);
                 }
               },
             ),
@@ -183,7 +197,7 @@ class _PinMapState extends State<PinMap> {
                 ],
               ),
               child: const Text(
-                'Déplacez la carte pour placer le repère',
+                'Touchez ou déplacez la carte',
                 style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
               ),
             ),

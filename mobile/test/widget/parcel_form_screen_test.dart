@@ -34,19 +34,10 @@ final _home = SavedAddress(
   longitude: 9.87,
 );
 
-/// A saved address the sheet offers for the drop-off.
-Map<String, dynamic> _samiAddress() => {
-  'id': 8,
-  'label': 'Chez Sami',
-  'addressLine': '2 Avenue Habib Bourguiba',
-  'instructions': 'Porte bleue',
-  'isDefault': false,
-  'deliveryZoneId': 2,
-  'deliveryZoneName': 'Corniche',
-  'deliveryZoneFee': '6.000',
-  'latitude': 37.29,
-  'longitude': 9.86,
-};
+List<Map<String, dynamic>> _zones() => [
+  {'id': 1, 'name': 'Centre-ville', 'fee': '5.000'},
+  {'id': 2, 'name': 'Corniche', 'fee': '6.000'},
+];
 
 Map<String, dynamic> _parcelOrder() => {
   'id': 42,
@@ -90,13 +81,13 @@ Widget _app(MockClient mock, {SavedAddress? current}) {
 
 void main() {
   testWidgets(
-    'collects at the current address, delivers to one picked in the sheet',
+    "collects at the sender's address, delivers to the address typed in",
     (tester) async {
       _useTallViewport(tester);
       Map<String, dynamic>? posted;
       final mock = MockClient((request) async {
-        if (request.url.path == '/api/addresses') {
-          return jsonResponse([_samiAddress()]);
+        if (request.url.path == '/api/delivery-zones') {
+          return jsonResponse(_zones());
         }
         posted = jsonDecode(request.body) as Map<String, dynamic>;
         return jsonResponse(_parcelOrder(), 201);
@@ -107,16 +98,8 @@ void main() {
 
       // Pickup is pre-filled from "LIVRER À".
       expect(find.text('Maison'), findsOneWidget);
-
-      await tester.tap(find.text("Choisir l'adresse de livraison"));
-      await tester.pumpAndSettle();
-      expect(find.text('Nouvelle adresse'), findsOneWidget);
-      await tester.tap(find.text('Chez Sami'));
-      await tester.pumpAndSettle();
-
-      // Its zone comes with it: no zone dropdown to fill.
-      expect(find.text('Corniche · 6.000 DT'), findsOneWidget);
-      expect(find.text('Zone de livraison'), findsNothing);
+      // The recipient's address is typed, not picked from the sender's own.
+      expect(find.text("Choisir l'adresse de livraison"), findsNothing);
 
       await tester.enterText(
         find.widgetWithText(TextFormField, 'Nom du destinataire'),
@@ -126,6 +109,14 @@ void main() {
         find.widgetWithText(TextFormField, 'Téléphone du destinataire'),
         '22000000',
       );
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Adresse du destinataire'),
+        '  2 Avenue Habib Bourguiba — Porte bleue ',
+      );
+      await tester.tap(find.text('Zone de livraison'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Corniche — 6.000 DT').last);
+      await tester.pumpAndSettle();
 
       await tester.tap(find.text('ENVOYER LE COLIS'));
       await tester.pumpAndSettle();
@@ -133,8 +124,6 @@ void main() {
       expect(posted, {
         'pickupLatitude': 37.27,
         'pickupLongitude': 9.87,
-        'deliveryLatitude': 37.29,
-        'deliveryLongitude': 9.86,
         'pickupAddress': '1 Rue de la Paix',
         'deliveryAddress': '2 Avenue Habib Bourguiba — Porte bleue',
         'recipientName': 'Sami Client',
@@ -151,6 +140,9 @@ void main() {
   ) async {
     _useTallViewport(tester);
     final mock = MockClient((request) async {
+      if (request.url.path == '/api/delivery-zones') {
+        return jsonResponse(_zones());
+      }
       fail('should not submit when the form is invalid');
     });
 
@@ -160,7 +152,9 @@ void main() {
     await tester.tap(find.text('ENVOYER LE COLIS'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Choisissez une adresse'), findsNWidgets(2));
+    expect(find.text('Choisissez une adresse'), findsOneWidget);
     expect(find.text('Nom requis'), findsOneWidget);
+    expect(find.text('Adresse requise'), findsOneWidget);
+    expect(find.text('Choisissez la zone de livraison'), findsOneWidget);
   });
 }

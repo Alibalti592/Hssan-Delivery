@@ -80,6 +80,8 @@ class ClientOrder {
     required this.deliveryStatus,
     required this.courierName,
     required this.courierPhone,
+    this.discountAmount = '0.000',
+    this.promotionTitle,
     this.bill,
     this.pickupLatitude,
     this.pickupLongitude,
@@ -115,6 +117,12 @@ class ClientOrder {
   final DeliveryStatus? deliveryStatus;
   final String? courierName;
   final String? courierPhone;
+
+  /// Taken off the items by a promotion ("0.000" without), and its name.
+  final String discountAmount;
+  final String? promotionTitle;
+
+  bool get hasDiscount => (double.tryParse(discountAmount) ?? 0) > 0;
 
   /// Set only for a Factures order — the bill (or mandat) the courier pays.
   final BillInfo? bill;
@@ -198,6 +206,8 @@ class ClientOrder {
           : null,
       courierName: json['courierName'] as String?,
       courierPhone: json['courierPhone'] as String?,
+      discountAmount: json['discountAmount'] as String? ?? '0.000',
+      promotionTitle: json['promotionTitle'] as String?,
       bill: BillInfo.fromJson(json['bill']),
       pickupLatitude: (json['pickupLatitude'] as num?)?.toDouble(),
       pickupLongitude: (json['pickupLongitude'] as num?)?.toDouble(),
@@ -228,6 +238,40 @@ class DeliveryZoneOption {
       id: json['id'] as int,
       name: json['name'] as String? ?? '',
       fee: json['fee'] as String? ?? '0.000',
+    );
+  }
+}
+
+/// The checkout's total for a cart, as the backend would charge it.
+class OrderQuote {
+  const OrderQuote({
+    required this.subtotal,
+    required this.discountAmount,
+    required this.deliveryFee,
+    required this.totalAmount,
+    this.promotionTitle,
+    this.promoCode,
+  });
+
+  final String subtotal;
+  final String discountAmount;
+  final String deliveryFee;
+  final String totalAmount;
+
+  /// The promotion that applies, if any, and its code when it has one.
+  final String? promotionTitle;
+  final String? promoCode;
+
+  bool get hasDiscount => (double.tryParse(discountAmount) ?? 0) > 0;
+
+  factory OrderQuote.fromJson(Map<String, dynamic> json) {
+    return OrderQuote(
+      subtotal: json['subtotal'] as String? ?? '0.000',
+      discountAmount: json['discountAmount'] as String? ?? '0.000',
+      deliveryFee: json['deliveryFee'] as String? ?? '0.000',
+      totalAmount: json['totalAmount'] as String? ?? '0.000',
+      promotionTitle: json['promotionTitle'] as String?,
+      promoCode: json['promoCode'] as String?,
     );
   }
 }

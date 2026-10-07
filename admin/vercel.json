@@ -1,3 +1,8 @@
 {
-  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+  "buildCommand": "VITE_API_URL=/ npm run build",
+  "rewrites": [
+    { "source": "/api/:path*", "destination": "https://hssan-delivery-production.up.railway.app/api/:path*" },
+    { "source": "/uploads/:path*", "destination": "https://hssan-delivery-production.up.railway.app/uploads/:path*" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
 }

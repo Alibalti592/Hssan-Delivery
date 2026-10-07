@@ -1,6 +1,7 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { useDispatchAlert, useDispatchSound } from './dispatch';
+import monogramUrl from '../assets/monogram.svg';
 
 const NAV_ITEMS = [
   { to: '/', label: 'Dashboard', end: true },
@@ -29,8 +30,11 @@ export default function Layout() {
     <div className="app-shell">
       <div className="side">
         <div className="sbrand">
-          Delivery Hassen
-          <span>Admin</span>
+          <img className="monogram" src={monogramUrl} alt="" aria-hidden="true" />
+          <div className="brand-name">
+            Delivery Hassen
+            <span>Admin</span>
+          </div>
         </div>
         <nav className="snav">
           {NAV_ITEMS.map((item) => (

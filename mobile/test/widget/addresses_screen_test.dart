@@ -107,10 +107,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Nouvelle adresse'), findsOneWidget);
-    expect(
-      find.text('Déplacez la carte pour placer le repère'),
-      findsOneWidget,
-    );
+    expect(find.text('Touchez ou déplacez la carte'), findsOneWidget);
 
     await tester.tap(find.text('Travail'));
     await tester.enterText(

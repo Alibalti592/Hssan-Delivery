@@ -54,13 +54,21 @@ flutter:
           weight: 700
         - asset: assets/fonts/Roboto-ExtraBold.ttf
           weight: 800
+    # The logo's name and tagline (lib/widgets/brand_logo.dart). SIL Open
+    # Font License, see assets/fonts/OFL-Poppins.txt.
+    - family: Poppins
+      fonts:
+        - asset: assets/fonts/Poppins-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Poppins-SemiBold.ttf
+          weight: 600
 
 # Native launcher icon, regenerated with `dart run flutter_launcher_icons`.
-# The plain italic "DH" of SplashMonogram (lib/onboarding/splash_screen.dart)
-# on black. Android gets an adaptive icon (black background + the monogram
-# as foreground, inside the safe zone); everything else gets the flat
-# square. Both images are rendered from SplashMonogram itself so the icon,
-# launch screen and loading screen share one glyph:
+# The chrome "DH" of BrandMonogram (lib/widgets/brand_monogram.dart) on
+# black. Android gets an adaptive icon (black background + the monogram as
+# foreground, inside the safe zone); everything else gets the flat square.
+# Both images are rendered from BrandMonogram itself (tool/
+# render_brand_assets.dart) so the icon, launch screen and app share it:
 # assets/icon/app_icon.png (1024x1024, no transparency) and
 # assets/icon/app_icon_foreground.png (1024x1024, transparent).
 flutter_launcher_icons:
@@ -79,7 +87,7 @@ flutter_launcher_icons:
 # (shown at 288dp, content inside the central 192dp circle) and the 4x
 # flutter_native_splash assumes elsewhere. SplashScreen draws the monogram
 # at the exact screen center too, so it doesn't move on the hand-off --
-# re-render the image whenever SplashMonogram changes. No separate dark-mode
+# re-render the image whenever BrandMonogram changes. No separate dark-mode
 # assets: the brand background is already black.
 flutter_native_splash:
   color: "#000000"

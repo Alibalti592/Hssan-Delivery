@@ -15,6 +15,8 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 final class AdminPromotionApiTest extends WebTestCase
 {
+    use SwitchesOffItsPromotions;
+
     private EntityManagerInterface $entityManager;
 
     public function testAdminCanCreatePromotion(): void

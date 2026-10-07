@@ -24,6 +24,8 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 final class AdminRestaurantApiTest extends WebTestCase
 {
+    use SwitchesOffItsPromotions;
+
     private EntityManagerInterface $entityManager;
 
     public function testAdminCanCreateRestaurant(): void
