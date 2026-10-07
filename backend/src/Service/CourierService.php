@@ -6,15 +6,14 @@ use App\Entity\User;
 use App\Pagination\PaginatedResult;
 use App\Repository\UserRepository;
 use Doctrine\ORM\EntityManagerInterface;
-use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 final class CourierService
 {
     public function __construct(
         private readonly EntityManagerInterface $entityManager,
         private readonly UserRepository $userRepository,
-        private readonly UserPasswordHasherInterface $passwordHasher,
         private readonly RefreshTokenService $refreshTokens,
+        private readonly PasswordResetService $passwordReset,
     ) {
     }
 
@@ -72,15 +71,6 @@ final class CourierService
      */
     public function resetPassword(User $courier, string $newPassword): User
     {
-        $courier->setPassword(
-            $this->passwordHasher->hashPassword($courier, $newPassword)
-        );
-
-        $this->entityManager->flush();
-
-        // Whoever was signed in with the old password is signed out.
-        $this->refreshTokens->revokeAll($courier);
-
-        return $courier;
+        return $this->passwordReset->reset($courier, $newPassword);
     }
 }

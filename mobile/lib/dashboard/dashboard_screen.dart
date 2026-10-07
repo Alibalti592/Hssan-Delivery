@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../core/support.dart';
 import '../auth/auth_controller.dart';
 import '../auth/change_password_screen.dart';
 import '../deliveries/available_deliveries_screen.dart';
@@ -144,6 +145,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   switch (action) {
                     case _MenuAction.changePassword:
                       _openChangePassword();
+                    case _MenuAction.help:
+                      showSupportSheet(context);
                     case _MenuAction.signOut:
                       _confirmSignOut();
                   }
@@ -152,6 +155,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   PopupMenuItem(
                     value: _MenuAction.changePassword,
                     child: Text('Changer le mot de passe'),
+                  ),
+                  PopupMenuItem(
+                    value: _MenuAction.help,
+                    child: Text('Aide / Contact'),
                   ),
                   PopupMenuItem(
                     value: _MenuAction.signOut,
@@ -376,4 +383,4 @@ class _InProgressCard extends StatelessWidget {
   }
 }
 
-enum _MenuAction { changePassword, signOut }
+enum _MenuAction { changePassword, help, signOut }
