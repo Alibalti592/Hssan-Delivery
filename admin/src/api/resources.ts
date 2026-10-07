@@ -139,6 +139,20 @@ export const couriersApi = {
     api.patch<Courier>(`/api/admin/couriers/${id}/password`, { password }),
 };
 
+// "Mot de passe oublié": a client or courier asks support on WhatsApp, the
+// admin sets a new password for their phone number and sends it back.
+export interface PasswordResetResult {
+  id: number;
+  name: string;
+  phone: string;
+  role: 'CLIENT' | 'COURIER';
+}
+
+export const usersApi = {
+  resetPassword: (phone: string, password: string) =>
+    api.patch<PasswordResetResult>('/api/admin/users/password', { phone, password }),
+};
+
 // Promotions
 export interface PromotionPayload {
   title: string;

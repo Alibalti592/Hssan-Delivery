@@ -20,6 +20,7 @@ import PromotionsListPage from './pages/promotions/PromotionsListPage';
 import PromotionFormPage from './pages/promotions/PromotionFormPage';
 import CourierMapPage from './pages/courier-map/CourierMapPage';
 import ChangePasswordPage from './pages/account/ChangePasswordPage';
+import PasswordResetPage from './pages/users/PasswordResetPage';
 import BillProvidersPage from './pages/bill-providers/BillProvidersPage';
 
 export default function App() {
@@ -63,6 +64,7 @@ export default function App() {
 
         <Route path="courier-map" element={<CourierMapPage />} />
 
+        <Route path="password-reset" element={<PasswordResetPage />} />
         <Route path="account/password" element={<ChangePasswordPage />} />
 
         <Route path="*" element={<Navigate to="/" replace />} />

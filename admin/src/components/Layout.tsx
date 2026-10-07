@@ -13,6 +13,7 @@ const NAV_ITEMS = [
   { to: '/promotions', label: 'Promotions' },
   { to: '/bill-providers', label: 'Bill Providers' },
   { to: '/courier-map', label: 'Courier Map' },
+  { to: '/password-reset', label: 'Password Reset' },
 ];
 
 export default function Layout() {
