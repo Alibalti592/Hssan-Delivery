@@ -11,6 +11,7 @@ use App\Entity\Product;
 use App\Entity\Restaurant;
 use App\Entity\User;
 use App\Enum\DeliveryStatus;
+use App\Event\DeliveryStatusChangedEvent;
 use App\Enum\OrderStatus;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
@@ -1287,6 +1288,51 @@ final class DeliveryApiTest extends WebTestCase
         $freedCourier = $this->entityManager->getRepository(User::class)->find($courier->getId());
 
         self::assertNotNull($freedCourier);
+    }
+
+    public function testReassigningADeliveryNotYetAcceptedTellsBothCouriers(): void
+    {
+        $client = static::createClient();
+        // Keep the listener below across requests.
+        $client->disableReboot();
+
+        $this->entityManager = self::getContainer()
+            ->get(EntityManagerInterface::class);
+
+        $events = [];
+        self::getContainer()->get('event_dispatcher')->addListener(
+            DeliveryStatusChangedEvent::class,
+            static function (DeliveryStatusChangedEvent $event) use (&$events): void {
+                $events[] = $event;
+            }
+        );
+
+        $admin = $this->createTestUser('ROLE_ADMIN', 'Test Admin');
+        $courier = $this->createTestUser('ROLE_LIVREUR', 'Silent Courier');
+        $otherCourier = $this->createTestUser('ROLE_LIVREUR', 'Rescue Courier');
+        $delivery = $this->createTestDelivery();
+
+        $adminToken = $this->authenticateClient($client, $admin);
+
+        foreach (['assign' => $courier, 'reassign' => $otherCourier] as $action => $to) {
+            $client->request(
+                'POST',
+                sprintf('/api/deliveries/%d/%s/%d', $delivery->getId(), $action, $to->getId()),
+                server: [
+                    'CONTENT_TYPE' => 'application/json',
+                    'HTTP_AUTHORIZATION' => 'Bearer ' . $adminToken,
+                ]
+            );
+
+            self::assertResponseStatusCodeSame(Response::HTTP_OK);
+        }
+
+        // The first courier never accepted: still ASSIGNED, but to someone
+        // else — which must reach the notification listener like any change.
+        self::assertCount(2, $events);
+        self::assertSame(DeliveryStatus::ASSIGNED, $events[1]->delivery->getStatus());
+        self::assertSame($otherCourier->getId(), $events[1]->delivery->getCourier()?->getId());
+        self::assertSame($courier->getId(), $events[1]->previousCourier?->getId());
     }
 
     public function testAdminCannotReassignPendingDelivery(): void

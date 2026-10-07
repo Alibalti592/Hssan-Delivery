@@ -121,7 +121,11 @@ class _HssanDeliveryAppState extends State<HssanDeliveryApp> {
       // actually what the user sees instead of a stranded pushed screen.
       onSessionEnded: () {
         _navigatorKey.currentState?.popUntil((route) => route.isFirst);
+        // Nothing of this account carries over to the next one on this
+        // phone: its address, cart, or a courier's deliveries.
         _selectedAddress.clear();
+        _cart.clear();
+        _deliveries.clear();
       },
     );
     _deliveries = DeliveriesController(DeliveryRepository(_api));

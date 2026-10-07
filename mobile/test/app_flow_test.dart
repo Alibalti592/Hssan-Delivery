@@ -1222,5 +1222,53 @@ void main() {
 
       expect(calls.length, countWhileActive);
     });
+
+    test('signing out clears the deliveries and stops reporting', () async {
+      final calls = <Map<String, dynamic>>[];
+      final mock = MockClient((request) async {
+        if (request.url.path == '/api/deliveries/mine') {
+          return _json(
+            _pagedBody([
+              {
+                'id': 1,
+                'status': 'ON_THE_WAY',
+                'courierId': 3,
+                'order': {'id': 10, 'status': 'READY_FOR_PICKUP', 'items': []},
+              },
+            ]),
+          );
+        }
+        calls.add(jsonDecode(request.body) as Map<String, dynamic>);
+        return http.Response('', 204);
+      });
+
+      final api = ApiClient(
+        tokenProvider: () => 'jwt',
+        onUnauthorized: () {},
+        httpClient: mock,
+      );
+      final deliveries = DeliveriesController(DeliveryRepository(api));
+      final service = CourierLocationService(
+        CourierLocationRepository(api),
+        deliveries,
+        interval: const Duration(milliseconds: 20),
+        ensurePermission: () async => true,
+        getPosition: () async => fakePosition(36.8, 10.18),
+      );
+      addTearDown(service.dispose);
+
+      await deliveries.refresh();
+      await Future<void>.delayed(const Duration(milliseconds: 70));
+      expect(calls, isNotEmpty);
+
+      // What main.dart does when the session ends.
+      deliveries.clear();
+      final countAtSignOut = calls.length;
+      await Future<void>.delayed(const Duration(milliseconds: 70));
+
+      expect(deliveries.deliveries, isEmpty);
+      expect(deliveries.loadedOnce, isFalse);
+      expect(calls.length, countAtSignOut);
+    });
   });
 }

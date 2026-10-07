@@ -35,6 +35,21 @@ class DeliveriesController extends ChangeNotifier {
   List<Delivery> get history =>
       _deliveries.where((d) => d.status.isTerminal).toList(growable: false);
 
+  /// Forgets everything when the session ends, so the next account on this
+  /// phone never sees these deliveries — and GPS reporting, which follows
+  /// [active], stops.
+  void clear() {
+    _deliveries = const [];
+    _loading = false;
+    _loadedOnce = false;
+    _loadingMoreHistory = false;
+    _error = null;
+    _actingOnId = null;
+    _page = 1;
+    _pages = 1;
+    notifyListeners();
+  }
+
   /// [silent]: an automatic refresh (timer, push) that updates the list in
   /// place without a spinner, and keeps what's shown if it fails.
   Future<void> refresh({bool silent = false}) async {

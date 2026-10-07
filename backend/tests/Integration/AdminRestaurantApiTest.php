@@ -491,7 +491,7 @@ final class AdminRestaurantApiTest extends WebTestCase
     /**
      * Deleting a restaurant is permanent and takes its order history with
      * it: orders, their items and deliveries are removed too. Another
-     * restaurant's orders must not be touched.
+     * restaurant's orders — even one in progress — must not be touched.
      */
     public function testDeletingRestaurantAlsoDeletesItsOrders(): void
     {
@@ -509,7 +509,7 @@ final class AdminRestaurantApiTest extends WebTestCase
         $this->entityManager->persist($deliveryZone);
 
         $doomed = $this->createRestaurantWithOrder('Restaurant With Orders', $clientUser, $deliveryZone);
-        $kept = $this->createRestaurantWithOrder('Other Restaurant', $clientUser, $deliveryZone);
+        $kept = $this->createRestaurantWithOrder('Other Restaurant', $clientUser, $deliveryZone, DeliveryStatus::ON_THE_WAY);
 
         $this->entityManager->flush();
 
@@ -544,11 +544,58 @@ final class AdminRestaurantApiTest extends WebTestCase
         self::assertCount(1, $keptOrder->getItems());
     }
 
+    public function testRestaurantWithAnOrderInProgressCannotBeDeleted(): void
+    {
+        $client = static::createClient();
+
+        $this->entityManager = self::getContainer()
+            ->get(EntityManagerInterface::class);
+
+        $admin = $this->createTestUser('ROLE_ADMIN', 'Test Admin');
+        $clientUser = $this->createTestUser('ROLE_USER', 'Hungry Client');
+
+        $deliveryZone = (new DeliveryZone())
+            ->setName('Zone '.random_int(1000, 9999))
+            ->setFee('4.000');
+        $this->entityManager->persist($deliveryZone);
+
+        $busy = $this->createRestaurantWithOrder('Busy Restaurant', $clientUser, $deliveryZone, DeliveryStatus::PICKED_UP);
+        $this->entityManager->flush();
+
+        $restaurantId = $busy['restaurant']->getId();
+        $orderId = $busy['order']->getId();
+
+        $adminToken = $this->authenticateClient($client, $admin);
+
+        $client->request(
+            'DELETE',
+            '/api/admin/restaurants/'.$restaurantId,
+            server: [
+                'HTTP_AUTHORIZATION' => 'Bearer '.$adminToken,
+            ]
+        );
+
+        self::assertResponseStatusCodeSame(Response::HTTP_CONFLICT);
+        self::assertStringContainsString(
+            '1 order in progress',
+            json_decode($client->getResponse()->getContent(), true)['message']
+        );
+
+        $this->entityManager->clear();
+
+        self::assertNotNull($this->entityManager->getRepository(Restaurant::class)->find($restaurantId));
+        self::assertNotNull($this->entityManager->getRepository(Order::class)->find($orderId));
+    }
+
     /**
      * @return array{restaurant: Restaurant, order: Order}
      */
-    private function createRestaurantWithOrder(string $name, User $customer, DeliveryZone $zone): array
-    {
+    private function createRestaurantWithOrder(
+        string $name,
+        User $customer,
+        DeliveryZone $zone,
+        DeliveryStatus $status = DeliveryStatus::DELIVERED,
+    ): array {
         $restaurant = (new Restaurant())
             ->setName($name)
             ->setDescription(null)
@@ -585,8 +632,9 @@ final class AdminRestaurantApiTest extends WebTestCase
 
         $delivery = (new Delivery())
             ->setOrder($order)
-            ->setStatus(DeliveryStatus::PENDING);
+            ->setStatus($status);
         $order->setDelivery($delivery);
+        $order->setStatus($status->toOrderStatus());
 
         $this->entityManager->persist($order);
         $this->entityManager->persist($delivery);

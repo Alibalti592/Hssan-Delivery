@@ -6,8 +6,10 @@ use App\Dto\Admin\CreateRestaurantRequest;
 use App\Dto\Admin\UpdateRestaurantRequest;
 use App\Entity\Restaurant;
 use App\Enum\RestaurantType;
+use App\Exception\ConflictException;
 use App\Pagination\PaginatedResult;
 use App\Pagination\Paginator;
+use App\Repository\DeliveryRepository;
 use App\Repository\PromotionRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
@@ -19,6 +21,7 @@ final class RestaurantService
     public function __construct(
         private readonly EntityManagerInterface $entityManager,
         private readonly PromotionRepository $promotionRepository,
+        private readonly DeliveryRepository $deliveryRepository,
         private readonly PhotoUploader $photoUploader,
     ) {
     }
@@ -145,6 +148,14 @@ final class RestaurantService
      */
     public function delete(Restaurant $restaurant): void
     {
+        // Its finished orders go with it, but not one still being prepared
+        // or delivered: the client and the courier would lose it mid-way.
+        $inProgress = $this->deliveryRepository->countActiveForRestaurant($restaurant);
+
+        if ($inProgress > 0) {
+            throw new ConflictException(sprintf('This restaurant has %d order%s in progress. Wait until %s delivered or cancelled before deleting it, or mark it unavailable.', $inProgress, 1 === $inProgress ? '' : 's', 1 === $inProgress ? 'it is' : 'they are'));
+        }
+
         // Photo files are only removed once the rows are actually gone, so a
         // failed delete can't leave a restaurant with its images deleted.
         $photos = [[$restaurant->getPhotoFilename(), self::PHOTO_SUBDIRECTORY]];
