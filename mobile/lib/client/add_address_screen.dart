@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
@@ -5,6 +7,7 @@ import 'package:provider/provider.dart';
 import '../addresses/address_models.dart';
 import '../addresses/address_repository.dart';
 import '../addresses/pin_map.dart';
+import '../addresses/reverse_geocoder.dart';
 import '../core/api_exception.dart';
 import '../orders/order_models.dart';
 import '../orders/orders_repository.dart';
@@ -12,8 +15,9 @@ import '../theme.dart';
 import '../widgets/dark_header.dart';
 
 /// Adds or edits an address: a pin on the map (what the courier navigates
-/// to), a label chip, the written address, the zone that prices it and
-/// door-step hints. Pops the resulting [SavedAddress].
+/// to), a label chip, the written address — filled in from where the pin
+/// is placed — the zone that prices it and door-step hints. Pops the
+/// resulting [SavedAddress].
 ///
 /// With [allowOneOff] (picking an address for an order), the client can
 /// switch off "Enregistrer dans mes adresses" to use it just this once —
@@ -53,6 +57,16 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
   bool _saving = false;
   String? _error;
 
+  /// Filling the address in from the pin: waits for the pin to rest, and
+  /// only the latest lookup counts.
+  Timer? _lookupDelay;
+  int _lookup = 0;
+  bool _lookingUp = false;
+
+  /// What the last lookup wrote, so a new pin replaces it — but never
+  /// replaces what the client typed themselves.
+  String? _filledIn;
+
   bool get _isEditing => widget.existing != null;
 
   @override
@@ -63,10 +77,37 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
 
   @override
   void dispose() {
+    _lookupDelay?.cancel();
     _customLabel.dispose();
     _addressLine.dispose();
     _instructions.dispose();
     super.dispose();
+  }
+
+  void _pinSettled(LatLng point) {
+    _lookupDelay?.cancel();
+    _lookupDelay = Timer(
+      const Duration(milliseconds: 500),
+      () => _fillAddressAt(point),
+    );
+  }
+
+  Future<void> _fillAddressAt(LatLng point) async {
+    final typed = _addressLine.text.trim();
+    if (typed.isNotEmpty && typed != _filledIn) return;
+    final lookup = ++_lookup;
+    setState(() => _lookingUp = true);
+    final address = await ReverseGeocoder.instance.addressAt(point);
+    if (!mounted || lookup != _lookup) return;
+    setState(() {
+      _lookingUp = false;
+      // Typed while the lookup ran: theirs wins.
+      final now = _addressLine.text.trim();
+      if (address != null && (now.isEmpty || now == _filledIn)) {
+        _addressLine.text = address;
+        _filledIn = address;
+      }
+    });
   }
 
   String get _label => _labelChoice == AddressLabel.other
@@ -150,6 +191,7 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
                     // No setState: the pin is only read on save, and
                     // rebuilding the form on every map frame is wasted work.
                     onMoved: (point) => _pin = point,
+                    onSettled: _saving ? null : _pinSettled,
                   ),
                   Form(
                     key: _formKey,
@@ -217,9 +259,23 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
                             enabled: !_saving,
                             minLines: 1,
                             maxLines: 3,
-                            decoration: const InputDecoration(
+                            decoration: InputDecoration(
                               labelText: 'Adresse',
                               hintText: 'Rue, numéro, quartier',
+                              helperText: _lookingUp
+                                  ? "Recherche de l'adresse…"
+                                  : null,
+                              suffixIcon: _lookingUp
+                                  ? const Padding(
+                                      padding: EdgeInsets.all(14),
+                                      child: SizedBox.square(
+                                        dimension: 18,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                        ),
+                                      ),
+                                    )
+                                  : null,
                             ),
                             validator: (v) => (v == null || v.trim().isEmpty)
                                 ? 'Adresse requise'
