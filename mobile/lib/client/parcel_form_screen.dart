@@ -5,13 +5,15 @@ import '../addresses/address_picker.dart';
 import '../addresses/selected_address.dart';
 import '../core/api_exception.dart';
 import '../core/phone_format.dart';
+import '../orders/order_models.dart';
 import '../orders/orders_repository.dart';
 import '../widgets/dark_header.dart';
 import 'order_confirmed_screen.dart';
 
-/// A Colis (parcel) request: pickup + drop-off address, who receives it,
-/// and which delivery zone prices it — no restaurant, no cart, since a
-/// parcel doesn't come from a catalogue like the other services.
+/// A Colis (parcel) request: where it is collected (one of the sender's
+/// addresses), who receives it and where, typed in since it is someone
+/// else's address, and the delivery zone that prices it — no restaurant,
+/// no cart, since a parcel doesn't come from a catalogue.
 class ParcelFormScreen extends StatefulWidget {
   const ParcelFormScreen({super.key});
 
@@ -22,9 +24,13 @@ class ParcelFormScreen extends StatefulWidget {
 class _ParcelFormScreenState extends State<ParcelFormScreen> {
   final _formKey = GlobalKey<FormState>();
   AddressSelection? _pickup;
-  AddressSelection? _dropOff;
+  DeliveryZoneOption? _zone;
+  late final Future<List<DeliveryZoneOption>> _zones = context
+      .read<OrdersRepository>()
+      .listDeliveryZones();
   final _recipientName = TextEditingController();
   final _recipientPhone = TextEditingController();
+  final _recipientAddress = TextEditingController();
   final _note = TextEditingController();
   bool _submitting = false;
   String? _error;
@@ -33,6 +39,7 @@ class _ParcelFormScreenState extends State<ParcelFormScreen> {
   void dispose() {
     _recipientName.dispose();
     _recipientPhone.dispose();
+    _recipientAddress.dispose();
     _note.dispose();
     super.dispose();
   }
@@ -41,7 +48,6 @@ class _ParcelFormScreenState extends State<ParcelFormScreen> {
     setState(() => _error = null);
     if (!_formKey.currentState!.validate()) return;
     final pickup = _pickup!.address;
-    final dropOff = _dropOff!;
 
     setState(() => _submitting = true);
     try {
@@ -49,12 +55,10 @@ class _ParcelFormScreenState extends State<ParcelFormScreen> {
         pickupAddress: pickup.fullText,
         pickupLatitude: pickup.latitude,
         pickupLongitude: pickup.longitude,
-        deliveryAddress: dropOff.address.fullText,
-        deliveryLatitude: dropOff.address.latitude,
-        deliveryLongitude: dropOff.address.longitude,
+        deliveryAddress: _recipientAddress.text.trim(),
         recipientName: _recipientName.text.trim(),
         recipientPhone: _recipientPhone.text.trim(),
-        deliveryZoneId: dropOff.zone!.id,
+        deliveryZoneId: _zone!.id,
         note: _note.text.trim(),
       );
       if (!mounted) return;
@@ -101,17 +105,17 @@ class _ParcelFormScreenState extends State<ParcelFormScreen> {
                         onChanged: (v) => setState(() => _pickup = v),
                       ),
                       const SizedBox(height: 20),
-                      AddressField(
-                        label: 'Livrer le colis à',
-                        enabled: !_submitting,
-                        allowOneOff: true,
-                        emptyText: "Choisir l'adresse de livraison",
-                        onChanged: (v) => setState(() => _dropOff = v),
+                      Text(
+                        'Livrer le colis à',
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 8),
                       TextFormField(
                         controller: _recipientName,
                         enabled: !_submitting,
+                        textCapitalization: TextCapitalization.words,
                         decoration: const InputDecoration(
                           labelText: 'Nom du destinataire',
                         ),
@@ -128,6 +132,53 @@ class _ParcelFormScreenState extends State<ParcelFormScreen> {
                           labelText: 'Téléphone du destinataire',
                         ),
                         validator: validatePhone,
+                      ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: _recipientAddress,
+                        enabled: !_submitting,
+                        minLines: 1,
+                        maxLines: 3,
+                        textCapitalization: TextCapitalization.sentences,
+                        decoration: const InputDecoration(
+                          labelText: 'Adresse du destinataire',
+                          hintText: 'Rue, numéro, quartier, repère…',
+                        ),
+                        validator: (v) => (v == null || v.trim().isEmpty)
+                            ? 'Adresse requise'
+                            : null,
+                      ),
+                      const SizedBox(height: 16),
+                      // The zone prices the delivery.
+                      FutureBuilder<List<DeliveryZoneOption>>(
+                        future: _zones,
+                        builder: (context, snapshot) {
+                          if (snapshot.connectionState ==
+                              ConnectionState.waiting) {
+                            return const LinearProgressIndicator();
+                          }
+                          final zones = snapshot.data ?? const [];
+                          return DropdownButtonFormField<DeliveryZoneOption>(
+                            initialValue: _zone,
+                            isExpanded: true,
+                            decoration: const InputDecoration(
+                              labelText: 'Zone de livraison',
+                            ),
+                            items: [
+                              for (final z in zones)
+                                DropdownMenuItem(
+                                  value: z,
+                                  child: Text('${z.name} — ${z.fee} DT'),
+                                ),
+                            ],
+                            onChanged: _submitting
+                                ? null
+                                : (z) => setState(() => _zone = z),
+                            validator: (z) => z == null
+                                ? 'Choisissez la zone de livraison'
+                                : null,
+                          );
+                        },
                       ),
                       const SizedBox(height: 16),
                       TextFormField(
