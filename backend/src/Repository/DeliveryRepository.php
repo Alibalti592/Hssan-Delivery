@@ -4,6 +4,7 @@ namespace App\Repository;
 
 use App\Entity\Delivery;
 use App\Entity\Order;
+use App\Entity\Restaurant;
 use App\Entity\User;
 use App\Enum\DeliveryStatus;
 use App\Pagination\PaginatedResult;
@@ -31,6 +32,23 @@ class DeliveryRepository extends ServiceEntityRepository
      * admin courier map to show "on delivery" status and link the marker to
      * the relevant delivery. A courier has at most one of these at a time.
      */
+    /**
+     * Orders of this restaurant still on their way to the client (from
+     * waiting for a courier to on the road).
+     */
+    public function countActiveForRestaurant(Restaurant $restaurant): int
+    {
+        return (int) $this->createQueryBuilder('d')
+            ->select('COUNT(d.id)')
+            ->join('d.order', 'o')
+            ->andWhere('o.restaurant = :restaurant')
+            ->andWhere('d.status IN (:statuses)')
+            ->setParameter('restaurant', $restaurant)
+            ->setParameter('statuses', self::ACTIVE_STATUSES)
+            ->getQuery()
+            ->getSingleScalarResult();
+    }
+
     public function findActiveForCourier(User $courier): ?Delivery
     {
         return $this->createQueryBuilder('d')

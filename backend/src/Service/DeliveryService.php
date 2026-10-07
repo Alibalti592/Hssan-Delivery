@@ -332,7 +332,12 @@ final class DeliveryService
             return $delivery;
         });
 
-        if ($delivery->getStatus() !== $previousStatus) {
+        // A reassignment of a delivery not accepted yet stays ASSIGNED: the
+        // courier changing is a change too (both couriers are told).
+        if (
+            $delivery->getStatus() !== $previousStatus
+            || $delivery->getCourier()?->getId() !== $previousCourier?->getId()
+        ) {
             $this->eventDispatcher->dispatch(
                 new DeliveryStatusChangedEvent($delivery, $previousStatus, $previousCourier)
             );
