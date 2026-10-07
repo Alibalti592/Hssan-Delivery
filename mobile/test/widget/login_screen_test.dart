@@ -201,6 +201,9 @@ void main() {
       );
 
       await tester.pumpWidget(_pumpableApp(auth));
+      // Below the fold on the test's short screen: scroll, as a user would.
+      await tester.ensureVisible(find.text('Créer un compte'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Créer un compte'));
       await tester.pumpAndSettle();
 
@@ -269,6 +272,9 @@ void main() {
       );
 
       await tester.pumpWidget(_pumpableApp(auth));
+      // Below the fold on the test's short screen: scroll, as a user would.
+      await tester.ensureVisible(find.text('Créer un compte'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Créer un compte'));
       await tester.pumpAndSettle();
       await tester.enterText(

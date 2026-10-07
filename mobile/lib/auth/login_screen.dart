@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../core/support.dart';
 import '../theme.dart';
 import '../widgets/brand_logo.dart';
 import 'auth_controller.dart';
@@ -104,11 +105,27 @@ class _LoginScreenState extends State<LoginScreen> {
                               enabled: !busy,
                               onSubmitted: _submit,
                             ),
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: TextButton(
+                                style: TextButton.styleFrom(
+                                  foregroundColor: navy,
+                                  minimumSize: const Size(0, 40),
+                                ),
+                                onPressed: busy
+                                    ? null
+                                    : () => showForgotPasswordSheet(
+                                        context,
+                                        phone: _phone.text,
+                                      ),
+                                child: const Text('Mot de passe oublié ?'),
+                              ),
+                            ),
                             if (_error != null) ...[
                               const SizedBox(height: 16),
                               AuthErrorBanner(_error!),
                             ],
-                            const SizedBox(height: 24),
+                            const SizedBox(height: 12),
                             AuthSubmitButton(
                               label: 'Se connecter',
                               busy: busy,
