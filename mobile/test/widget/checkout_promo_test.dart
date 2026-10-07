@@ -51,16 +51,30 @@ void main() {
               'deliveryZoneName': 'Bizerte centre',
               'deliveryZoneFee': '4.000',
             },
+            {
+              'id': 2,
+              'label': 'Travail',
+              'addressLine': '3 Avenue Habib Bourguiba',
+              'instructions': null,
+              'isDefault': false,
+              'deliveryZoneId': null,
+              'deliveryZoneName': null,
+              'deliveryZoneFee': null,
+            },
           ]);
         }
         if (path == '/api/delivery-zones') {
           return jsonResponse([
             {'id': 1, 'name': 'Bizerte centre', 'fee': '4.000'},
+            {'id': 2, 'name': 'Zarzouna', 'fee': '6.000'},
           ]);
         }
         final body = jsonDecode(request.body) as Map<String, dynamic>;
         final code = body['promoCode'] as String?;
         if (path == '/api/orders/quote') {
+          if (body['deliveryZoneId'] == 2) {
+            return jsonResponse({'message': 'Service indisponible.'}, 503);
+          }
           if (code == null) {
             return jsonResponse(
               _quote(
@@ -183,5 +197,36 @@ void main() {
     await tester.tap(find.text('CONFIRMER LA COMMANDE'));
     await tester.pumpAndSettle();
     expect(placed.single['promoCode'], 'BIENVENUE');
+  });
+
+  testWidgets('another address drops the old zone\'s price', (tester) async {
+    tester.view.physicalSize = const Size(800, 2000);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(await app());
+    await tester.pumpAndSettle();
+    expect(find.text('25.600 DT'), findsOneWidget);
+
+    // An address with no zone yet: no fee to show, just the cart.
+    await tester.tap(find.text('Changer'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Travail').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('25.600 DT'), findsNothing);
+    expect(find.text('-2.400 DT'), findsNothing);
+    expect(find.text('24.000 DT'), findsNWidgets(2));
+    expect(find.text('0.000 DT'), findsOneWidget);
+
+    // Its zone can't be priced right now: its own fee, not the old one.
+    await tester.tap(find.text('Zone de livraison'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Zarzouna — 6.000 DT').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('6.000 DT'), findsOneWidget);
+    expect(find.text('30.000 DT'), findsOneWidget);
+    expect(find.text('4.000 DT'), findsNothing);
   });
 }
