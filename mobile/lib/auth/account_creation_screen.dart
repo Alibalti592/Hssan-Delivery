@@ -269,7 +269,7 @@ class _AppMark extends StatelessWidget {
         ],
       ),
       alignment: Alignment.center,
-      child: const BrandMonogram(size: 19),
+      child: const BrandMonogram(width: 38),
     );
   }
 }

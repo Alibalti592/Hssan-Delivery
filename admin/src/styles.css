@@ -1,21 +1,11 @@
-/* ---- brand: the logo's script "DH" and its type (SIL OFL fonts) ---- */
-@font-face { font-family: 'Alex Brush'; src: url('./assets/fonts/AlexBrush-Regular.ttf') format('truetype'); font-display: swap; }
+/* ---- brand: the logo's chrome "DH" (assets/monogram.svg, traced from the
+   client's artwork) and its type (Poppins, SIL OFL) ---- */
 @font-face { font-family: 'Poppins'; font-weight: 500; src: url('./assets/fonts/Poppins-Medium.ttf') format('truetype'); font-display: swap; }
 @font-face { font-family: 'Poppins'; font-weight: 600; src: url('./assets/fonts/Poppins-SemiBold.ttf') format('truetype'); font-display: swap; }
-.monogram {
-  font-family: 'Alex Brush', cursive; font-weight: 400; line-height: 1; display: inline-block;
-  /* The H's flourish reaches past the glyph box: room for the chrome to
-     paint it, taken back on the right so the letters stay centred. */
-  padding: 0.3em 0.6em 0.06em 0.06em; margin: -0.2em -0.46em 0 0; letter-spacing: -0.07em;
-  /* Polished chrome lit from above, a thicker stroke for the artwork's weight,
-     a dark rim and the drop shadow below. */
-  background: linear-gradient(180deg, #fff 0%, #f3f5f7 34%, #cdd2d8 58%, #9aa1a9 82%, #c9ced4 100%);
-  -webkit-background-clip: text; background-clip: text; color: transparent;
-  -webkit-text-stroke: 0.035em transparent;
-  filter: drop-shadow(0 0 0.6px #4b5058) drop-shadow(0.02em 0.07em 0.04em rgba(0, 0, 0, 0.7));
-}
-.brand-name { font-family: 'Poppins', system-ui, sans-serif; font-weight: 600; color: #fff; letter-spacing: 0.2px; }
-.brand-tagline { font-family: 'Poppins', system-ui, sans-serif; font-weight: 500; color: #b4bac2; letter-spacing: 0.3px; }
+/* The SVG keeps a margin around the letters for their shadow. */
+.monogram { display: block; height: auto; }
+.brand-name { font-family: 'Poppins', system-ui, sans-serif; font-weight: 600; color: #dcdcdc; }
+.brand-tagline { font-family: 'Poppins', system-ui, sans-serif; font-weight: 600; color: #e8e8e8; }
 
 * { box-sizing: border-box; }
 
@@ -52,7 +42,7 @@ a { color: inherit; text-decoration: none; }
 }
 .sbrand span { color: #8b93a0; font-weight: 400; display: block; font-size: 9px; margin-top: 2px; }
 .sbrand { display: flex; align-items: center; gap: 8px; }
-.sbrand .monogram { font-size: 30px; margin-right: -0.26em; }
+.sbrand .monogram { width: 58px; margin: -6px -2px -6px -4px; }
 .sbrand .brand-name { font-size: 12.5px; white-space: nowrap; }
 
 .snav { flex: 1; }
@@ -207,9 +197,9 @@ tr.row-link:hover td { background: #fafbfc; }
   background: radial-gradient(circle at 50% 35%, #2b2b2d 0%, #141415 55%, #070707 100%);
   padding: 26px 30px 30px 30px; text-align: center;
 }
-.login-header .monogram { font-size: 64px; }
+.login-header .monogram { width: 168px; margin: -8px auto -2px auto; }
 .login-header h1 { font-size: 18px; margin: 6px 0 0 0; }
-.login-header .brand-tagline { font-size: 10.5px; margin: 3px 0 0 0; }
+.login-header .brand-tagline { font-size: 9.5px; margin: 1px 0 0 0; }
 .login-header .login-role {
   display: inline-block; margin-top: 12px; padding: 3px 10px; border-radius: 10px;
   border: 1px solid rgba(255, 255, 255, 0.18); color: #d6dae0; font-size: 9.5px; letter-spacing: 0.6px; text-transform: uppercase;

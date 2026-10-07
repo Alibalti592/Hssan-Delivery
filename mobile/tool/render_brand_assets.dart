@@ -10,15 +10,9 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mobile/onboarding/splash_screen.dart';
 import 'package:mobile/widgets/brand_logo.dart';
-
-Future<void> _loadFonts() async {
-  final loader = FontLoader('AlexBrush')
-    ..addFont(rootBundle.load('assets/fonts/AlexBrush-Regular.ttf'));
-  await loader.load();
-}
 
 Future<void> _render(
   WidgetTester tester, {
@@ -54,7 +48,6 @@ void main() {
     tester.view.physicalSize = const Size(4000, 4000);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
-    await tester.runAsync(_loadFonts);
 
     // Launcher icon: the monogram on the logo's backdrop.
     await _render(
@@ -63,7 +56,7 @@ void main() {
       canvas: 1024,
       child: const BrandBackdrop(
         center: Alignment.center,
-        child: Center(child: BrandMonogram(size: 340)),
+        child: Center(child: BrandMonogram(width: 760)),
       ),
     );
 
@@ -72,18 +65,18 @@ void main() {
       tester,
       path: 'assets/icon/app_icon_foreground.png',
       canvas: 1024,
-      child: const Center(child: BrandMonogram(size: 250)),
+      child: const Center(child: BrandMonogram(width: 570)),
     );
 
-    // Launch image: SplashScreen's monogram (size 76) at 4x, centered in
-    // the 288dp (1152px) square Android 12+ expects; 76 keeps it inside the
+    // Launch image: SplashScreen's monogram at 4x, centered in the 288dp
+    // (1152px) square Android 12+ expects; 172 wide keeps it inside the
     // central 192dp circle that Android 12+ shows.
     await _render(
       tester,
       path: 'assets/icon/splash_logo.png',
       canvas: 288,
       pixelRatio: 4,
-      child: const Center(child: BrandMonogram(size: 76)),
+      child: const Center(child: BrandMonogram(width: splashMonogramWidth)),
     );
   });
 }

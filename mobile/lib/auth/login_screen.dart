@@ -153,7 +153,7 @@ class _BrandHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return const Padding(
       padding: EdgeInsets.fromLTRB(24, 28, 24, 30),
-      child: BrandLogo(monogramSize: 72),
+      child: BrandLogo(width: 150),
     );
   }
 }

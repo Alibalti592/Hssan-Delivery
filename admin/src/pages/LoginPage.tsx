@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
+import monogramUrl from '../assets/monogram.svg';
 
 export default function LoginPage() {
   const { login, isLoading, error } = useAuth();
@@ -23,9 +24,7 @@ export default function LoginPage() {
     <div className="login-page">
       <div className="login-card">
         <div className="login-header">
-          <div className="monogram" aria-hidden="true">
-            DH
-          </div>
+          <img className="monogram" src={monogramUrl} alt="" aria-hidden="true" />
           <h1 className="brand-name">Delivery Hassen</h1>
           <p className="brand-tagline">As Fast as you think</p>
           <span className="login-role">Administration</span>
