@@ -49,7 +49,15 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   void _onAddressChanged(AddressSelection? selection) {
     final zoneChanged = selection?.zone?.id != _selection?.zone?.id;
-    setState(() => _selection = selection);
+    setState(() {
+      _selection = selection;
+      // The old zone's price no longer holds, nor does an answer still on
+      // its way for it: the cart's own sum shows until the new one lands.
+      if (zoneChanged) {
+        _quote = null;
+        _quoteGeneration++;
+      }
+    });
     // Picking another address here also changes "LIVRER À".
     if (selection != null) {
       context.read<SelectedAddressController>().select(selection.address);

@@ -93,6 +93,46 @@ final class CourierLocationApiTest extends WebTestCase
         self::assertSame(10.2, $locations[0]->getLongitude());
     }
 
+    public function testReportingTheSamePositionStillCountsAsSeenNow(): void
+    {
+        $client = static::createClient();
+
+        $this->entityManager = self::getContainer()
+            ->get(EntityManagerInterface::class);
+
+        $courier = $this->createTestUser('ROLE_LIVREUR', 'Waiting Courier');
+
+        $token = $this->authenticateClient($client, $courier);
+        $report = static fn () => $client->request(
+            'POST',
+            '/api/couriers/location',
+            server: [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_AUTHORIZATION' => 'Bearer '.$token,
+            ],
+            content: json_encode(['latitude' => 37.2746, 'longitude' => 9.8739])
+        );
+
+        $report();
+        self::assertResponseStatusCodeSame(Response::HTTP_NO_CONTENT);
+
+        // Ten minutes later, still waiting at the restaurant: the phone
+        // reports the very same position.
+        $this->entityManager->getConnection()->executeStatement(
+            'UPDATE courier_location SET updated_at = :then WHERE courier_id = :courier',
+            ['then' => (new \DateTimeImmutable('-10 minutes'))->format('Y-m-d H:i:s'), 'courier' => $courier->getId()]
+        );
+
+        $report();
+        self::assertResponseStatusCodeSame(Response::HTTP_NO_CONTENT);
+
+        $this->entityManager->clear();
+        $location = $this->entityManager->getRepository(CourierLocation::class)->findOneBy(['courier' => $courier]);
+
+        self::assertNotNull($location);
+        self::assertGreaterThan(new \DateTimeImmutable('-1 minute'), $location->getUpdatedAt());
+    }
+
     public function testInvalidLatitudeIsRejected(): void
     {
         $client = static::createClient();

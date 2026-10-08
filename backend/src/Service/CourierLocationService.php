@@ -45,6 +45,10 @@ final class CourierLocationService
         $location->setCourier($courier);
         $location->setLatitude($latitude);
         $location->setLongitude($longitude);
+        // A courier standing still reports the same point: Doctrine would
+        // see nothing to update and skip PreUpdate, leaving updatedAt to go
+        // stale and the map to show them OFFLINE. Every report is a sighting.
+        $location->touch();
 
         $this->entityManager->persist($location);
         $this->entityManager->flush();
