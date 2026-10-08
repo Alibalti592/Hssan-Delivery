@@ -42,7 +42,7 @@ reinstall anything.
 ## 1. The server
 
 - Ubuntu 24.04. **2 vCPU and 4 GB RAM** is plenty to start; 40 GB of disk or more.
-- Log in as root once, then:
+- Log in as root once (on OVHcloud: `ssh ubuntu@<server-ip>` then `sudo -i`), then:
 
 ```bash
 apt update && apt upgrade -y
@@ -51,7 +51,9 @@ curl -fsSL https://get.docker.com | sh
 # A user for the app and for deploys, allowed to run Docker.
 adduser --disabled-password --gecos "" deploy
 usermod -aG docker deploy
-mkdir -p /home/deploy/.ssh && cp ~/.ssh/authorized_keys /home/deploy/.ssh/
+# The SSH key you log in with (OVHcloud puts it on the "ubuntu" user).
+mkdir -p /home/deploy/.ssh
+cp /home/ubuntu/.ssh/authorized_keys /home/deploy/.ssh/ 2>/dev/null || cp ~/.ssh/authorized_keys /home/deploy/.ssh/
 chown -R deploy:deploy /home/deploy/.ssh
 
 # Firewall: SSH and the web only. Postgres is never opened.
@@ -62,6 +64,26 @@ mkdir -p /opt/hssan-delivery && chown deploy:deploy /opt/hssan-delivery
 ```
 
 From here on, work as `deploy` (`ssh deploy@your-server`).
+
+### On OVHcloud
+
+- **Product:** a **VPS** is the simplest choice: a fixed monthly price, with
+  the IP and disk included. Pick a plan with at least 2 vCores and 4 GB RAM.
+  Public Cloud instances also work, but bill by the hour and have more knobs.
+- **Location:** a datacenter in France (Gravelines, Roubaix or Strasbourg),
+  the closest to Tunisia.
+- **Image:** Ubuntu 24.04. Add your SSH public key when ordering. OVH's
+  Ubuntu logs you in as `ubuntu` (with `sudo`), not as `root`.
+- **DNS:** if your domain is at OVH, go to **Web Cloud → Domain names → your
+  domain → DNS zone → Add an entry → A**, once for `api` and once for
+  `admin`, each pointing to the VPS's IPv4 (step 3). If the domain is
+  elsewhere, create the same two A records there.
+- **Off-site backups:** OVH **Object Storage** (S3-compatible) works with
+  `rclone` (step 8; choose the S3 / OVHcloud provider in `rclone config`).
+  Put the bucket in a **different region** from the VPS.
+- OVH's paid **automated backup** option for the VPS snapshots the whole
+  server. It's a nice extra, but it doesn't replace the nightly database
+  dumps: those restore just the data, to any of the last 14 days.
 
 ## 2. The code and the settings
 
