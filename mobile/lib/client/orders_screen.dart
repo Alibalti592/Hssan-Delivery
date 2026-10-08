@@ -109,7 +109,10 @@ class _OrdersScreenState extends State<OrdersScreen> {
       );
       if (!mounted) return;
       setState(() {
-        _orders.addAll(result.items);
+        // An order placed since page 1 was fetched shifts older ones down a
+        // page: the next page can repeat one already shown.
+        final known = _orders.map((o) => o.id).toSet();
+        _orders.addAll(result.items.where((o) => !known.contains(o.id)));
         _page = result.page;
         _pages = result.pages;
       });

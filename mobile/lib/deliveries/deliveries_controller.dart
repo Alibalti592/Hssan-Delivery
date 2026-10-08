@@ -84,7 +84,13 @@ class DeliveriesController extends ChangeNotifier {
     notifyListeners();
     try {
       final result = await _repository.listMine(page: _page + 1);
-      _deliveries = _sorted([..._deliveries, ...result.items]);
+      // A delivery assigned since page 1 was fetched shifts older ones
+      // down a page: the next page can repeat one already shown.
+      final shown = {for (final d in _deliveries) d.id};
+      _deliveries = _sorted([
+        ..._deliveries,
+        ...result.items.where((d) => !shown.contains(d.id)),
+      ]);
       _page = result.page;
       _pages = result.pages;
       return null;
@@ -118,6 +124,10 @@ class DeliveriesController extends ChangeNotifier {
             ]);
       return null;
     } on ApiException catch (e) {
+      // Refused: the delivery most likely changed under the courier
+      // (cancelled, reassigned). Show where it really stands, rather than
+      // leaving buttons that will only fail again.
+      await refresh(silent: true);
       return e.message;
     } on NetworkException catch (e) {
       return e.message;

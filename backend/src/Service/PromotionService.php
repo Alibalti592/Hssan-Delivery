@@ -192,8 +192,11 @@ final class PromotionService
         $promotion->setDiscountValue($isOffer
             ? Money::fromMillimes(Money::toMillimes((string) $dto->discountValue))
             : (string) $dto->discountValue);
-        // An offer is ordered at its price, not unlocked with a code.
-        $promotion->setPromoCode($isOffer ? null : $dto->promoCode);
+        // An offer is ordered at its price, not unlocked with a code. The
+        // client's code is trimmed before it's compared, so this one is too;
+        // a blank one is no code at all (the promotion applies by itself).
+        $promoCode = null === $dto->promoCode ? '' : trim($dto->promoCode);
+        $promotion->setPromoCode($isOffer || '' === $promoCode ? null : $promoCode);
         $promotion->setStartAt($dto->startAt);
         $promotion->setEndAt($dto->endAt);
         $promotion->setIsActive($dto->isActive);

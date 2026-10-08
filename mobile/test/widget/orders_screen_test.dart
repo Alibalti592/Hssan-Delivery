@@ -77,6 +77,30 @@ void main() {
     expect(find.text('Charger plus'), findsNothing);
   });
 
+  testWidgets('the next page never repeats an order already shown', (
+    tester,
+  ) async {
+    final mock = MockClient((request) async {
+      final page = int.parse(request.url.queryParameters['page'] ?? '1');
+      if (page == 1) {
+        return jsonResponse(
+          pagedBody([_order(3), _order(2)], page: 1, pages: 2),
+        );
+      }
+      // An order placed since page 1 pushed #2 onto page 2.
+      return jsonResponse(pagedBody([_order(2), _order(1)], page: 2, pages: 2));
+    });
+
+    await tester.pumpWidget(_app(_api(mock)));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Charger plus'));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('#1'), findsOneWidget);
+    expect(find.textContaining('#2'), findsOneWidget);
+    expect(find.textContaining('#3'), findsOneWidget);
+  });
+
   testWidgets('shows what each order is, not just its number', (tester) async {
     final mock = MockClient(
       (request) async => jsonResponse(
