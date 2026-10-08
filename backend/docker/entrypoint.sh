@@ -5,8 +5,9 @@ set -e
 # webroot). Both things that must survive a redeploy live there: uploaded
 # photos, and the JWT keypair -- regenerating the keypair on every boot
 # silently invalidated every admin and client session after each deploy.
-# (docker-compose.staging.yml mounts public/uploads and config/jwt as their
-# own volumes instead; the guards below leave those alone.)
+# (deploy/docker-compose.prod.yml mounts var/storage the same way; a host
+# mounting public/uploads and config/jwt as their own volumes instead is
+# left alone by the guards below.)
 mkdir -p var/storage/uploads var/storage/jwt
 
 # One-time migration: the volume used to be mounted directly at
@@ -76,7 +77,7 @@ fi
 # next write fails. Only entries not already owned by www-data are touched,
 # so boot time doesn't grow with the number of stored photos. -H follows
 # public/uploads and config/jwt when they're symlinks into var/storage, or
-# separate volumes (docker-compose.staging.yml).
+# separate volumes.
 find -H var config/jwt public/uploads \( ! -user www-data -o ! -group www-data \) \
     -exec chown -h www-data:www-data {} +
 

@@ -30,3 +30,6 @@
 # OS
 .DS_Store
 Thumbs.db
+# Self-hosted production (deploy/)
+/deploy/backups/
+/deploy/secrets/

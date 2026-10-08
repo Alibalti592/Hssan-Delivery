@@ -61,7 +61,10 @@ jobs:
         working-directory: mobile
 
     env:
-      API_BASE_URL: https://hssan-delivery-production.up.railway.app
+      # The API the app talks to, baked into the build: the repo variable
+      # API_BASE_URL (Settings > Secrets and variables > Actions >
+      # Variables), e.g. https://api.your-domain.tn. Railway until it's set.
+      API_BASE_URL: ${{ vars.API_BASE_URL || 'https://hssan-delivery-production.up.railway.app' }}
       # Public client identifiers, like android-release.yml's, but for the
       # iOS app registered in Firebase -- push stays off until they're set.
       FIREBASE_API_KEY: ${{ vars.FIREBASE_IOS_API_KEY }}

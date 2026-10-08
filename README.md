@@ -627,14 +627,13 @@ from JWT_PASSPHRASE (never baked into the image, matching config/jwt/*.pem
 being gitignored), and pending Doctrine migrations run automatically on
 every boot.
 
-The workflow's final step in each job SSHes into a staging host and runs
-`docker compose pull && up -d` — inert until three repo secrets exist
-(STAGING_SSH_HOST, STAGING_SSH_USER, STAGING_SSH_KEY), so the pipeline
-runs end-to-end (build + push) without requiring a staging server to
-exist yet. docker-compose.staging.yml documents the layout such a server
-needs (backend + admin + postgres, referencing the GHCR images) — it's a
-template to fill in and place on the staging host, not something CI runs
-itself.
+The workflow's last job SSHes into the production server and runs
+`git pull` then `docker compose pull && up -d` in deploy/ — inert until
+three repo secrets exist (PROD_SSH_HOST, PROD_SSH_USER, PROD_SSH_KEY), so
+the pipeline runs end-to-end (build + push) without a server. deploy/
+holds that server's setup (backend + admin + postgres + Caddy for HTTPS +
+nightly backups, referencing the GHCR images); docs/DEPLOY.md walks
+through it, including moving the data off Railway.
 
 Deploying admin and backend on different hosts (e.g. Vercel + Railway)
 
@@ -1135,11 +1134,10 @@ should be scoped before implementation starts.
  Money transfer (wallet/balance, transaction ledger, licensing review)
 Phase 7 — Production infrastructure
  Docker (done — backend + admin images, see "Docker / CD pipeline" above)
- CD pipeline (done — build/push to GHCR on merge to main; staging deploy inert until a host exists, see "Docker / CD pipeline" above)
- Staging environment (host not provisioned yet — docker-compose.staging.yml is ready to place on one)
- Production environment
- Nginx / HTTPS (nginx serves the admin image; HTTPS itself is a staging/production host concern, not yet set up)
- Database backups
+ CD pipeline (done — build/push to GHCR on merge to main; server deploy inert until PROD_SSH_* exist, see "Docker / CD pipeline" above)
+ Production environment (ready to place on a server — deploy/, docs/DEPLOY.md)
+ HTTPS (done — Caddy with Let's Encrypt, deploy/Caddyfile)
+ Database backups (done — nightly pg_dump + photos, deploy/backup.sh; copying them off the server is the operator's step, see docs/DEPLOY.md)
  Monitoring
  Error tracking (done — Sentry, inert until a DSN is configured; see "Error tracking" above)
 Phase 8 — Production hardening

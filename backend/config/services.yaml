@@ -9,6 +9,10 @@
 parameters:
     # Mirrors the 'lax' fallback in packages/lexik_jwt_authentication.php.
     env(JWT_COOKIE_SAMESITE): 'lax'
+    # Who may tell the app the client's real address (see trusted_proxies in
+    # packages/framework.yaml). Railway's edge by default; a self-hosted
+    # server behind Caddy in Docker sets '127.0.0.1,PRIVATE_SUBNETS'.
+    env(TRUSTED_PROXIES): '127.0.0.1,100.64.0.0/10'
 
 services:
     # default configuration for services in *this* file
