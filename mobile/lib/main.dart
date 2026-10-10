@@ -176,8 +176,11 @@ class _HssanDeliveryAppState extends State<HssanDeliveryApp> {
         debugShowCheckedModeBanner: false,
         navigatorKey: _navigatorKey,
         scaffoldMessengerKey: _pushNotifications.messengerKey,
-        theme: buildTheme(Brightness.light),
-        darkTheme: buildTheme(Brightness.dark),
+        // One look whatever the phone's dark mode: every screen is designed
+        // on the light theme (brand colors fixed in ~250 places), so
+        // following the system's dark mode left white text on white cards.
+        theme: buildTheme(),
+        themeMode: ThemeMode.light,
         home: const _Root(),
       ),
     );

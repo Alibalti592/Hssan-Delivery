@@ -21,47 +21,33 @@ const mutedText = Color(0xFF8B93A0);
 const fieldFill = Color(0xFFEAF0F7);
 const cardBorder = Color(0xFFEDF0F4);
 
-ThemeData buildTheme(Brightness brightness) {
+/// The app's one theme, light (see main.dart: it doesn't follow the
+/// phone's dark mode).
+ThemeData buildTheme() {
   // ColorScheme.fromSeed(seedColor: Colors.black) doesn't stay neutral —
   // Material 3's tonal palette algorithm falls back to a low-chroma pink/
   // mauve hue for a seed with no real chroma of its own, which then leaks
   // into anything using colorScheme.primary/surfaceContainerHighest/outline
   // (filled buttons, image placeholders). Override those roles with true
   // black/white/gray so the "black and white" brand actually stays neutral.
-  final seeded = ColorScheme.fromSeed(seedColor: navy, brightness: brightness);
-  final scheme = brightness == Brightness.light
-      ? seeded.copyWith(
-          primary: navy,
-          onPrimary: Colors.white,
-          secondary: const Color(0xFF4A4A4A),
-          onSecondary: Colors.white,
-          secondaryContainer: const Color(0xFFEDEDED),
-          onSecondaryContainer: navy,
-          surface: Colors.white,
-          onSurface: navy,
-          surfaceContainerHighest: const Color(0xFFEDEDED),
-          outline: const Color(0xFFBDBDBD),
-        )
-      : seeded.copyWith(
-          primary: Colors.white,
-          onPrimary: navy,
-          secondary: const Color(0xFFBDBDBD),
-          onSecondary: navy,
-          secondaryContainer: const Color(0xFF2A2A2A),
-          onSecondaryContainer: Colors.white,
-          surface: const Color(0xFF121212),
-          onSurface: Colors.white,
-          surfaceContainerHighest: const Color(0xFF2A2A2A),
-          outline: const Color(0xFF5A5A5A),
-        );
+  final scheme = ColorScheme.fromSeed(seedColor: navy).copyWith(
+    primary: navy,
+    onPrimary: Colors.white,
+    secondary: const Color(0xFF4A4A4A),
+    onSecondary: Colors.white,
+    secondaryContainer: const Color(0xFFEDEDED),
+    onSecondaryContainer: navy,
+    surface: Colors.white,
+    onSurface: navy,
+    surfaceContainerHighest: const Color(0xFFEDEDED),
+    outline: const Color(0xFFBDBDBD),
+  );
 
   return ThemeData(
     colorScheme: scheme,
     useMaterial3: true,
     fontFamily: 'Roboto',
-    scaffoldBackgroundColor: brightness == Brightness.light
-        ? Colors.white
-        : scheme.surface,
+    scaffoldBackgroundColor: Colors.white,
     appBarTheme: AppBarTheme(
       backgroundColor: Colors.transparent,
       foregroundColor: scheme.onSurface,
