@@ -180,7 +180,8 @@ class _BillFormScreenState extends State<BillFormScreen> {
             DarkHeader(
               title: provider.name,
               subtitle: _isTransfer ? 'Envoyer un mandat' : 'Payer une facture',
-              onBack: _submitting ? null : () => Navigator.of(context).pop(),
+              onBack: () => Navigator.of(context).pop(),
+              backEnabled: !_submitting,
             ),
             Expanded(
               child: SingleChildScrollView(

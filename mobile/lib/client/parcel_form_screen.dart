@@ -86,7 +86,8 @@ class _ParcelFormScreenState extends State<ParcelFormScreen> {
             DarkHeader(
               title: 'Colis',
               subtitle: 'Envoyer un colis',
-              onBack: _submitting ? null : () => Navigator.of(context).pop(),
+              onBack: () => Navigator.of(context).pop(),
+              backEnabled: !_submitting,
             ),
             Expanded(
               child: SingleChildScrollView(

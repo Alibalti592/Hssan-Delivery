@@ -181,7 +181,8 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
           children: [
             DarkHeader(
               title: _isEditing ? 'Modifier l\'adresse' : 'Nouvelle adresse',
-              onBack: _saving ? null : () => Navigator.of(context).pop(),
+              onBack: () => Navigator.of(context).pop(),
+              backEnabled: !_saving,
             ),
             Expanded(
               child: ListView(
