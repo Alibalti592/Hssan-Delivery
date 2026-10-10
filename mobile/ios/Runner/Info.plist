@@ -54,6 +54,11 @@
 		<true/>
 		<key>UIStatusBarHidden</key>
 		<false/>
+		<!-- White status bar icons from the start: the launch screen and
+		     the first Flutter screens (splash, login) are black. Screens
+		     then set their own style (lib/widgets/status_bar.dart). -->
+		<key>UIStatusBarStyle</key>
+		<string>UIStatusBarStyleLightContent</string>
 		<!-- Foreground-only (see CourierLocationService): shown when a
 		     courier's app reports its position while a delivery is active.
 		     No NSLocationAlwaysAndWhenInUseUsageDescription — background
