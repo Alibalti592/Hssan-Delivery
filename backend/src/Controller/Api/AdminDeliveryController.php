@@ -46,6 +46,18 @@ final class AdminDeliveryController extends AbstractController
         ));
     }
 
+    /**
+     * Orders on their way: a courier has them but hasn't delivered yet.
+     */
+    #[Route('/active', name: 'api_admin_delivery_active', methods: ['GET'])]
+    public function active(): JsonResponse
+    {
+        return $this->json(array_map(
+            static fn ($delivery) => DeliveryResponse::fromEntity($delivery),
+            $this->deliveryRepository->findInProgress()
+        ));
+    }
+
     #[Route('/{id}', name: 'api_admin_delivery_show', methods: ['GET'], requirements: ['id' => '\d+'])]
     public function show(int $id): JsonResponse
     {

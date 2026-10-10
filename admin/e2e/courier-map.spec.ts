@@ -59,9 +59,14 @@ test('shows courier counts derived from last known locations', async ({ page }) 
   const values = await page.locator('.stval').allTextContents();
   expect(values).toEqual(['3', '1', '1', '1']);
 
+  // Every courier is listed too, with how fresh their position is.
+  await expect(page.getByRole('cell', { name: 'Courier Offline' })).toBeVisible();
+  await expect(page.getByText('No position yet')).toBeVisible();
+  await expect(page.getByRole('cell', { name: 'just now' })).toHaveCount(2);
+
   await expect(
     page.getByText(
-      "This shows each courier's last reported position, not live continuous tracking.",
+      'A courier shows here while their app is open and they are available',
       { exact: false },
     ),
   ).toBeVisible();

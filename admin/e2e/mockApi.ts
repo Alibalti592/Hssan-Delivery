@@ -36,6 +36,7 @@ export async function mockLogin(page: Page, roles: string[]) {
   // Every admin page polls the dispatch queue; empty unless a test says
   // otherwise (a later page.route() for the same URL takes precedence).
   await page.route('**/api/admin/deliveries/waiting', (route) => json(route, []));
+  await page.route('**/api/admin/deliveries/active', (route) => json(route, []));
 
   // AuthContext calls this when /me comes back without ROLE_ADMIN, to clear
   // the httpOnly auth cookie the backend just set on login.

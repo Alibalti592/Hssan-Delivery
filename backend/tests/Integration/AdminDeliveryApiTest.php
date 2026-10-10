@@ -117,6 +117,34 @@ final class AdminDeliveryApiTest extends WebTestCase
         self::assertResponseStatusCodeSame(Response::HTTP_FORBIDDEN);
     }
 
+    public function testTheDashboardListsOrdersOnTheirWay(): void
+    {
+        $client = static::createClient();
+        $this->entityManager = self::getContainer()->get(EntityManagerInterface::class);
+        $admin = $this->createTestUser('ROLE_ADMIN', 'Test Admin');
+
+        $waiting = $this->createTestDelivery();
+        $onTheWay = $this->createTestDelivery();
+        $onTheWay->setCourier($this->createTestUser('ROLE_LIVREUR', 'Awa Courier'));
+        $onTheWay->setStatus(DeliveryStatus::ON_THE_WAY);
+        $done = $this->createTestDelivery();
+        $done->setCourier($this->createTestUser('ROLE_LIVREUR', 'Done Courier'));
+        $done->setStatus(DeliveryStatus::DELIVERED);
+        $this->entityManager->flush();
+
+        $client->request('GET', '/api/admin/deliveries/active', server: [
+            'HTTP_AUTHORIZATION' => 'Bearer '.$this->authenticateClient($client, $admin),
+        ]);
+        self::assertResponseIsSuccessful();
+        $active = json_decode($client->getResponse()->getContent(), true);
+
+        $ids = array_column($active, 'id');
+        self::assertContains($onTheWay->getId(), $ids);
+        self::assertNotContains($waiting->getId(), $ids);
+        self::assertNotContains($done->getId(), $ids);
+        self::assertSame('Awa Courier', $active[array_search($onTheWay->getId(), $ids, true)]['courierName']);
+    }
+
     public function testNonAdminCannotListDeliveries(): void
     {
         $client = static::createClient();

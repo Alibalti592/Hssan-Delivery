@@ -236,6 +236,8 @@ export const deliveriesApi = {
   get: (id: number) => api.get<AdminDelivery>(`/api/admin/deliveries/${id}`),
   /** The dispatch queue, oldest first. */
   waiting: () => api.get<WaitingDelivery[]>('/api/admin/deliveries/waiting'),
+  /** Orders a courier has but hasn't delivered yet, oldest first. */
+  active: () => api.get<WaitingDelivery[]>('/api/admin/deliveries/active'),
   assign: (deliveryId: number, courierId: number) =>
     api.post<AdminDelivery>(`/api/deliveries/${deliveryId}/assign/${courierId}`),
   reassign: (deliveryId: number, courierId: number) =>

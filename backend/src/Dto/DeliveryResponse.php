@@ -20,6 +20,7 @@ final class DeliveryResponse
             'orderId' => $order?->getId(),
             'status' => $delivery->getStatus()->value,
             'courierId' => $delivery->getCourier()?->getId(),
+            'courierName' => $delivery->getCourier()?->getName(),
             'assignedAt' => $delivery->getAssignedAt()?->format(\DateTimeInterface::ATOM),
             'acceptedAt' => $delivery->getAcceptedAt()?->format(\DateTimeInterface::ATOM),
             'pickedUpAt' => $delivery->getPickedUpAt()?->format(\DateTimeInterface::ATOM),
