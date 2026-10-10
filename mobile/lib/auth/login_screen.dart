@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../core/support.dart';
@@ -53,107 +54,112 @@ class _LoginScreenState extends State<LoginScreen> {
     final busy = context.watch<AuthController>().busy;
     final textTheme = Theme.of(context).textTheme;
 
-    return Scaffold(
-      backgroundColor: navy,
-      body: BrandBackdrop(
-        center: const Alignment(0, -0.8),
-        child: GestureDetector(
-          // Tapping outside a field puts the keyboard away.
-          onTap: () => FocusScope.of(context).unfocus(),
-          child: SafeArea(
-            bottom: false,
-            child: CustomScrollView(
-              slivers: [
-                const SliverToBoxAdapter(child: _BrandHeader()),
-                SliverFillRemaining(
-                  hasScrollBody: false,
-                  child: Container(
-                    decoration: const BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.vertical(
-                        top: Radius.circular(28),
+    // White status bar icons on the black background.
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: statusBarOnDark,
+      child: Scaffold(
+        backgroundColor: navy,
+        body: BrandBackdrop(
+          center: const Alignment(0, -0.8),
+          child: GestureDetector(
+            // Tapping outside a field puts the keyboard away.
+            onTap: () => FocusScope.of(context).unfocus(),
+            child: SafeArea(
+              bottom: false,
+              child: CustomScrollView(
+                slivers: [
+                  const SliverToBoxAdapter(child: _BrandHeader()),
+                  SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: Container(
+                      decoration: const BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.vertical(
+                          top: Radius.circular(28),
+                        ),
                       ),
-                    ),
-                    padding: const EdgeInsets.fromLTRB(24, 28, 24, 24),
-                    child: AutofillGroup(
-                      child: Form(
-                        key: _formKey,
-                        autovalidateMode: _submitted
-                            ? AutovalidateMode.onUserInteraction
-                            : AutovalidateMode.disabled,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Text(
-                              'Connexion',
-                              style: textTheme.headlineSmall?.copyWith(
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'Heureux de vous revoir !',
-                              style: textTheme.bodyMedium?.copyWith(
-                                color: mutedText,
-                              ),
-                            ),
-                            const SizedBox(height: 24),
-                            PhoneField(controller: _phone, enabled: !busy),
-                            const SizedBox(height: 16),
-                            PasswordField(
-                              controller: _password,
-                              enabled: !busy,
-                              onSubmitted: _submit,
-                            ),
-                            Align(
-                              alignment: Alignment.centerRight,
-                              child: TextButton(
-                                style: TextButton.styleFrom(
-                                  foregroundColor: navy,
-                                  minimumSize: const Size(0, 40),
+                      padding: const EdgeInsets.fromLTRB(24, 28, 24, 24),
+                      child: AutofillGroup(
+                        child: Form(
+                          key: _formKey,
+                          autovalidateMode: _submitted
+                              ? AutovalidateMode.onUserInteraction
+                              : AutovalidateMode.disabled,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Text(
+                                'Connexion',
+                                style: textTheme.headlineSmall?.copyWith(
+                                  fontWeight: FontWeight.w800,
                                 ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Heureux de vous revoir !',
+                                style: textTheme.bodyMedium?.copyWith(
+                                  color: mutedText,
+                                ),
+                              ),
+                              const SizedBox(height: 24),
+                              PhoneField(controller: _phone, enabled: !busy),
+                              const SizedBox(height: 16),
+                              PasswordField(
+                                controller: _password,
+                                enabled: !busy,
+                                onSubmitted: _submit,
+                              ),
+                              Align(
+                                alignment: Alignment.centerRight,
+                                child: TextButton(
+                                  style: TextButton.styleFrom(
+                                    foregroundColor: navy,
+                                    minimumSize: const Size(0, 40),
+                                  ),
+                                  onPressed: busy
+                                      ? null
+                                      : () => showForgotPasswordSheet(
+                                          context,
+                                          phone: _phone.text,
+                                        ),
+                                  child: const Text('Mot de passe oublié ?'),
+                                ),
+                              ),
+                              if (_error != null) ...[
+                                const SizedBox(height: 16),
+                                AuthErrorBanner(_error!),
+                              ],
+                              const SizedBox(height: 12),
+                              AuthSubmitButton(
+                                label: 'Se connecter',
+                                busy: busy,
+                                onPressed: _submit,
+                              ),
+                              const SizedBox(height: 24),
+                              const _OrDivider(),
+                              const SizedBox(height: 16),
+                              OutlinedButton(
                                 onPressed: busy
                                     ? null
-                                    : () => showForgotPasswordSheet(
-                                        context,
-                                        phone: _phone.text,
+                                    : () => Navigator.of(context).push(
+                                        MaterialPageRoute(
+                                          builder: (_) =>
+                                              const RegisterScreen(),
+                                        ),
                                       ),
-                                child: const Text('Mot de passe oublié ?'),
+                                child: const Text('Créer un compte'),
                               ),
-                            ),
-                            if (_error != null) ...[
-                              const SizedBox(height: 16),
-                              AuthErrorBanner(_error!),
+                              const Spacer(),
+                              const SizedBox(height: 24),
+                              const _CourierNote(),
                             ],
-                            const SizedBox(height: 12),
-                            AuthSubmitButton(
-                              label: 'Se connecter',
-                              busy: busy,
-                              onPressed: _submit,
-                            ),
-                            const SizedBox(height: 24),
-                            const _OrDivider(),
-                            const SizedBox(height: 16),
-                            OutlinedButton(
-                              onPressed: busy
-                                  ? null
-                                  : () => Navigator.of(context).push(
-                                      MaterialPageRoute(
-                                        builder: (_) => const RegisterScreen(),
-                                      ),
-                                    ),
-                              child: const Text('Créer un compte'),
-                            ),
-                            const Spacer(),
-                            const SizedBox(height: 24),
-                            const _CourierNote(),
-                          ],
+                          ),
                         ),
                       ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),

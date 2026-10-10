@@ -78,6 +78,8 @@ class _ParcelFormScreenState extends State<ParcelFormScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: SafeArea(
+        // DarkHeader pads itself for the status bar.
+        top: false,
         bottom: false,
         child: Column(
           children: [

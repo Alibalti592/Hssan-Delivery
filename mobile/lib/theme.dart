@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'deliveries/delivery.dart';
 
@@ -7,6 +8,20 @@ import 'deliveries/delivery.dart';
 /// background, primary buttons, active icons). Kept as `navy` rather than
 /// renamed — it's referenced across a dozen screens as "the brand color".
 const navy = Color(0xFF000000);
+
+/// Status bar icons for a white top of screen (the default) and for a black
+/// one (DarkHeader, splash, login). Set explicitly: left to the phone, an
+/// iPhone in dark mode draws white icons, invisible on our white screens.
+const statusBarOnLight = SystemUiOverlayStyle(
+  statusBarColor: Colors.transparent,
+  statusBarIconBrightness: Brightness.dark, // Android
+  statusBarBrightness: Brightness.light, // iOS
+);
+const statusBarOnDark = SystemUiOverlayStyle(
+  statusBarColor: Colors.transparent,
+  statusBarIconBrightness: Brightness.light,
+  statusBarBrightness: Brightness.dark,
+);
 
 /// Status palette shared by delivery and order status chips.
 const successText = Color(0xFF276749);

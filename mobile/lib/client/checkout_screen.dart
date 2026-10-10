@@ -158,6 +158,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
     return Scaffold(
       body: SafeArea(
+        // DarkHeader pads itself for the status bar.
+        top: false,
         bottom: false,
         child: Column(
           children: [

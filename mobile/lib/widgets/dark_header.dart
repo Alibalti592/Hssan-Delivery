@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../theme.dart';
 
 /// Full-bleed dark header block used at the top of primary-action screens
 /// (auth, cart, checkout, profile, courier dashboard) — the visual signature
 /// of the Delivery Hassen design.
+///
+/// It reaches up under the status bar (screens hosting it leave the top
+/// unpadded: SafeArea(top: false)), so the black runs to the top edge with
+/// white status bar icons on it.
 class DarkHeader extends StatelessWidget {
   const DarkHeader({
     required this.title,
@@ -23,33 +28,55 @@ class DarkHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      color: navy,
-      padding: EdgeInsets.fromLTRB(24, onBack != null ? 14 : 28, 24, 24),
-      child: Column(
-        crossAxisAlignment: centered
-            ? CrossAxisAlignment.center
-            : CrossAxisAlignment.start,
-        children: [
-          if (onBack != null)
-            Align(
-              alignment: Alignment.centerLeft,
-              child: InkWell(
-                onTap: onBack,
-                borderRadius: BorderRadius.circular(20),
-                child: const Padding(
-                  padding: EdgeInsets.all(4),
-                  child: Icon(Icons.arrow_back, color: Colors.white, size: 22),
+    final statusBar = MediaQuery.paddingOf(context).top;
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: statusBarOnDark,
+      child: Container(
+        width: double.infinity,
+        color: navy,
+        padding: EdgeInsets.fromLTRB(
+          24,
+          statusBar + (onBack != null ? 14 : 28),
+          24,
+          24,
+        ),
+        child: Column(
+          crossAxisAlignment: centered
+              ? CrossAxisAlignment.center
+              : CrossAxisAlignment.start,
+          children: [
+            if (onBack != null)
+              Align(
+                alignment: Alignment.centerLeft,
+                child: InkWell(
+                  onTap: onBack,
+                  borderRadius: BorderRadius.circular(20),
+                  child: const Padding(
+                    padding: EdgeInsets.all(4),
+                    child: Icon(
+                      Icons.arrow_back,
+                      color: Colors.white,
+                      size: 22,
+                    ),
+                  ),
                 ),
               ),
-            ),
-          Row(
-            mainAxisSize: centered ? MainAxisSize.min : MainAxisSize.max,
-            children: [
-              if (!centered)
-                Expanded(
-                  child: Text(
+            Row(
+              mainAxisSize: centered ? MainAxisSize.min : MainAxisSize.max,
+              children: [
+                if (!centered)
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 20,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  )
+                else
+                  Text(
                     title,
                     style: const TextStyle(
                       color: Colors.white,
@@ -57,28 +84,19 @@ class DarkHeader extends StatelessWidget {
                       fontWeight: FontWeight.w800,
                     ),
                   ),
-                )
-              else
-                Text(
-                  title,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ?trailing,
-            ],
-          ),
-          if (subtitle != null) ...[
-            const SizedBox(height: 4),
-            Text(
-              subtitle!,
-              textAlign: centered ? TextAlign.center : TextAlign.start,
-              style: const TextStyle(color: Colors.white70, fontSize: 13),
+                ?trailing,
+              ],
             ),
+            if (subtitle != null) ...[
+              const SizedBox(height: 4),
+              Text(
+                subtitle!,
+                textAlign: centered ? TextAlign.center : TextAlign.start,
+                style: const TextStyle(color: Colors.white70, fontSize: 13),
+              ),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }

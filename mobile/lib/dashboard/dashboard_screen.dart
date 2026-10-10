@@ -131,6 +131,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     return Scaffold(
       body: SafeArea(
+        // DarkHeader pads itself for the status bar.
+        top: false,
         bottom: false,
         child: Column(
           children: [
