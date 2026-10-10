@@ -45,7 +45,8 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  # write: publishing the ios-latest pre-release (unsigned .ipa, below).
+  contents: write
 
 concurrency:
   group: ios-${{ github.ref }}
@@ -97,6 +98,37 @@ jobs:
             --dart-define=FIREBASE_MESSAGING_SENDER_ID="$FIREBASE_MESSAGING_SENDER_ID" \
             --dart-define=FIREBASE_PROJECT_ID="$FIREBASE_PROJECT_ID" \
             --build-number="${{ github.run_number }}"
+
+      # No Mac needed to try it on an iPhone: this unsigned .ipa is signed
+      # and installed from Linux/Windows with xtool (xtool install), with a
+      # free or paid Apple ID. See docs/IPHONE-TEST.md.
+      - name: Package the unsigned .ipa
+        if: env.SIGN != 'true' && github.event_name != 'pull_request'
+        run: |
+          rm -rf Payload hssan-delivery.ipa
+          mkdir Payload
+          cp -R build/ios/iphoneos/Runner.app Payload/
+          zip -qry hssan-delivery.ipa Payload
+          ls -l hssan-delivery.ipa
+
+      - name: Upload the .ipa as a workflow artifact
+        if: env.SIGN != 'true' && github.event_name != 'pull_request'
+        uses: actions/upload-artifact@v7
+        with:
+          name: hssan-delivery-ipa
+          path: mobile/hssan-delivery.ipa
+
+      - name: Publish the ios-latest pre-release
+        if: env.SIGN != 'true' && github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete ios-latest --yes --cleanup-tag || true
+          gh release create ios-latest hssan-delivery.ipa \
+            --target "$GITHUB_SHA" \
+            --prerelease \
+            --title "iPhone test build (${GITHUB_REF_NAME} #${{ github.run_number }})" \
+            --notes "Unsigned iPhone build from ${GITHUB_REF_NAME} @ ${GITHUB_SHA::7}, pointing at ${API_BASE_URL}. Install it from Linux or Windows with xtool: xtool install hssan-delivery.ipa (see docs/IPHONE-TEST.md)."
 
       - name: Explain why nothing was uploaded
         if: env.SIGN != 'true' && github.event_name != 'pull_request'
