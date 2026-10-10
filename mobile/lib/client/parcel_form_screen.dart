@@ -10,9 +10,9 @@ import '../widgets/dark_header.dart';
 import 'order_confirmed_screen.dart';
 
 /// A Colis (parcel) request: where it is collected (one of the sender's
-/// addresses), who receives it, and where — placed on the map, which also
-/// sets the delivery zone that prices it. No restaurant, no cart, since a
-/// parcel doesn't come from a catalogue.
+/// addresses — its pin sets the delivery zone that prices it), and who
+/// receives it and where, typed in since it is someone else's address. No
+/// restaurant, no cart, since a parcel doesn't come from a catalogue.
 class ParcelFormScreen extends StatefulWidget {
   const ParcelFormScreen({super.key});
 
@@ -23,9 +23,9 @@ class ParcelFormScreen extends StatefulWidget {
 class _ParcelFormScreenState extends State<ParcelFormScreen> {
   final _formKey = GlobalKey<FormState>();
   AddressSelection? _pickup;
-  AddressSelection? _dropOff;
   final _recipientName = TextEditingController();
   final _recipientPhone = TextEditingController();
+  final _recipientAddress = TextEditingController();
   final _note = TextEditingController();
   bool _submitting = false;
   String? _error;
@@ -34,6 +34,7 @@ class _ParcelFormScreenState extends State<ParcelFormScreen> {
   void dispose() {
     _recipientName.dispose();
     _recipientPhone.dispose();
+    _recipientAddress.dispose();
     _note.dispose();
     super.dispose();
   }
@@ -42,7 +43,6 @@ class _ParcelFormScreenState extends State<ParcelFormScreen> {
     setState(() => _error = null);
     if (!_formKey.currentState!.validate()) return;
     final pickup = _pickup!.address;
-    final dropOff = _dropOff!;
 
     setState(() => _submitting = true);
     try {
@@ -50,12 +50,10 @@ class _ParcelFormScreenState extends State<ParcelFormScreen> {
         pickupAddress: pickup.fullText,
         pickupLatitude: pickup.latitude,
         pickupLongitude: pickup.longitude,
-        deliveryAddress: dropOff.address.fullText,
-        deliveryLatitude: dropOff.address.latitude,
-        deliveryLongitude: dropOff.address.longitude,
+        deliveryAddress: _recipientAddress.text.trim(),
         recipientName: _recipientName.text.trim(),
         recipientPhone: _recipientPhone.text.trim(),
-        deliveryZoneId: dropOff.zone!.id,
+        deliveryZoneId: _pickup!.zone!.id,
         note: _note.text.trim(),
       );
       if (!mounted) return;
@@ -97,7 +95,6 @@ class _ParcelFormScreenState extends State<ParcelFormScreen> {
                       AddressField(
                         label: 'Récupérer le colis à',
                         enabled: !_submitting,
-                        needsZone: false,
                         allowOneOff: true,
                         initialAddress: context
                             .read<SelectedAddressController>()
@@ -134,13 +131,19 @@ class _ParcelFormScreenState extends State<ParcelFormScreen> {
                         validator: validatePhone,
                       ),
                       const SizedBox(height: 16),
-                      // Placed on the map: it sets the zone and price.
-                      AddressField(
-                        label: 'Adresse du destinataire',
+                      TextFormField(
+                        controller: _recipientAddress,
                         enabled: !_submitting,
-                        allowOneOff: true,
-                        emptyText: 'Placer l\'adresse sur la carte',
-                        onChanged: (v) => setState(() => _dropOff = v),
+                        minLines: 1,
+                        maxLines: 3,
+                        textCapitalization: TextCapitalization.sentences,
+                        decoration: const InputDecoration(
+                          labelText: 'Adresse du destinataire',
+                          hintText: 'Rue, numéro, quartier, repère…',
+                        ),
+                        validator: (v) => (v == null || v.trim().isEmpty)
+                            ? 'Adresse requise'
+                            : null,
                       ),
                       const SizedBox(height: 16),
                       TextFormField(

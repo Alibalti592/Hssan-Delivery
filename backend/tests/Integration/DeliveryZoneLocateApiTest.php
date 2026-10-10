@@ -152,6 +152,30 @@ final class DeliveryZoneLocateApiTest extends WebTestCase
         self::assertSame('Nous ne livrons pas encore à cette adresse.', $this->json()['message']);
     }
 
+    public function testAParcelIsPricedByTheZoneOfTheSendersPin(): void
+    {
+        $centre = $this->placedZone('Centre', $this->lat, $this->lng, 1.0);
+        $cheaper = $this->zone('Moins chère');
+        $token = $this->login('ROLE_CLIENT');
+
+        // Collected in the Centre; the recipient's address is only typed.
+        $parcel = $this->parcel($cheaper->getId(), $this->lat, $this->lng);
+        $parcel['pickupLatitude'] = $parcel['deliveryLatitude'];
+        $parcel['pickupLongitude'] = $parcel['deliveryLongitude'];
+        unset($parcel['deliveryLatitude'], $parcel['deliveryLongitude']);
+
+        $this->client->request('POST', '/api/orders/parcels', server: $this->auth($token) + ['CONTENT_TYPE' => 'application/json'], content: json_encode($parcel));
+
+        self::assertResponseStatusCodeSame(Response::HTTP_CREATED);
+        self::assertSame($centre->getId(), $this->json()['deliveryZoneId']);
+
+        // Collected 20 km away: nowhere we deliver.
+        $parcel['pickupLatitude'] = $this->lat - 0.18;
+        $this->client->request('POST', '/api/orders/parcels', server: $this->auth($token) + ['CONTENT_TYPE' => 'application/json'], content: json_encode($parcel));
+
+        self::assertResponseStatusCodeSame(Response::HTTP_BAD_REQUEST);
+    }
+
     public function testAnOrderIsPricedByTheZoneOfItsDropOffPin(): void
     {
         $centre = $this->placedZone('Centre', $this->lat, $this->lng, 1.0);

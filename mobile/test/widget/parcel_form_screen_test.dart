@@ -34,34 +34,6 @@ final _home = SavedAddress(
   longitude: 9.87,
 );
 
-/// The client's saved addresses: the recipient's is one of them.
-List<Map<String, dynamic>> _addresses() => [
-  {
-    'id': 3,
-    'label': 'Maison',
-    'addressLine': '1 Rue de la Paix',
-    'instructions': null,
-    'isDefault': true,
-    'deliveryZoneId': 1,
-    'deliveryZoneName': 'Centre-ville',
-    'deliveryZoneFee': '5.000',
-    'latitude': 37.27,
-    'longitude': 9.87,
-  },
-  {
-    'id': 4,
-    'label': 'Chez Sami',
-    'addressLine': '2 Avenue Habib Bourguiba',
-    'instructions': 'Porte bleue',
-    'isDefault': false,
-    'deliveryZoneId': 1,
-    'deliveryZoneName': 'Centre-ville',
-    'deliveryZoneFee': '5.000',
-    'latitude': 37.29,
-    'longitude': 9.86,
-  },
-];
-
 Map<String, dynamic> _parcelOrder() => {
   'id': 42,
   'restaurantId': null,
@@ -104,23 +76,17 @@ Widget _app(MockClient mock, {SavedAddress? current}) {
 
 void main() {
   testWidgets(
-    "collects at the sender's address, delivers where the recipient's pin is",
+    "collects at the sender's address, priced by its pin, delivers to the "
+    'address typed in',
     (tester) async {
       _useTallViewport(tester);
       Map<String, dynamic>? posted;
       final located = <String>[];
       final mock = MockClient((request) async {
-        switch (request.url.path) {
-          case '/api/addresses':
-            return jsonResponse(_addresses());
-          case '/api/delivery-zones/locate':
-            located.add(request.url.query);
-            // Chez Sami's pin is in the Corniche, whatever was saved.
-            return jsonResponse(
-              request.url.queryParameters['latitude'] == '37.29'
-                  ? {'id': 2, 'name': 'Corniche', 'fee': '6.000'}
-                  : {'id': 1, 'name': 'Centre-ville', 'fee': '5.000'},
-            );
+        if (request.url.path == '/api/delivery-zones/locate') {
+          located.add(request.url.query);
+          // The pickup pin is in the Corniche, whatever zone was saved.
+          return jsonResponse({'id': 2, 'name': 'Corniche', 'fee': '6.000'});
         }
         posted = jsonDecode(request.body) as Map<String, dynamic>;
         return jsonResponse(_parcelOrder(), 201);
@@ -129,10 +95,11 @@ void main() {
       await tester.pumpWidget(_app(mock, current: _home));
       await tester.pumpAndSettle();
 
-      // Pickup is pre-filled from "LIVRER À"; its zone isn't needed.
+      // Pickup is pre-filled from "LIVRER À", its zone from its pin.
       expect(find.text('Maison'), findsOneWidget);
-      expect(located, isEmpty);
-      // No zone to choose anywhere.
+      expect(located, hasLength(1));
+      expect(find.text('Corniche · 6.000 DT'), findsOneWidget);
+      // No zone to choose.
       expect(find.byType(DropdownButtonFormField), findsNothing);
 
       await tester.enterText(
@@ -143,13 +110,10 @@ void main() {
         find.widgetWithText(TextFormField, 'Téléphone du destinataire'),
         '22000000',
       );
-      await tester.tap(find.text("Placer l'adresse sur la carte"));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Chez Sami'));
-      await tester.pumpAndSettle();
-
-      expect(located, hasLength(1));
-      expect(find.text('Corniche · 6.000 DT'), findsOneWidget);
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Adresse du destinataire'),
+        '  2 Avenue Habib Bourguiba — Porte bleue ',
+      );
 
       await tester.tap(find.text('ENVOYER LE COLIS'));
       await tester.pumpAndSettle();
@@ -157,8 +121,6 @@ void main() {
       expect(posted, {
         'pickupLatitude': 37.27,
         'pickupLongitude': 9.87,
-        'deliveryLatitude': 37.29,
-        'deliveryLongitude': 9.86,
         'pickupAddress': '1 Rue de la Paix',
         'deliveryAddress': '2 Avenue Habib Bourguiba — Porte bleue',
         'recipientName': 'Sami Client',
@@ -170,30 +132,33 @@ void main() {
     },
   );
 
-  testWidgets("a recipient outside every zone can't be sent to", (
-    tester,
-  ) async {
+  testWidgets("a pickup outside every zone can't be sent from", (tester) async {
     _useTallViewport(tester);
     final mock = MockClient((request) async {
-      switch (request.url.path) {
-        case '/api/addresses':
-          return jsonResponse(_addresses());
-        case '/api/delivery-zones/locate':
-          return jsonResponse({'message': 'Hors zone'}, 404);
+      if (request.url.path == '/api/delivery-zones/locate') {
+        return jsonResponse({'message': 'Hors zone'}, 404);
       }
       fail('should not submit outside every zone');
     });
 
     await tester.pumpWidget(_app(mock, current: _home));
     await tester.pumpAndSettle();
-    await tester.tap(find.text("Placer l'adresse sur la carte"));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Chez Sami'));
-    await tester.pumpAndSettle();
 
     expect(
       find.text('Nous ne livrons pas encore à cette adresse.'),
       findsOneWidget,
+    );
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Nom du destinataire'),
+      'Sami Client',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Téléphone du destinataire'),
+      '22000000',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Adresse du destinataire'),
+      'Rue X',
     );
     await tester.tap(find.text('ENVOYER LE COLIS'));
     await tester.pumpAndSettle();
@@ -213,8 +178,8 @@ void main() {
     await tester.tap(find.text('ENVOYER LE COLIS'));
     await tester.pumpAndSettle();
 
-    // Neither the pickup nor the recipient's address is chosen yet.
-    expect(find.text('Choisissez une adresse'), findsNWidgets(2));
+    expect(find.text('Choisissez une adresse'), findsOneWidget);
     expect(find.text('Nom requis'), findsOneWidget);
+    expect(find.text('Adresse requise'), findsOneWidget);
   });
 }
