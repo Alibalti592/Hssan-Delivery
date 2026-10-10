@@ -287,7 +287,7 @@ export function OnTheirWay() {
       <div className="card">
         {list.length === 0 ? (
           <div className="dispatch-empty">
-            {active.isLoading ? 'Loading…' : 'No order is out for delivery right now.'}
+            {active.isLoading ? 'Loading…' : active.error ? 'Could not load these orders.' : 'No order is out for delivery right now.'}
           </div>
         ) : (
           <table>
