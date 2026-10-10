@@ -46,7 +46,14 @@ export interface DeliveryZone {
   fee: string;
 }
 
-export interface DeliveryZoneAdmin extends DeliveryZone {
+export interface DeliveryZoneArea {
+  /** Center of the zone on the map, and the radius it covers. Null until placed. */
+  latitude: number | null;
+  longitude: number | null;
+  radiusKm: number | null;
+}
+
+export interface DeliveryZoneAdmin extends DeliveryZone, DeliveryZoneArea {
   createdAt: string;
   updatedAt: string;
 }

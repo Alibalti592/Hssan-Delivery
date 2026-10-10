@@ -16,7 +16,9 @@ import '../widgets/dark_header.dart';
 
 /// Adds or edits an address: a pin on the map (what the courier navigates
 /// to), a label chip, the written address — filled in from where the pin
-/// is placed — the zone that prices it and door-step hints. Pops the
+/// is placed — and door-step hints. The zone that prices deliveries there
+/// follows the pin (the zones the admin placed on the map) without being
+/// shown; the client can't save a pin outside every zone. Pops the
 /// resulting [SavedAddress].
 ///
 /// With [allowOneOff] (picking an address for an order), the client can
@@ -49,11 +51,13 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
   );
   late bool _isDefault = widget.existing?.isDefault ?? false;
   late DeliveryZoneOption? _zone = widget.existing?.zone;
+  late _ZoneStatus _zoneStatus = _zone == null
+      ? _ZoneStatus.needsPin
+      : _ZoneStatus.found;
   late LatLng? _pin = widget.existing?.hasLocation == true
       ? LatLng(widget.existing!.latitude!, widget.existing!.longitude!)
       : null;
   bool _saveForLater = true;
-  late Future<List<DeliveryZoneOption>> _zonesFuture;
   bool _saving = false;
   String? _error;
 
@@ -67,12 +71,19 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
   /// replaces what the client typed themselves.
   String? _filledIn;
 
+  /// Only the latest zone lookup counts.
+  int _zoneLookup = 0;
+
+  /// Save was tapped without a zone: say why under the zone.
+  bool _zoneRequired = false;
+
   bool get _isEditing => widget.existing != null;
 
   @override
   void initState() {
     super.initState();
-    _zonesFuture = context.read<OrdersRepository>().listDeliveryZones();
+    // An address being edited: its zone as the map stands today.
+    if (_pin != null) _detectZoneAt(_pin!);
   }
 
   @override
@@ -86,10 +97,31 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
 
   void _pinSettled(LatLng point) {
     _lookupDelay?.cancel();
-    _lookupDelay = Timer(
-      const Duration(milliseconds: 500),
-      () => _fillAddressAt(point),
-    );
+    _lookupDelay = Timer(const Duration(milliseconds: 500), () {
+      _fillAddressAt(point);
+      _detectZoneAt(point);
+    });
+  }
+
+  Future<void> _detectZoneAt(LatLng point) async {
+    final lookup = ++_zoneLookup;
+    setState(() => _zoneStatus = _ZoneStatus.looking);
+    DeliveryZoneOption? zone;
+    var status = _ZoneStatus.outside;
+    try {
+      zone = await context.read<OrdersRepository>().locateZone(
+        point.latitude,
+        point.longitude,
+      );
+      if (zone != null) status = _ZoneStatus.found;
+    } on Exception {
+      status = _ZoneStatus.failed;
+    }
+    if (!mounted || lookup != _zoneLookup) return;
+    setState(() {
+      _zone = zone;
+      _zoneStatus = status;
+    });
   }
 
   Future<void> _fillAddressAt(LatLng point) async {
@@ -115,8 +147,19 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
       : _labelChoice.text;
 
   Future<void> _save() async {
-    setState(() => _error = null);
-    if (!_formKey.currentState!.validate()) return;
+    setState(() {
+      _error = null;
+      _zoneRequired = true;
+    });
+    final formValid = _formKey.currentState!.validate();
+    // Still looking, or the lookup failed (no network): look (again) now.
+    if ((_zoneStatus == _ZoneStatus.looking ||
+            _zoneStatus == _ZoneStatus.failed) &&
+        _pin != null) {
+      await _detectZoneAt(_pin!);
+      if (!mounted) return;
+    }
+    if (!formValid || _zoneStatus != _ZoneStatus.found) return;
 
     if (!_saveForLater) {
       Navigator.of(context).pop(
@@ -181,7 +224,8 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
           children: [
             DarkHeader(
               title: _isEditing ? 'Modifier l\'adresse' : 'Nouvelle adresse',
-              onBack: _saving ? null : () => Navigator.of(context).pop(),
+              onBack: () => Navigator.of(context).pop(),
+              backEnabled: !_saving,
             ),
             Expanded(
               child: ListView(
@@ -283,39 +327,9 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
                                 ? 'Adresse requise'
                                 : null,
                           ),
-                          const SizedBox(height: 16),
-                          FutureBuilder<List<DeliveryZoneOption>>(
-                            future: _zonesFuture,
-                            builder: (context, snapshot) {
-                              if (snapshot.connectionState ==
-                                  ConnectionState.waiting) {
-                                return const LinearProgressIndicator();
-                              }
-                              final zones = snapshot.data ?? const [];
-                              return DropdownButtonFormField<
-                                DeliveryZoneOption
-                              >(
-                                initialValue: zones.contains(_zone)
-                                    ? _zone
-                                    : null,
-                                isExpanded: true,
-                                decoration: const InputDecoration(
-                                  labelText: 'Zone de livraison',
-                                ),
-                                items: [
-                                  for (final z in zones)
-                                    DropdownMenuItem(
-                                      value: z,
-                                      child: Text('${z.name} — ${z.fee} DT'),
-                                    ),
-                                ],
-                                validator: (v) =>
-                                    v == null ? 'Choisissez la zone' : null,
-                                onChanged: _saving
-                                    ? null
-                                    : (z) => setState(() => _zone = z),
-                              );
-                            },
+                          _ZoneProblem(
+                            status: _zoneStatus,
+                            required: _zoneRequired,
                           ),
                           const SizedBox(height: 16),
                           TextFormField(
@@ -386,6 +400,50 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+enum _ZoneStatus { needsPin, looking, found, outside, failed }
+
+/// Why the pin can't be saved, if it can't: outside every zone, the zone
+/// couldn't be looked up, or no pin yet (once save was tapped). The zone
+/// itself isn't shown here: it isn't the client's to choose.
+class _ZoneProblem extends StatelessWidget {
+  const _ZoneProblem({required this.status, required this.required});
+
+  final _ZoneStatus status;
+
+  /// Save was tapped: a missing pin is an error now.
+  final bool required;
+
+  @override
+  Widget build(BuildContext context) {
+    final message = switch (status) {
+      _ZoneStatus.outside => 'Nous ne livrons pas encore à cette adresse.',
+      _ZoneStatus.failed =>
+        'Impossible de vérifier cette adresse. Vérifiez votre connexion.',
+      _ZoneStatus.needsPin when required =>
+        'Placez le repère sur votre adresse',
+      _ => null,
+    };
+    if (message == null) return const SizedBox.shrink();
+    final color = Theme.of(context).colorScheme.error;
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 10, left: 4),
+      child: Row(
+        children: [
+          Icon(Icons.location_off_outlined, size: 18, color: color),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              message,
+              style: TextStyle(color: color, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
       ),
     );
   }

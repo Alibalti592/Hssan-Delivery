@@ -2,7 +2,9 @@ import 'dart:async';
 
 import '../cart/cart.dart';
 import '../core/api_client.dart';
+import '../core/api_exception.dart';
 import '../core/paged_result.dart';
+import 'courier_position.dart';
 import 'order_models.dart';
 
 class OrdersRepository {
@@ -19,11 +21,40 @@ class OrdersRepository {
 
   void notifyChanged(int orderId) => _changes.add(orderId);
 
-  Future<List<DeliveryZoneOption>> listDeliveryZones() async {
-    final body = await _api.get('/api/delivery-zones');
-    return (body as List<dynamic>)
-        .map((e) => DeliveryZoneOption.fromJson(e as Map<String, dynamic>))
-        .toList(growable: false);
+  /// Where the courier is, while they're on this order (accepted it, until
+  /// delivered); null otherwise, or before their app reports a position.
+  Future<CourierPosition?> courierPosition(int orderId) async {
+    try {
+      final body = await _api.get('/api/orders/$orderId/courier-location');
+      // Polled every few seconds: a malformed answer just means no
+      // position this time, never an error.
+      if (body is! Map<String, dynamic> ||
+          body['latitude'] is! num ||
+          body['longitude'] is! num) {
+        return null;
+      }
+      return CourierPosition.fromJson(body);
+    } on ApiException catch (e) {
+      if (e.statusCode == 404) return null;
+      rethrow;
+    }
+  }
+
+  /// The zone an address pin falls in, from the zones the admin placed on
+  /// the map; null when none covers it (we don't deliver there).
+  Future<DeliveryZoneOption?> locateZone(
+    double latitude,
+    double longitude,
+  ) async {
+    try {
+      final body = await _api.get(
+        '/api/delivery-zones/locate?latitude=$latitude&longitude=$longitude',
+      );
+      return DeliveryZoneOption.fromJson(body as Map<String, dynamic>);
+    } on ApiException catch (e) {
+      if (e.statusCode == 404) return null;
+      rethrow;
+    }
   }
 
   Future<ClientOrder> createOrder({

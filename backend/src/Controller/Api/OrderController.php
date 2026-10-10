@@ -6,16 +6,18 @@ use App\Dto\Order\CreateBillOrderRequest;
 use App\Dto\Order\CreateOrderRequest;
 use App\Dto\Order\CreateParcelOrderRequest;
 use App\Dto\Order\OrderResponse;
+use App\Enum\DeliveryStatus;
 use App\Exception\InvalidOperationException;
+use App\Repository\CourierLocationRepository;
 use App\Repository\OrderRepository;
 use App\Service\BillOrderService;
 use App\Service\OrderService;
 use App\Util\Money;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
-use Symfony\Component\HttpFoundation\ResponseHeaderBag;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpFoundation\ResponseHeaderBag;
 use Symfony\Component\RateLimiter\RateLimiterFactory;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Serializer\SerializerInterface;
@@ -31,6 +33,7 @@ final class OrderController extends AbstractApiController
         private readonly RateLimiterFactory $orderCreateLimiter,
         private readonly BillOrderService $billOrderService,
         private readonly OrderRepository $orderRepository,
+        private readonly CourierLocationRepository $courierLocationRepository,
         SerializerInterface $serializer,
         ValidatorInterface $validator,
     ) {
@@ -288,6 +291,50 @@ final class OrderController extends AbstractApiController
         $response->setContentDisposition(ResponseHeaderBag::DISPOSITION_INLINE, 'facture-'.$order->getId().'.'.pathinfo($path, PATHINFO_EXTENSION));
 
         return $response;
+    }
+
+    /**
+     * Where the courier is, for the client following their order on the
+     * map ("Suivre ma commande"): their last reported position, only while
+     * they're actually on this order (accepted it, until it's delivered).
+     * 404 otherwise — before a courier accepts, after delivery, or while
+     * their app hasn't reported a position yet.
+     */
+    #[Route('/{id}/courier-location', name: 'api_orders_courier_location', methods: ['GET'], requirements: ['id' => '\d+'])]
+    public function courierLocation(int $id): JsonResponse
+    {
+        $user = $this->getUser();
+
+        if (!$user instanceof \App\Entity\User) {
+            return $this->json(
+                ['message' => 'Authentication required.'],
+                Response::HTTP_UNAUTHORIZED
+            );
+        }
+
+        $delivery = $this->orderService->getUserOrder($id, $user)?->getDelivery();
+        $courier = $delivery?->getCourier();
+        $onTheJob = \in_array($delivery?->getStatus(), [
+            DeliveryStatus::ACCEPTED,
+            DeliveryStatus::PICKED_UP,
+            DeliveryStatus::ON_THE_WAY,
+        ], true);
+        $location = $onTheJob && null !== $courier
+            ? $this->courierLocationRepository->findOneByCourier($courier)
+            : null;
+
+        if (null === $location) {
+            return $this->json(
+                ['message' => 'Position du livreur indisponible.'],
+                Response::HTTP_NOT_FOUND
+            );
+        }
+
+        return $this->json([
+            'latitude' => $location->getLatitude(),
+            'longitude' => $location->getLongitude(),
+            'updatedAt' => $location->getUpdatedAt()?->format(\DateTimeInterface::ATOM),
+        ]);
     }
 
     #[Route('/{id}/cancel', name: 'api_orders_cancel', methods: ['POST'], requirements: ['id' => '\d+'])]

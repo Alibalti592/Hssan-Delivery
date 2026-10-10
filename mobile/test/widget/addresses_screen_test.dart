@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -81,17 +82,19 @@ void main() {
     expect(find.text('Domicile'), findsOneWidget);
     expect(find.text('Par défaut'), findsOneWidget);
     expect(find.text('Bizerte centre · 4.000 DT'), findsOneWidget);
-    // Saved before zones were asked for: flagged, fixed at checkout.
-    expect(find.text('Zone à choisir'), findsOneWidget);
+    // Saved before pins: flagged, placed on the map at checkout.
+    expect(find.text('Zone selon la position sur la carte'), findsOneWidget);
   });
 
-  testWidgets('adds an address with a label chip and its zone', (tester) async {
+  testWidgets('adds an address with a label chip, its zone from the pin', (
+    tester,
+  ) async {
     _useTallViewport(tester);
     Map<String, dynamic>? posted;
 
     final mock = MockClient((request) async {
-      if (request.url.path == '/api/delivery-zones') {
-        return jsonResponse(_zones);
+      if (request.url.path == '/api/delivery-zones/locate') {
+        return jsonResponse(_zones[1]);
       }
       if (request.method == 'POST') {
         posted = jsonDecode(request.body) as Map<String, dynamic>;
@@ -117,23 +120,23 @@ void main() {
     await tester.tap(find.text('ENREGISTRER'));
     await tester.pumpAndSettle();
 
-    // The zone is required.
-    expect(find.text('Choisissez la zone'), findsOneWidget);
+    // No pin yet, so no zone: nothing is saved.
+    expect(find.text('Placez le repère sur votre adresse'), findsOneWidget);
     expect(posted, isNull);
 
-    await tester.tap(find.text('Zone de livraison'));
+    await tester.tapAt(tester.getCenter(find.byType(FlutterMap)));
+    // Past flutter_map's double-tap window, then the settle delay.
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pump(const Duration(milliseconds: 600));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Corniche — 5.000 DT').last);
-    await tester.pumpAndSettle();
+
     await tester.tap(find.text('ENREGISTRER'));
     await tester.pumpAndSettle();
 
-    expect(posted, {
-      'label': 'Travail',
-      'addressLine': 'Avenue Habib Bourguiba',
-      'isDefault': false,
-      'deliveryZoneId': 2,
-    });
+    expect(posted, containsPair('label', 'Travail'));
+    expect(posted, containsPair('addressLine', 'Avenue Habib Bourguiba'));
+    expect(posted, containsPair('deliveryZoneId', 2));
+    expect(posted!['latitude'], isA<double>());
     expect(find.text('Travail'), findsOneWidget);
   });
 

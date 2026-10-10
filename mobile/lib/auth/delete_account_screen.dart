@@ -91,7 +91,8 @@ class _DeleteAccountScreenState extends State<DeleteAccountScreen> {
             children: [
               DarkHeader(
                 title: 'Supprimer mon compte',
-                onBack: _deleting ? null : () => Navigator.of(context).pop(),
+                onBack: () => Navigator.of(context).pop(),
+                backEnabled: !_deleting,
               ),
               Expanded(
                 child: SingleChildScrollView(

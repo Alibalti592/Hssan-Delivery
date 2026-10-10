@@ -166,7 +166,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             DarkHeader(
               title: 'Livraison',
               subtitle: cart.restaurantName ?? 'Vérifiez votre commande',
-              onBack: _submitting ? null : () => Navigator.of(context).pop(),
+              onBack: () => Navigator.of(context).pop(),
+              backEnabled: !_submitting,
             ),
             Expanded(
               child: SingleChildScrollView(

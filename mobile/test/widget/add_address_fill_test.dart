@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -27,15 +29,39 @@ class _FakeGeocoder extends ReverseGeocoder {
   }
 }
 
+/// The zone the server says covers a pin (null: none, a 404).
+Map<String, dynamic>? _locatedZone;
+final _locateAsked = <String>[];
+var _saves = 0;
+Map<String, dynamic>? _saved;
+
 Widget _app() {
   final api = ApiClient(
     tokenProvider: () => 'jwt-123',
     onUnauthorized: () {},
-    httpClient: MockClient(
-      (request) async => jsonResponse([
+    httpClient: MockClient((request) async {
+      if (request.url.path == '/api/delivery-zones/locate') {
+        _locateAsked.add(request.url.query);
+        return _locatedZone == null
+            ? jsonResponse({'message': 'Aucune zone'}, 404)
+            : jsonResponse(_locatedZone!);
+      }
+      if (request.method == 'POST') {
+        _saves++;
+        _saved = jsonDecode(request.body) as Map<String, dynamic>;
+        return jsonResponse({
+          'id': 9,
+          ..._saved!,
+          'instructions': null,
+          'deliveryZoneName': null,
+          'deliveryZoneFee': null,
+        }, 201);
+      }
+      return jsonResponse([
         {'id': 1, 'name': 'Bizerte centre', 'fee': '4.000'},
-      ]),
-    ),
+        {'id': 2, 'name': 'Corniche', 'fee': '5.000'},
+      ]);
+    }),
   );
   return MultiProvider(
     providers: [
@@ -44,6 +70,13 @@ Widget _app() {
     ],
     child: const MaterialApp(home: AddAddressScreen()),
   );
+}
+
+/// Tall enough that the save button is on screen to tap.
+void _useTallViewport(WidgetTester tester) {
+  tester.view.physicalSize = const Size(800, 1800);
+  tester.view.devicePixelRatio = 1.0;
+  addTearDown(tester.view.reset);
 }
 
 Finder get _addressField => find.widgetWithText(TextFormField, 'Adresse');
@@ -65,6 +98,10 @@ void main() {
   setUp(() {
     PinMap.offline = true;
     real = ReverseGeocoder.instance;
+    _locatedZone = null;
+    _locateAsked.clear();
+    _saves = 0;
+    _saved = null;
   });
   tearDown(() => ReverseGeocoder.instance = real);
 
@@ -99,6 +136,67 @@ void main() {
     await _tapMap(tester, const Offset(40, 30));
 
     expect(_addressText(tester), 'Chez Ali, derrière la poste');
+  });
+
+  testWidgets('the zone follows the pin, without a field to choose it', (
+    tester,
+  ) async {
+    _useTallViewport(tester);
+    ReverseGeocoder.instance = _FakeGeocoder('Corniche, Bizerte');
+    _locatedZone = {'id': 2, 'name': 'Corniche', 'fee': '5.000'};
+    await tester.pumpWidget(_app());
+    await tester.pumpAndSettle();
+
+    // No zone input at all.
+    expect(find.text('Zone de livraison'), findsNothing);
+    expect(find.byType(DropdownButtonFormField), findsNothing);
+
+    await _tapMap(tester, const Offset(40, 30));
+    _locatedZone = {'id': 1, 'name': 'Bizerte centre', 'fee': '4.000'};
+    await _tapMap(tester, const Offset(-30, -20));
+    expect(_locateAsked, hasLength(2));
+
+    await tester.tap(find.text('ENREGISTRER'));
+    await tester.pumpAndSettle();
+
+    expect(_saves, 1);
+    expect(_saved, containsPair('deliveryZoneId', 1));
+    expect(_saved!['latitude'], isA<double>());
+  });
+
+  testWidgets('outside every zone, the address cannot be saved', (
+    tester,
+  ) async {
+    _useTallViewport(tester);
+    ReverseGeocoder.instance = _FakeGeocoder('Menzel Jemil');
+    await tester.pumpWidget(_app());
+    await tester.pumpAndSettle();
+
+    await _tapMap(tester, const Offset(40, 30));
+
+    expect(_locateAsked, hasLength(1));
+    expect(
+      find.text('Nous ne livrons pas encore à cette adresse.'),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.text('ENREGISTRER'));
+    await tester.pumpAndSettle();
+    expect(_saves, 0);
+  });
+
+  testWidgets('without a pin, saving asks to place it', (tester) async {
+    _useTallViewport(tester);
+    ReverseGeocoder.instance = _FakeGeocoder(null);
+    await tester.pumpWidget(_app());
+    await tester.pumpAndSettle();
+
+    await tester.enterText(_addressField, 'Rue de Marseille');
+    await tester.tap(find.text('ENREGISTRER'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Placez le repère sur votre adresse'), findsOneWidget);
+    expect(_saves, 0);
   });
 
   test('formats a Nominatim result as number street, area, town', () {

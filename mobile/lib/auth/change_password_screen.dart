@@ -73,7 +73,8 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
           children: [
             DarkHeader(
               title: 'Changer le mot de passe',
-              onBack: _saving ? null : () => Navigator.of(context).pop(),
+              onBack: () => Navigator.of(context).pop(),
+              backEnabled: !_saving,
             ),
             Expanded(
               child: SingleChildScrollView(

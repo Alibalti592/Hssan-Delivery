@@ -13,7 +13,6 @@ use App\Enum\OrderStatus;
 use App\Exception\InvalidOperationException;
 use App\Exception\ValidationFailedException;
 use App\Repository\BillProviderRepository;
-use App\Repository\DeliveryZoneRepository;
 use App\Util\Money;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
@@ -38,7 +37,7 @@ final class BillOrderService
     public function __construct(
         private readonly EntityManagerInterface $entityManager,
         private readonly BillProviderRepository $billProviderRepository,
-        private readonly DeliveryZoneRepository $deliveryZoneRepository,
+        private readonly DeliveryZoneService $deliveryZoneService,
         #[Autowire(service: 'app.private_photo_uploader')]
         private readonly PhotoUploader $privatePhotoUploader,
     ) {
@@ -52,11 +51,9 @@ final class BillOrderService
             throw new InvalidOperationException('Ce service n\'est plus proposé.');
         }
 
-        $deliveryZone = $this->deliveryZoneRepository->find($dto->deliveryZoneId);
-
-        if (null === $deliveryZone) {
-            throw new InvalidOperationException('Cette zone de livraison n\'existe plus. Choisissez-en une autre.');
-        }
+        // The zone covering the drop-off pin, when there is one.
+        $deliveryZone = $this->deliveryZoneService->resolve($dto->deliveryZoneId, $dto->deliveryLatitude, $dto->deliveryLongitude)
+            ?? throw new InvalidOperationException('Choisissez la zone de livraison.');
 
         $amountMillimes = Money::toMillimes((string) $dto->amount);
         $reference = $this->blankToNull($dto->reference);

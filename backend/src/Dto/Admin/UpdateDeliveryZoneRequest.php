@@ -6,6 +6,8 @@ use Symfony\Component\Validator\Constraints as Assert;
 
 final class UpdateDeliveryZoneRequest
 {
+    use DeliveryZoneAreaFields;
+
     #[Assert\NotBlank]
     #[Assert\Length(max: 255)]
     public ?string $name = null;

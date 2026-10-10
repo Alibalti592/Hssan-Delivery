@@ -6,9 +6,7 @@ use App\Dto\Address\CreateAddressRequest;
 use App\Dto\Address\UpdateAddressRequest;
 use App\Entity\Address;
 use App\Entity\User;
-use App\Exception\InvalidOperationException;
 use App\Repository\AddressRepository;
-use App\Repository\DeliveryZoneRepository;
 use Doctrine\ORM\EntityManagerInterface;
 
 final class AddressService
@@ -16,7 +14,7 @@ final class AddressService
     public function __construct(
         private readonly EntityManagerInterface $entityManager,
         private readonly AddressRepository $addressRepository,
-        private readonly DeliveryZoneRepository $deliveryZoneRepository,
+        private readonly DeliveryZoneService $deliveryZoneService,
     ) {
     }
 
@@ -79,17 +77,8 @@ final class AddressService
 
     private function applyLocation(Address $address, CreateAddressRequest|UpdateAddressRequest $dto): void
     {
-        $zone = null;
-
-        if (null !== $dto->deliveryZoneId) {
-            $zone = $this->deliveryZoneRepository->find($dto->deliveryZoneId);
-
-            if (null === $zone) {
-                throw new InvalidOperationException('Cette zone de livraison n\'existe plus. Choisissez-en une autre.');
-            }
-        }
-
-        $address->setDeliveryZone($zone);
+        // With a pin, the zone covering it — not one the client picked.
+        $address->setDeliveryZone($this->deliveryZoneService->resolve($dto->deliveryZoneId, $dto->latitude, $dto->longitude));
         $address->setLocation($dto->latitude, $dto->longitude);
     }
 }

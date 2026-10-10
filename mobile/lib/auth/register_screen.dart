@@ -74,7 +74,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
               DarkHeader(
                 title: 'Créer un compte',
                 subtitle: 'Commandez en quelques secondes',
-                onBack: busy ? null : () => Navigator.of(context).pop(),
+                onBack: () => Navigator.of(context).pop(),
+                backEnabled: !busy,
               ),
               Expanded(child: _form(context, busy)),
             ],

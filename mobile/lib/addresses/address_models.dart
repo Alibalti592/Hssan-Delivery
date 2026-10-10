@@ -21,8 +21,9 @@ class SavedAddress {
   final String? instructions;
   final bool isDefault;
 
-  /// The zone that prices deliveries here; null for addresses saved before
-  /// the app asked for it (checkout asks then).
+  /// The zone that prices deliveries here, from the pin; null for an
+  /// address outside every zone, or saved before pins (checkout then asks
+  /// to place it on the map).
   final DeliveryZoneOption? zone;
 
   /// The pin the client placed on the map; null when only typed.

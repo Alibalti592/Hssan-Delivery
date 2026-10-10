@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 
@@ -31,6 +30,7 @@ import 'onboarding/splash_screen.dart';
 import 'orders/orders_repository.dart';
 import 'promotions/promotions_repository.dart';
 import 'theme.dart';
+import 'widgets/status_bar.dart';
 
 Future<void> main() async {
   // Throws before the app runs if this is a release build pointed at a
@@ -184,10 +184,7 @@ class _HssanDeliveryAppState extends State<HssanDeliveryApp> {
         themeMode: ThemeMode.light,
         // Dark status bar icons for our white screens, whatever the phone's
         // mode; black headers (DarkHeader, splash, login) set white ones.
-        builder: (context, child) => AnnotatedRegion<SystemUiOverlayStyle>(
-          value: statusBarOnLight,
-          child: child!,
-        ),
+        builder: (context, child) => StatusBarDefault(child: child!),
         home: const _Root(),
       ),
     );
