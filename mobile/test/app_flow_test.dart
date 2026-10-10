@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/testing.dart';
@@ -1122,6 +1123,48 @@ void main() {
         {'latitude': 36.8, 'longitude': 10.18},
       ]);
     });
+
+    test(
+      'reports while the courier is available, even with no delivery',
+      () async {
+        final calls = <Map<String, dynamic>>[];
+        final mock = MockClient((request) async {
+          if (request.url.path == '/api/courier/location' ||
+              request.url.path == '/api/couriers/location') {
+            calls.add(jsonDecode(request.body) as Map<String, dynamic>);
+          }
+          return http.Response('', 204);
+        });
+        final api = ApiClient(
+          tokenProvider: () => 'jwt',
+          onUnauthorized: () {},
+          httpClient: mock,
+        );
+        final deliveries = DeliveriesController(DeliveryRepository(api));
+        final available = ValueNotifier(false);
+        final service = CourierLocationService(
+          CourierLocationRepository(api),
+          deliveries,
+          interval: const Duration(minutes: 5),
+          ensurePermission: () async => true,
+          getPosition: () async => fakePosition(37.27, 9.87),
+          onDuty: available,
+          isOnDuty: () => available.value,
+        );
+        addTearDown(service.dispose);
+
+        available.value = true;
+        await Future<void>.delayed(Duration.zero);
+        expect(calls, [
+          {'latitude': 37.27, 'longitude': 9.87},
+        ]);
+
+        // Off duty with nothing to deliver: no more reports.
+        available.value = false;
+        await Future<void>.delayed(Duration.zero);
+        expect(calls, hasLength(1));
+      },
+    );
 
     test('never reports when location permission is unavailable', () async {
       var reported = false;

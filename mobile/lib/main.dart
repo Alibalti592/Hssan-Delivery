@@ -138,6 +138,12 @@ class _HssanDeliveryAppState extends State<HssanDeliveryApp> {
     _courierLocation = CourierLocationService(
       CourierLocationRepository(_api),
       _deliveries,
+      // An available courier shows on the admin's map even between orders.
+      onDuty: _auth,
+      isOnDuty: () {
+        final account = _auth.account;
+        return account != null && account.isCourier && account.isAvailable;
+      },
     );
     _cart = CartController();
     _selectedAddress = SelectedAddressController(_addresses);

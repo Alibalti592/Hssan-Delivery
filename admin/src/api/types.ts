@@ -176,6 +176,10 @@ export interface DeliveryOrderSummary {
   deliveryAddress: string;
   totalAmount: string;
   bill: OrderBill | null;
+  pickupLatitude?: number | null;
+  pickupLongitude?: number | null;
+  deliveryLatitude?: number | null;
+  deliveryLongitude?: number | null;
 }
 
 /** An order waiting for the admin to give it to a courier. */
@@ -188,6 +192,7 @@ export interface AdminDelivery {
   orderId: number;
   status: DeliveryStatus;
   courierId: number | null;
+  courierName?: string | null;
   assignedAt: string | null;
   acceptedAt: string | null;
   pickedUpAt: string | null;

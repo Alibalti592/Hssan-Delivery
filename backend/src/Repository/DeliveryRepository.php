@@ -157,6 +157,38 @@ class DeliveryRepository extends ServiceEntityRepository
     }
 
     /**
+     * Deliveries a courier has but hasn't finished — assigned, accepted,
+     * picked up, on the way — oldest first, for the dashboard.
+     *
+     * @return Delivery[]
+     */
+    public function findInProgress(int $limit = 100): array
+    {
+        $deliveries = $this->createQueryBuilder('d')
+            ->addSelect('o', 'r', 'u', 'bp', 'c')
+            ->leftJoin('d.order', 'o')
+            ->leftJoin('o.restaurant', 'r')
+            ->leftJoin('o.billProvider', 'bp')
+            ->leftJoin('o.user', 'u')
+            ->leftJoin('d.courier', 'c')
+            ->andWhere('d.status IN (:statuses)')
+            ->setParameter('statuses', [
+                DeliveryStatus::ASSIGNED,
+                DeliveryStatus::ACCEPTED,
+                DeliveryStatus::PICKED_UP,
+                DeliveryStatus::ON_THE_WAY,
+            ])
+            ->orderBy('d.createdAt', 'ASC')
+            ->addOrderBy('d.id', 'ASC')
+            ->setMaxResults($limit)
+            ->getQuery()
+            ->getResult();
+        $this->hydrateOrderItems($deliveries);
+
+        return $deliveries;
+    }
+
+    /**
      * @return PaginatedResult<Delivery>
      */
     public function paginateAllOrderedByCreatedAtDesc(int $page, int $limit): PaginatedResult

@@ -1,12 +1,15 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 
 import '../deliveries/deliveries_controller.dart';
 import 'courier_location_repository.dart';
 
 /// Reports the courier's current GPS position to the backend while they
-/// have at least one active (non-terminal) delivery — see the "last known
+/// are on duty — available for new orders ([isOnDuty]) — or have at least
+/// one active (non-terminal) delivery, so the admin sees them on the map
+/// and can give an order to the nearest one. See the "last known
 /// location, not real-time tracking" caveat on the backend's
 /// CourierLocation entity. This only ever runs in the foreground, while the
 /// app is open: there is no background service, and Android's background
@@ -24,11 +27,18 @@ class CourierLocationService {
     Duration interval = const Duration(seconds: 20),
     Future<bool> Function()? ensurePermission,
     Future<Position> Function()? getPosition,
+    Listenable? onDuty,
+    bool Function()? isOnDuty,
   }) : _interval = interval,
        _ensurePermission = ensurePermission ?? _defaultEnsurePermission,
-       _getPosition = getPosition ?? _defaultGetPosition {
+       _getPosition = getPosition ?? _defaultGetPosition,
+       _onDuty = onDuty,
+       _isOnDuty = isOnDuty ?? _never {
     _deliveries.addListener(_onDeliveriesChanged);
+    _onDuty?.addListener(_onDeliveriesChanged);
   }
+
+  static bool _never() => false;
 
   final CourierLocationRepository _repository;
   final DeliveriesController _deliveries;
@@ -36,11 +46,15 @@ class CourierLocationService {
   final Future<bool> Function() _ensurePermission;
   final Future<Position> Function() _getPosition;
 
+  /// Notifies when [_isOnDuty] may have changed (the signed-in account).
+  final Listenable? _onDuty;
+  final bool Function() _isOnDuty;
+
   Timer? _timer;
   bool _reporting = false;
 
   void _onDeliveriesChanged() {
-    final shouldReport = _deliveries.active.isNotEmpty;
+    final shouldReport = _isOnDuty() || _deliveries.active.isNotEmpty;
 
     if (shouldReport && _timer == null) {
       _reportOnce();
@@ -91,5 +105,6 @@ class CourierLocationService {
   void dispose() {
     _timer?.cancel();
     _deliveries.removeListener(_onDeliveriesChanged);
+    _onDuty?.removeListener(_onDeliveriesChanged);
   }
 }

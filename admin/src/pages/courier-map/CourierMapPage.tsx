@@ -1,6 +1,6 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { MapContainer, Marker, Popup, TileLayer } from 'react-leaflet';
+import { MapContainer, Marker, Popup, TileLayer, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Link } from 'react-router-dom';
@@ -8,9 +8,8 @@ import { courierLocationsApi } from '../../api/resources';
 import type { CourierLocationEntry, CourierMapStatus } from '../../api/types';
 import { PageHeader, Loading, ErrorBanner, NoteBanner } from '../../components/ui';
 
-// Tunis — a reasonable default center when no courier has ever reported a
-// location yet.
-const DEFAULT_CENTER: [number, number] = [36.8065, 10.1815];
+// Bizerte, where the service runs — until a courier reports a position.
+const DEFAULT_CENTER: [number, number] = [37.2744, 9.8739];
 
 const STATUS_COLOR: Record<CourierMapStatus, string> = {
   ONLINE: '#22c55e',
@@ -49,7 +48,47 @@ function timeAgo(iso: string | null): string {
   return `${days} day${days === 1 ? '' : 's'} ago`;
 }
 
+/**
+ * Frames every located courier — once at first, then again only when a
+ * courier appears or leaves, so the 12 s refresh doesn't undo the admin's
+ * own panning. [focus] flies to one courier picked from the list.
+ */
+function FrameCouriers({
+  located,
+  focus,
+}: {
+  located: CourierLocationEntry[];
+  focus: CourierLocationEntry | null;
+}) {
+  const map = useMap();
+  const framedIds = useRef<string | null>(null);
+
+  useEffect(() => {
+    const ids = located
+      .map((c) => c.courierId)
+      .sort((a, b) => a - b)
+      .join(',');
+    if (located.length === 0 || ids === framedIds.current) return;
+    framedIds.current = ids;
+    const points = located.map((c) => [c.latitude as number, c.longitude as number] as [number, number]);
+    if (points.length === 1) {
+      map.setView(points[0], 15);
+    } else {
+      map.fitBounds(L.latLngBounds(points), { padding: [40, 40], maxZoom: 15 });
+    }
+  }, [located, map]);
+
+  useEffect(() => {
+    if (focus?.latitude != null && focus.longitude != null) {
+      map.flyTo([focus.latitude, focus.longitude], 16);
+    }
+  }, [focus, map]);
+
+  return null;
+}
+
 export default function CourierMapPage() {
+  const [focus, setFocus] = useState<CourierLocationEntry | null>(null);
   const { data, isLoading, error } = useQuery({
     queryKey: ['courier-locations'],
     queryFn: courierLocationsApi.list,
@@ -64,10 +103,13 @@ export default function CourierMapPage() {
     [data],
   );
 
-  const center = useMemo<[number, number]>(() => {
-    if (located.length === 0) return DEFAULT_CENTER;
-    return [located[0].latitude as number, located[0].longitude as number];
-  }, [located]);
+  // On delivery first, then online, then offline; by name within each.
+  const listed = useMemo(() => {
+    const rank: Record<CourierMapStatus, number> = { ON_DELIVERY: 0, ONLINE: 1, OFFLINE: 2 };
+    return [...(data ?? [])].sort(
+      (a, b) => rank[a.status] - rank[b.status] || a.name.localeCompare(b.name),
+    );
+  }, [data]);
 
   const counts = useMemo(() => {
     const list = data ?? [];
@@ -85,9 +127,9 @@ export default function CourierMapPage() {
       <div className="content">
         <ErrorBanner error={error} />
         <NoteBanner>
-          This shows each courier's last reported position, not live continuous tracking. A
-          courier's app reports its location periodically while active — see "Last updated" per
-          marker for how fresh that is.
+          A courier shows here while their app is open and they are available (or on a
+          delivery): it reports their position every 20 seconds. Without a report for 5 minutes
+          they show as offline, at their last known position.
         </NoteBanner>
 
         {isLoading ? (
@@ -114,11 +156,8 @@ export default function CourierMapPage() {
             </div>
 
             <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-              <MapContainer
-                center={center}
-                zoom={located.length > 0 ? 12 : 11}
-                style={{ height: 480, width: '100%' }}
-              >
+              <MapContainer center={DEFAULT_CENTER} zoom={13} style={{ height: 480, width: '100%' }}>
+                <FrameCouriers located={located} focus={focus} />
                 <TileLayer
                   attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                   url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -148,6 +187,54 @@ export default function CourierMapPage() {
                 ))}
               </MapContainer>
             </div>
+
+            {listed.length > 0 && (
+              <div className="card" style={{ marginTop: 16 }}>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Courier</th>
+                      <th>Status</th>
+                      <th>Last position</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {listed.map((courier) => {
+                      const hasPosition = courier.latitude !== null && courier.longitude !== null;
+                      return (
+                        <tr key={courier.courierId}>
+                          <td className="rname">
+                            <span
+                              className="courier-dot"
+                              style={{ background: STATUS_COLOR[courier.status] }}
+                            />
+                            {courier.name}
+                          </td>
+                          <td>{STATUS_LABEL[courier.status]}</td>
+                          <td>{hasPosition ? timeAgo(courier.updatedAt) : 'No position yet'}</td>
+                          <td style={{ whiteSpace: 'nowrap', textAlign: 'right' }}>
+                            {courier.currentDeliveryId && (
+                              <Link to={`/deliveries/${courier.currentDeliveryId}`} className="btn ghost sm">
+                                Delivery
+                              </Link>
+                            )}{' '}
+                            <button
+                              type="button"
+                              className="btn ghost sm"
+                              disabled={!hasPosition}
+                              onClick={() => setFocus({ ...courier })}
+                            >
+                              Show on map
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </>
         )}
       </div>

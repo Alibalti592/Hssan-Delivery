@@ -200,14 +200,18 @@ final class OrderService
     /**
      * A Colis order: no restaurant, no items — just carrying a package from
      * pickupAddress to deliveryAddress. Priced the same way as every other
-     * service, off the chosen DeliveryZone's flat fee.
+     * service, off a DeliveryZone's flat fee: the zone of the sender's pickup
+     * pin (the recipient's address is only typed), or of a drop-off pin from
+     * an older app.
      */
     public function createParcelOrder(
         CreateParcelOrderRequest $dto,
         User $user,
     ): Order {
-        // The zone covering the drop-off pin, when there is one.
-        $deliveryZone = $this->deliveryZoneService->resolve($dto->deliveryZoneId, $dto->deliveryLatitude, $dto->deliveryLongitude)
+        [$latitude, $longitude] = null !== $dto->pickupLatitude
+            ? [$dto->pickupLatitude, $dto->pickupLongitude]
+            : [$dto->deliveryLatitude, $dto->deliveryLongitude];
+        $deliveryZone = $this->deliveryZoneService->resolve($dto->deliveryZoneId, $latitude, $longitude)
             ?? throw new InvalidOperationException('Choisissez la zone de livraison.');
 
         $order = new Order();

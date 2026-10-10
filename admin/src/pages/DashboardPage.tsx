@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { statsApi } from '../api/resources';
 import { PageHeader, Loading, ErrorBanner } from '../components/ui';
-import { DispatchQueue } from '../components/DispatchQueue';
+import { DispatchQueue, OnTheirWay } from '../components/DispatchQueue';
 
 export default function DashboardPage() {
   const stats = useQuery({ queryKey: ['stats'], queryFn: statsApi.summary });
@@ -11,6 +11,7 @@ export default function DashboardPage() {
       <PageHeader title="Dashboard" subtitle="Overview" />
       <div className="content">
         <DispatchQueue />
+        <OnTheirWay />
         <ErrorBanner error={stats.error} />
         {stats.isLoading ? (
           <Loading />
