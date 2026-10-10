@@ -129,7 +129,6 @@ void main() {
     await tester.pump(const Duration(milliseconds: 400));
     await tester.pump(const Duration(milliseconds: 600));
     await tester.pumpAndSettle();
-    expect(find.text('Corniche — 5.000 DT'), findsOneWidget);
 
     await tester.tap(find.text('ENREGISTRER'));
     await tester.pumpAndSettle();

@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -31,6 +33,7 @@ class _FakeGeocoder extends ReverseGeocoder {
 Map<String, dynamic>? _locatedZone;
 final _locateAsked = <String>[];
 var _saves = 0;
+Map<String, dynamic>? _saved;
 
 Widget _app() {
   final api = ApiClient(
@@ -43,7 +46,17 @@ Widget _app() {
             ? jsonResponse({'message': 'Aucune zone'}, 404)
             : jsonResponse(_locatedZone!);
       }
-      if (request.method == 'POST') _saves++;
+      if (request.method == 'POST') {
+        _saves++;
+        _saved = jsonDecode(request.body) as Map<String, dynamic>;
+        return jsonResponse({
+          'id': 9,
+          ..._saved!,
+          'instructions': null,
+          'deliveryZoneName': null,
+          'deliveryZoneFee': null,
+        }, 201);
+      }
       return jsonResponse([
         {'id': 1, 'name': 'Bizerte centre', 'fee': '4.000'},
         {'id': 2, 'name': 'Corniche', 'fee': '5.000'},
@@ -88,6 +101,7 @@ void main() {
     _locatedZone = null;
     _locateAsked.clear();
     _saves = 0;
+    _saved = null;
   });
   tearDown(() => ReverseGeocoder.instance = real);
 
@@ -124,37 +138,30 @@ void main() {
     expect(_addressText(tester), 'Chez Ali, derrière la poste');
   });
 
-  testWidgets('the zone covering the pin is filled in by itself', (
+  testWidgets('the zone follows the pin, without a field to choose it', (
     tester,
   ) async {
+    _useTallViewport(tester);
     ReverseGeocoder.instance = _FakeGeocoder('Corniche, Bizerte');
     _locatedZone = {'id': 2, 'name': 'Corniche', 'fee': '5.000'};
     await tester.pumpWidget(_app());
     await tester.pumpAndSettle();
 
-    await _tapMap(tester, const Offset(40, 30));
-
-    expect(_locateAsked, hasLength(1));
-    expect(find.text('Corniche — 5.000 DT'), findsOneWidget);
-    expect(find.text("D'après la position sur la carte"), findsOneWidget);
-    // Shown, never chosen.
+    // No zone input at all.
+    expect(find.text('Zone de livraison'), findsNothing);
     expect(find.byType(DropdownButtonFormField), findsNothing);
-  });
-
-  testWidgets('the zone follows the pin', (tester) async {
-    ReverseGeocoder.instance = _FakeGeocoder('Bizerte');
-    _locatedZone = {'id': 2, 'name': 'Corniche', 'fee': '5.000'};
-    await tester.pumpWidget(_app());
-    await tester.pumpAndSettle();
 
     await _tapMap(tester, const Offset(40, 30));
-    expect(find.text('Corniche — 5.000 DT'), findsOneWidget);
-
     _locatedZone = {'id': 1, 'name': 'Bizerte centre', 'fee': '4.000'};
     await _tapMap(tester, const Offset(-30, -20));
+    expect(_locateAsked, hasLength(2));
 
-    expect(find.text('Bizerte centre — 4.000 DT'), findsOneWidget);
-    expect(find.text('Corniche — 5.000 DT'), findsNothing);
+    await tester.tap(find.text('ENREGISTRER'));
+    await tester.pumpAndSettle();
+
+    expect(_saves, 1);
+    expect(_saved, containsPair('deliveryZoneId', 1));
+    expect(_saved!['latitude'], isA<double>());
   });
 
   testWidgets('outside every zone, the address cannot be saved', (

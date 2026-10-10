@@ -17,8 +17,8 @@ import '../widgets/dark_header.dart';
 /// Adds or edits an address: a pin on the map (what the courier navigates
 /// to), a label chip, the written address — filled in from where the pin
 /// is placed — and door-step hints. The zone that prices deliveries there
-/// follows the pin (the zones the admin placed on the map); the client
-/// doesn't choose it, and can't save a pin outside every zone. Pops the
+/// follows the pin (the zones the admin placed on the map) without being
+/// shown; the client can't save a pin outside every zone. Pops the
 /// resulting [SavedAddress].
 ///
 /// With [allowOneOff] (picking an address for an order), the client can
@@ -152,8 +152,10 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
       _zoneRequired = true;
     });
     final formValid = _formKey.currentState!.validate();
-    // The lookup failed (no network): try once more before giving up.
-    if (_zoneStatus == _ZoneStatus.failed && _pin != null) {
+    // Still looking, or the lookup failed (no network): look (again) now.
+    if ((_zoneStatus == _ZoneStatus.looking ||
+            _zoneStatus == _ZoneStatus.failed) &&
+        _pin != null) {
       await _detectZoneAt(_pin!);
       if (!mounted) return;
     }
@@ -325,9 +327,7 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
                                 ? 'Adresse requise'
                                 : null,
                           ),
-                          const SizedBox(height: 16),
-                          _ZoneDisplay(
-                            zone: _zone,
+                          _ZoneProblem(
                             status: _zoneStatus,
                             required: _zoneRequired,
                           ),
@@ -407,70 +407,43 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
 
 enum _ZoneStatus { needsPin, looking, found, outside, failed }
 
-/// The zone that prices deliveries to the pin — shown, never chosen.
-class _ZoneDisplay extends StatelessWidget {
-  const _ZoneDisplay({
-    required this.zone,
-    required this.status,
-    required this.required,
-  });
+/// Why the pin can't be saved, if it can't: outside every zone, the zone
+/// couldn't be looked up, or no pin yet (once save was tapped). The zone
+/// itself isn't shown here: it isn't the client's to choose.
+class _ZoneProblem extends StatelessWidget {
+  const _ZoneProblem({required this.status, required this.required});
 
-  final DeliveryZoneOption? zone;
   final _ZoneStatus status;
 
-  /// Save was tapped: a missing zone is an error now, not just a hint.
+  /// Save was tapped: a missing pin is an error now.
   final bool required;
 
   @override
   Widget build(BuildContext context) {
-    final zone = this.zone;
-    final (String text, String? helper, String? error) = switch (status) {
-      _ZoneStatus.found when zone != null => (
-        '${zone.name} — ${zone.fee} DT',
-        "D'après la position sur la carte",
-        null,
-      ),
-      _ZoneStatus.looking => ('Recherche de la zone…', null, null),
-      _ZoneStatus.outside => (
-        'Hors zone',
-        null,
-        'Nous ne livrons pas encore à cette adresse.',
-      ),
-      _ZoneStatus.failed => (
-        'Zone introuvable',
-        null,
-        'Impossible de trouver la zone. Vérifiez votre connexion.',
-      ),
-      _ => (
-        'Selon le repère sur la carte',
-        required ? null : 'Touchez la carte à votre adresse',
-        required ? 'Placez le repère sur votre adresse' : null,
-      ),
+    final message = switch (status) {
+      _ZoneStatus.outside => 'Nous ne livrons pas encore à cette adresse.',
+      _ZoneStatus.failed =>
+        'Impossible de vérifier cette adresse. Vérifiez votre connexion.',
+      _ZoneStatus.needsPin when required =>
+        'Placez le repère sur votre adresse',
+      _ => null,
     };
-    final found = status == _ZoneStatus.found && zone != null;
+    if (message == null) return const SizedBox.shrink();
+    final color = Theme.of(context).colorScheme.error;
 
-    return InputDecorator(
-      decoration: InputDecoration(
-        labelText: 'Zone de livraison',
-        helperText: helper,
-        errorText: error,
-        prefixIcon: const Icon(Icons.map_outlined),
-        suffixIcon: status == _ZoneStatus.looking
-            ? const Padding(
-                padding: EdgeInsets.all(14),
-                child: SizedBox.square(
-                  dimension: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                ),
-              )
-            : null,
-      ),
-      child: Text(
-        text,
-        style: TextStyle(
-          fontWeight: found ? FontWeight.w700 : FontWeight.w500,
-          color: found ? null : mutedText,
-        ),
+    return Padding(
+      padding: const EdgeInsets.only(top: 10, left: 4),
+      child: Row(
+        children: [
+          Icon(Icons.location_off_outlined, size: 18, color: color),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              message,
+              style: TextStyle(color: color, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
       ),
     );
   }
