@@ -173,10 +173,13 @@ class AddressTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final scheme = Theme.of(context).colorScheme;
+    final accent = accentOf(context);
+    final fill = fieldFillOf(context);
     final zone = address.zone;
 
     return Material(
-      color: selected ? fieldFill : Theme.of(context).colorScheme.surface,
+      color: selected ? fill : scheme.surface,
       borderRadius: BorderRadius.circular(14),
       child: InkWell(
         onTap: onTap,
@@ -186,7 +189,7 @@ class AddressTile extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
-              color: selected ? navy : cardBorder,
+              color: selected ? accent : cardBorderOf(context),
               width: selected ? 1.5 : 1,
             ),
           ),
@@ -196,12 +199,12 @@ class AddressTile extends StatelessWidget {
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  color: selected ? navy : fieldFill,
+                  color: selected ? accent : fill,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(
                   addressLabelIcon(address.label),
-                  color: selected ? Colors.white : navy,
+                  color: selected ? scheme.onPrimary : accent,
                   size: 20,
                 ),
               ),
@@ -423,11 +426,14 @@ class _AddressFieldBodyState extends State<_AddressFieldBody> {
                   )
                 : value.address,
             onTap: enabled ? _pick : null,
-            trailing: const Padding(
-              padding: EdgeInsets.only(left: 8),
+            trailing: Padding(
+              padding: const EdgeInsets.only(left: 8),
               child: Text(
                 'Changer',
-                style: TextStyle(fontWeight: FontWeight.w700, color: navy),
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  color: accentOf(context),
+                ),
               ),
             ),
           ),
@@ -491,7 +497,7 @@ class _EmptyAddressCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: fieldFill,
+      color: fieldFillOf(context),
       borderRadius: BorderRadius.circular(14),
       child: InkWell(
         onTap: onTap,
@@ -506,7 +512,7 @@ class _EmptyAddressCard extends StatelessWidget {
           ),
           child: Row(
             children: [
-              const Icon(Icons.add_location_alt_outlined, color: navy),
+              Icon(Icons.add_location_alt_outlined, color: accentOf(context)),
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
