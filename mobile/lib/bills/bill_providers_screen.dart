@@ -36,6 +36,8 @@ class _BillProvidersScreenState extends State<BillProvidersScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: SafeArea(
+        // DarkHeader pads itself for the status bar.
+        top: false,
         bottom: false,
         child: Column(
           children: [

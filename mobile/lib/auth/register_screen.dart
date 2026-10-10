@@ -67,6 +67,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
       body: GestureDetector(
         onTap: () => FocusScope.of(context).unfocus(),
         child: SafeArea(
+          // DarkHeader pads itself for the status bar.
+          top: false,
           child: Column(
             children: [
               DarkHeader(

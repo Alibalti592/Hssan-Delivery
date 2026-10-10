@@ -52,7 +52,9 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
           ? AppBar(title: const Text('Mes commandes'))
           : null,
       body: SafeArea(
-        top: !showLightAppBar,
+        // Home pads itself here; Orders has its AppBar, and the cart and
+        // profile tabs a DarkHeader that reaches under the status bar.
+        top: _index == 0,
         bottom: false,
         child: IndexedStack(index: _index, children: _tabs),
       ),

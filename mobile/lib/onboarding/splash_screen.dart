@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../theme.dart';
 import '../widgets/brand_logo.dart';
@@ -19,56 +20,62 @@ class SplashScreen extends StatelessWidget {
     // The native launch screen is flat black with the monogram centered:
     // the monogram stays exactly there, while the backdrop's glow, the name
     // and the tagline fade in around it.
-    return Scaffold(
-      backgroundColor: navy,
-      body: TweenAnimationBuilder<double>(
-        tween: Tween(begin: 0, end: 1),
-        duration: const Duration(milliseconds: 450),
-        builder: (context, t, child) => Stack(
-          fit: StackFit.expand,
-          children: [
-            Opacity(
-              opacity: t,
-              child: const BrandBackdrop(
-                center: Alignment.center,
-                child: SizedBox.expand(),
-              ),
-            ),
-            child!,
-          ],
-        ),
-        child: SizedBox.expand(
-          child: Column(
+    // White status bar icons on the black background.
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: statusBarOnDark,
+      child: Scaffold(
+        backgroundColor: navy,
+        body: TweenAnimationBuilder<double>(
+          tween: Tween(begin: 0, end: 1),
+          duration: const Duration(milliseconds: 450),
+          builder: (context, t, child) => Stack(
+            fit: StackFit.expand,
             children: [
-              const Spacer(),
-              const BrandMonogram(width: splashMonogramWidth),
-              Expanded(
-                child: TweenAnimationBuilder<double>(
-                  tween: Tween(begin: 0, end: 1),
-                  duration: const Duration(milliseconds: 450),
-                  builder: (context, opacity, child) =>
-                      Opacity(opacity: opacity, child: child),
-                  child: const Column(
-                    children: [
-                      // The artwork's proportions, as in BrandLogo.
-                      SizedBox(height: 0.12 * splashMonogramWidth),
-                      BrandName(fontSize: splashMonogramWidth / 8.1),
-                      SizedBox(height: 0.01 * splashMonogramWidth),
-                      BrandTagline(fontSize: splashMonogramWidth / 16.5),
-                      SizedBox(height: 40),
-                      SizedBox(
-                        width: 22,
-                        height: 22,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2.4,
-                          valueColor: AlwaysStoppedAnimation(Color(0xFF6B7787)),
-                        ),
-                      ),
-                    ],
-                  ),
+              Opacity(
+                opacity: t,
+                child: const BrandBackdrop(
+                  center: Alignment.center,
+                  child: SizedBox.expand(),
                 ),
               ),
+              child!,
             ],
+          ),
+          child: SizedBox.expand(
+            child: Column(
+              children: [
+                const Spacer(),
+                const BrandMonogram(width: splashMonogramWidth),
+                Expanded(
+                  child: TweenAnimationBuilder<double>(
+                    tween: Tween(begin: 0, end: 1),
+                    duration: const Duration(milliseconds: 450),
+                    builder: (context, opacity, child) =>
+                        Opacity(opacity: opacity, child: child),
+                    child: const Column(
+                      children: [
+                        // The artwork's proportions, as in BrandLogo.
+                        SizedBox(height: 0.12 * splashMonogramWidth),
+                        BrandName(fontSize: splashMonogramWidth / 8.1),
+                        SizedBox(height: 0.01 * splashMonogramWidth),
+                        BrandTagline(fontSize: splashMonogramWidth / 16.5),
+                        SizedBox(height: 40),
+                        SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.4,
+                            valueColor: AlwaysStoppedAnimation(
+                              Color(0xFF6B7787),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

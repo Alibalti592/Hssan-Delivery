@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 
@@ -181,6 +182,12 @@ class _HssanDeliveryAppState extends State<HssanDeliveryApp> {
         // following the system's dark mode left white text on white cards.
         theme: buildTheme(),
         themeMode: ThemeMode.light,
+        // Dark status bar icons for our white screens, whatever the phone's
+        // mode; black headers (DarkHeader, splash, login) set white ones.
+        builder: (context, child) => AnnotatedRegion<SystemUiOverlayStyle>(
+          value: statusBarOnLight,
+          child: child!,
+        ),
         home: const _Root(),
       ),
     );

@@ -84,6 +84,8 @@ class _DeleteAccountScreenState extends State<DeleteAccountScreen> {
       body: GestureDetector(
         onTap: () => FocusScope.of(context).unfocus(),
         child: SafeArea(
+          // DarkHeader pads itself for the status bar.
+          top: false,
           bottom: false,
           child: Column(
             children: [

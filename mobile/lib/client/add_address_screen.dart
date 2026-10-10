@@ -174,6 +174,8 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
 
     return Scaffold(
       body: SafeArea(
+        // DarkHeader pads itself for the status bar.
+        top: false,
         bottom: false,
         child: Column(
           children: [
