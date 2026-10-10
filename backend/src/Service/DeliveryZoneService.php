@@ -27,6 +27,7 @@ final class DeliveryZoneService
 
         $zone->setName($name);
         $zone->setFee($dto->fee);
+        $zone->setArea($dto->latitude, $dto->longitude, $dto->radiusKm);
 
         $this->entityManager->persist($zone);
         $this->entityManager->flush();
@@ -59,10 +60,33 @@ final class DeliveryZoneService
 
         $zone->setName($name);
         $zone->setFee($dto->fee);
+        $zone->setArea($dto->latitude, $dto->longitude, $dto->radiusKm);
 
         $this->entityManager->flush();
 
         return $zone;
+    }
+
+    /**
+     * The zone an address pin falls in: among the zones placed on the map
+     * whose radius covers it, the one with the nearest center (where two
+     * zones overlap). Null when none covers it.
+     */
+    public function locate(float $latitude, float $longitude): ?DeliveryZone
+    {
+        $best = null;
+        $bestDistance = INF;
+
+        foreach ($this->deliveryZoneRepository->findAllOrderedByName() as $zone) {
+            $distance = $zone->distanceKmFrom($latitude, $longitude);
+
+            if (null !== $distance && $distance <= $zone->getRadiusKm() && $distance < $bestDistance) {
+                $best = $zone;
+                $bestDistance = $distance;
+            }
+        }
+
+        return $best;
     }
 
     private function assertNameIsAvailable(string $name): void

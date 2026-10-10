@@ -20,6 +20,20 @@ class DeliveryZone
     #[ORM\Column(type: 'decimal', precision: 10, scale: 3)]
     private ?string $fee = null;
 
+    /**
+     * The zone on the map: a center the admin placed and the radius it
+     * covers. Null until placed; an address pin inside it gets this zone
+     * automatically (DeliveryZoneService::locate).
+     */
+    #[ORM\Column(nullable: true)]
+    private ?float $latitude = null;
+
+    #[ORM\Column(nullable: true)]
+    private ?float $longitude = null;
+
+    #[ORM\Column(nullable: true)]
+    private ?float $radiusKm = null;
+
     #[ORM\Column]
     private ?\DateTimeImmutable $createdAt = null;
 
@@ -68,6 +82,57 @@ class DeliveryZone
         $this->fee = $fee;
 
         return $this;
+    }
+
+    public function getLatitude(): ?float
+    {
+        return $this->latitude;
+    }
+
+    public function getLongitude(): ?float
+    {
+        return $this->longitude;
+    }
+
+    public function getRadiusKm(): ?float
+    {
+        return $this->radiusKm;
+    }
+
+    /**
+     * Places the zone on the map, or takes it off (all three null).
+     */
+    public function setArea(?float $latitude, ?float $longitude, ?float $radiusKm): static
+    {
+        $this->latitude = $latitude;
+        $this->longitude = $longitude;
+        $this->radiusKm = $radiusKm;
+
+        return $this;
+    }
+
+    public function isPlaced(): bool
+    {
+        return null !== $this->latitude && null !== $this->longitude && null !== $this->radiusKm;
+    }
+
+    /**
+     * Straight-line distance from the zone's center, in km (haversine), or
+     * null for a zone not placed on the map.
+     */
+    public function distanceKmFrom(float $latitude, float $longitude): ?float
+    {
+        if (!$this->isPlaced()) {
+            return null;
+        }
+
+        $toRad = static fn (float $deg): float => $deg * M_PI / 180;
+        $dLat = $toRad($latitude - $this->latitude);
+        $dLng = $toRad($longitude - $this->longitude);
+        $a = sin($dLat / 2) ** 2
+            + cos($toRad($this->latitude)) * cos($toRad($latitude)) * sin($dLng / 2) ** 2;
+
+        return 6371.0 * 2 * atan2(sqrt($a), sqrt(1 - $a));
     }
 
     public function getCreatedAt(): ?\DateTimeImmutable

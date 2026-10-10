@@ -366,10 +366,37 @@ class _AddressFieldBodyState extends State<_AddressFieldBody> {
     // Report the pre-filled address so the form knows it from the start.
     final initial = _value;
     if (initial != null) {
-      WidgetsBinding.instance.addPostFrameCallback(
-        (_) => widget.onChanged(initial),
-      );
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        widget.onChanged(initial);
+        _detectZone(initial);
+      });
     }
+  }
+
+  /// An address with a pin but no zone yet: the zone covering the pin, from
+  /// the zones the admin placed on the map. Left to the client otherwise.
+  Future<void> _detectZone(AddressSelection selection) async {
+    final address = selection.address;
+    if (!widget.needsZone ||
+        selection.zone != null ||
+        address.latitude == null ||
+        address.longitude == null) {
+      return;
+    }
+    DeliveryZoneOption? zone;
+    try {
+      zone = await context.read<OrdersRepository>().locateZone(
+        address.latitude!,
+        address.longitude!,
+      );
+    } on Exception {
+      return;
+    }
+    // Still that address, and the client hasn't picked a zone meanwhile.
+    if (!mounted || zone == null) return;
+    final now = _value;
+    if (now == null || now.address != address || now.zone != null) return;
+    _set(AddressSelection(address, zone));
   }
 
   Future<List<DeliveryZoneOption>> _zones() =>
@@ -388,7 +415,9 @@ class _AddressFieldBodyState extends State<_AddressFieldBody> {
       allowOneOff: widget.allowOneOff,
     );
     if (picked == null) return;
-    _set(AddressSelection(picked, picked.zone));
+    final selection = AddressSelection(picked, picked.zone);
+    _set(selection);
+    _detectZone(selection);
   }
 
   @override
@@ -448,6 +477,8 @@ class _AddressFieldBodyState extends State<_AddressFieldBody> {
                 }
                 final zones = snapshot.data ?? const [];
                 return DropdownButtonFormField<DeliveryZoneOption>(
+                  // Rebuilt when the zone is filled in from the pin.
+                  key: ValueKey(value.zone?.id),
                   initialValue: zones.contains(value.zone) ? value.zone : null,
                   isExpanded: true,
                   decoration: const InputDecoration(

@@ -67,6 +67,12 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
   /// replaces what the client typed themselves.
   String? _filledIn;
 
+  /// The zone follows the pin (the zones the admin placed on the map) until
+  /// the client picks one themselves; then theirs stays.
+  bool _zonePickedByHand = false;
+  bool _zoneDetected = false;
+  int _zoneLookup = 0;
+
   bool get _isEditing => widget.existing != null;
 
   @override
@@ -86,10 +92,31 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
 
   void _pinSettled(LatLng point) {
     _lookupDelay?.cancel();
-    _lookupDelay = Timer(
-      const Duration(milliseconds: 500),
-      () => _fillAddressAt(point),
-    );
+    _lookupDelay = Timer(const Duration(milliseconds: 500), () {
+      _fillAddressAt(point);
+      _detectZoneAt(point);
+    });
+  }
+
+  Future<void> _detectZoneAt(LatLng point) async {
+    if (_zonePickedByHand) return;
+    final lookup = ++_zoneLookup;
+    DeliveryZoneOption? zone;
+    try {
+      zone = await context.read<OrdersRepository>().locateZone(
+        point.latitude,
+        point.longitude,
+      );
+    } on Exception {
+      return; // Picked by hand then, as before.
+    }
+    if (!mounted || lookup != _zoneLookup || _zonePickedByHand) return;
+    // Outside every placed zone: keep what's there, the client picks.
+    if (zone == null) return;
+    setState(() {
+      _zone = zone;
+      _zoneDetected = true;
+    });
   }
 
   Future<void> _fillAddressAt(LatLng point) async {
@@ -296,12 +323,17 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
                               return DropdownButtonFormField<
                                 DeliveryZoneOption
                               >(
+                                // Rebuilt when the pin sets the zone.
+                                key: ValueKey(_zone?.id),
                                 initialValue: zones.contains(_zone)
                                     ? _zone
                                     : null,
                                 isExpanded: true,
-                                decoration: const InputDecoration(
+                                decoration: InputDecoration(
                                   labelText: 'Zone de livraison',
+                                  helperText: _zoneDetected
+                                      ? 'Choisie d\'après la position sur la carte'
+                                      : null,
                                 ),
                                 items: [
                                   for (final z in zones)
@@ -314,7 +346,11 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
                                     v == null ? 'Choisissez la zone' : null,
                                 onChanged: _saving
                                     ? null
-                                    : (z) => setState(() => _zone = z),
+                                    : (z) => setState(() {
+                                        _zone = z;
+                                        _zonePickedByHand = true;
+                                        _zoneDetected = false;
+                                      }),
                               );
                             },
                           ),

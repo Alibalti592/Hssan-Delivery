@@ -1,12 +1,15 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../addresses/route_map.dart';
 import '../bills/bill_widgets.dart';
 import '../core/api_exception.dart';
+import '../deliveries/delivery.dart';
+import '../orders/courier_position.dart';
 import '../orders/order_models.dart';
 import '../orders/order_tracking.dart';
 import '../orders/orders_repository.dart';
@@ -32,6 +35,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   Timer? _pollTimer;
   StreamSubscription<int>? _pushes;
 
+  /// The courier on the map, while they're on this order.
+  CourierPosition? _courier;
+  Timer? _courierTimer;
+
   @override
   void initState() {
     super.initState();
@@ -46,6 +53,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
   @override
   void dispose() {
+    _courierTimer?.cancel();
     _pollTimer?.cancel();
     _pushes?.cancel();
     super.dispose();
@@ -63,6 +71,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         _error = null;
       });
       _scheduleNextPoll(order);
+      _followCourier(order);
     } on ApiException catch (e) {
       if (mounted && !silent) setState(() => _error = e.message);
     } on NetworkException catch (e) {
@@ -80,6 +89,41 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     _pollTimer?.cancel();
     if (order.status.isTerminal) return;
     _pollTimer = Timer(const Duration(seconds: 15), () => _load(silent: true));
+  }
+
+  /// From the courier accepting until delivery: where they are, every 10 s.
+  static bool _courierOnTheJob(ClientOrder order) => const {
+    DeliveryStatus.accepted,
+    DeliveryStatus.pickedUp,
+    DeliveryStatus.onTheWay,
+  }.contains(order.deliveryStatus);
+
+  void _followCourier(ClientOrder order) {
+    if (!_courierOnTheJob(order)) {
+      _courierTimer?.cancel();
+      _courierTimer = null;
+      if (_courier != null) setState(() => _courier = null);
+      return;
+    }
+    if (_courierTimer != null) return;
+    _fetchCourier();
+    _courierTimer = Timer.periodic(
+      const Duration(seconds: 10),
+      (_) => _fetchCourier(),
+    );
+  }
+
+  Future<void> _fetchCourier() async {
+    try {
+      final position = await context.read<OrdersRepository>().courierPosition(
+        widget.orderId,
+      );
+      if (mounted) setState(() => _courier = position);
+    } on ApiException {
+      // Next time; the order itself still shows.
+    } on NetworkException {
+      // Same.
+    }
   }
 
   Future<void> _confirmCancel() async {
@@ -172,17 +216,34 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     // A bill's courier collects and returns to the same door: one pin.
     final pickup = order.isBill ? null : order.pickupPoint;
     final dropOff = order.deliveryPoint;
+    final courier = _courierOnTheJob(order) ? _courier : null;
+    final heading = _headingTo(order, pickup, dropOff);
 
     return RefreshIndicator(
       onRefresh: () => _load(silent: true),
       child: Column(
         children: [
           if (tracking && RouteMap.canShow(pickup, dropOff))
-            RouteMap(pickup: pickup, dropOff: dropOff),
+            RouteMap(
+              pickup: pickup,
+              dropOff: dropOff,
+              courier: courier?.point,
+              heading: courier == null ? null : heading,
+              height: courier != null ? 300 : 200,
+            ),
           Expanded(
             child: ListView(
               padding: const EdgeInsets.all(16),
               children: [
+                if (_courierOnTheJob(order)) ...[
+                  _CourierProgress(
+                    order: order,
+                    courier: courier,
+                    heading: heading,
+                    goingToPickup: heading != null && heading == pickup,
+                  ),
+                  const SizedBox(height: 16),
+                ],
                 Row(
                   children: [
                     Icon(order.serviceIcon, color: navy),
@@ -461,6 +522,113 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
 /// The order's progress in its service's own words (see trackingSteps) —
 /// the backend doesn't record a time per step, so none is invented here.
+/// Where the courier is going next: the pickup until they've collected,
+/// then the client. A bill's courier collects at the client's door, pays at
+/// the counter (no pin), then comes back.
+LatLng? _headingTo(ClientOrder order, LatLng? pickup, LatLng? dropOff) {
+  switch (order.deliveryStatus) {
+    case DeliveryStatus.accepted:
+      return pickup ?? dropOff;
+    case DeliveryStatus.pickedUp:
+      return order.isBill ? null : dropOff;
+    case DeliveryStatus.onTheWay:
+      return dropOff;
+    default:
+      return null;
+  }
+}
+
+/// "Votre livreur arrive · à 1,2 km · environ 5 min", under the map.
+class _CourierProgress extends StatelessWidget {
+  const _CourierProgress({
+    required this.order,
+    required this.courier,
+    required this.heading,
+    required this.goingToPickup,
+  });
+
+  final ClientOrder order;
+  final CourierPosition? courier;
+  final LatLng? heading;
+  final bool goingToPickup;
+
+  String get _title {
+    if (order.isBill) {
+      return switch (order.deliveryStatus) {
+        DeliveryStatus.accepted => 'Votre livreur vient chez vous',
+        DeliveryStatus.pickedUp => 'Votre livreur paie au guichet',
+        _ => 'Votre livreur revient avec le reçu',
+      };
+    }
+    return goingToPickup
+        ? 'Votre livreur va chercher votre commande'
+        : 'Votre livreur arrive';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final courier = this.courier;
+    final heading = this.heading;
+
+    final String detail;
+    if (courier == null) {
+      detail = 'Sa position s\'affichera sur la carte dans un instant.';
+    } else if (heading == null) {
+      detail = 'Suivez-le sur la carte.';
+    } else {
+      final km = courier.distanceKmTo(heading);
+      final where = goingToPickup
+          ? 'à ${formatDistance(km)} du point de retrait'
+          : 'à ${formatDistance(km)} · environ ${estimatedMinutes(km)} min';
+      final age = courier.updatedAt == null
+          ? null
+          : DateTime.now().difference(courier.updatedAt!).inMinutes;
+      detail = age != null && age >= 2
+          ? '$where · position d\'il y a $age min'
+          : where;
+    }
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: const BoxDecoration(
+                color: navy,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.delivery_dining, color: Colors.white),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _title,
+                    style: textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    detail,
+                    style: textTheme.bodySmall?.copyWith(color: mutedText),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _StatusTimeline extends StatelessWidget {
   const _StatusTimeline({required this.order});
 

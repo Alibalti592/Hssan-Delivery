@@ -27,15 +27,26 @@ class _FakeGeocoder extends ReverseGeocoder {
   }
 }
 
+/// The zone the server says covers a pin (null: none, a 404).
+Map<String, dynamic>? _locatedZone;
+final _locateAsked = <String>[];
+
 Widget _app() {
   final api = ApiClient(
     tokenProvider: () => 'jwt-123',
     onUnauthorized: () {},
-    httpClient: MockClient(
-      (request) async => jsonResponse([
+    httpClient: MockClient((request) async {
+      if (request.url.path == '/api/delivery-zones/locate') {
+        _locateAsked.add(request.url.query);
+        return _locatedZone == null
+            ? jsonResponse({'message': 'Aucune zone'}, 404)
+            : jsonResponse(_locatedZone!);
+      }
+      return jsonResponse([
         {'id': 1, 'name': 'Bizerte centre', 'fee': '4.000'},
-      ]),
-    ),
+        {'id': 2, 'name': 'Corniche', 'fee': '5.000'},
+      ]);
+    }),
   );
   return MultiProvider(
     providers: [
@@ -65,6 +76,8 @@ void main() {
   setUp(() {
     PinMap.offline = true;
     real = ReverseGeocoder.instance;
+    _locatedZone = null;
+    _locateAsked.clear();
   });
   tearDown(() => ReverseGeocoder.instance = real);
 
@@ -99,6 +112,56 @@ void main() {
     await _tapMap(tester, const Offset(40, 30));
 
     expect(_addressText(tester), 'Chez Ali, derrière la poste');
+  });
+
+  testWidgets('the zone covering the pin is filled in by itself', (
+    tester,
+  ) async {
+    ReverseGeocoder.instance = _FakeGeocoder('Corniche, Bizerte');
+    _locatedZone = {'id': 2, 'name': 'Corniche', 'fee': '5.000'};
+    await tester.pumpWidget(_app());
+    await tester.pumpAndSettle();
+
+    await _tapMap(tester, const Offset(40, 30));
+
+    expect(_locateAsked, hasLength(1));
+    expect(find.text('Corniche — 5.000 DT'), findsOneWidget);
+    expect(
+      find.text("Choisie d'après la position sur la carte"),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('a zone the client picked stays when the pin moves', (
+    tester,
+  ) async {
+    ReverseGeocoder.instance = _FakeGeocoder('Bizerte');
+    _locatedZone = {'id': 2, 'name': 'Corniche', 'fee': '5.000'};
+    await tester.pumpWidget(_app());
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('Zone de livraison'));
+    await tester.tap(find.text('Zone de livraison'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Bizerte centre — 4.000 DT').last);
+    await tester.pumpAndSettle();
+
+    await _tapMap(tester, const Offset(40, 30));
+
+    expect(find.text('Bizerte centre — 4.000 DT'), findsOneWidget);
+    expect(find.text('Corniche — 5.000 DT'), findsNothing);
+  });
+
+  testWidgets('outside every zone, the client picks it', (tester) async {
+    ReverseGeocoder.instance = _FakeGeocoder('Menzel Jemil');
+    await tester.pumpWidget(_app());
+    await tester.pumpAndSettle();
+
+    await _tapMap(tester, const Offset(40, 30));
+
+    expect(_locateAsked, hasLength(1));
+    expect(find.textContaining('DT'), findsNothing);
+    expect(find.text("Choisie d'après la position sur la carte"), findsNothing);
   });
 
   test('formats a Nominatim result as number street, area, town', () {

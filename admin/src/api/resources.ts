@@ -9,6 +9,7 @@ import type {
   CourierLocationEntry,
   CurrentUser,
   DeliveryZoneAdmin,
+  DeliveryZoneArea,
   DiscountType,
   Paginated,
   Product,
@@ -117,12 +118,13 @@ export const productsApi = {
 };
 
 // Delivery zones
+export type DeliveryZoneInput = { name: string; fee: string } & DeliveryZoneArea;
+
 export const deliveryZonesApi = {
   list: () => api.get<DeliveryZoneAdmin[]>('/api/admin/delivery-zones'),
   get: (id: number) => api.get<DeliveryZoneAdmin>(`/api/admin/delivery-zones/${id}`),
-  create: (data: { name: string; fee: string }) =>
-    api.post<DeliveryZoneAdmin>('/api/admin/delivery-zones', data),
-  update: (id: number, data: { name: string; fee: string }) =>
+  create: (data: DeliveryZoneInput) => api.post<DeliveryZoneAdmin>('/api/admin/delivery-zones', data),
+  update: (id: number, data: DeliveryZoneInput) =>
     api.put<DeliveryZoneAdmin>(`/api/admin/delivery-zones/${id}`, data),
 };
 
