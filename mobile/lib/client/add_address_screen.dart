@@ -16,7 +16,9 @@ import '../widgets/dark_header.dart';
 
 /// Adds or edits an address: a pin on the map (what the courier navigates
 /// to), a label chip, the written address — filled in from where the pin
-/// is placed — the zone that prices it and door-step hints. Pops the
+/// is placed — and door-step hints. The zone that prices deliveries there
+/// follows the pin (the zones the admin placed on the map); the client
+/// doesn't choose it, and can't save a pin outside every zone. Pops the
 /// resulting [SavedAddress].
 ///
 /// With [allowOneOff] (picking an address for an order), the client can
@@ -49,11 +51,13 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
   );
   late bool _isDefault = widget.existing?.isDefault ?? false;
   late DeliveryZoneOption? _zone = widget.existing?.zone;
+  late _ZoneStatus _zoneStatus = _zone == null
+      ? _ZoneStatus.needsPin
+      : _ZoneStatus.found;
   late LatLng? _pin = widget.existing?.hasLocation == true
       ? LatLng(widget.existing!.latitude!, widget.existing!.longitude!)
       : null;
   bool _saveForLater = true;
-  late Future<List<DeliveryZoneOption>> _zonesFuture;
   bool _saving = false;
   String? _error;
 
@@ -67,18 +71,19 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
   /// replaces what the client typed themselves.
   String? _filledIn;
 
-  /// The zone follows the pin (the zones the admin placed on the map) until
-  /// the client picks one themselves; then theirs stays.
-  bool _zonePickedByHand = false;
-  bool _zoneDetected = false;
+  /// Only the latest zone lookup counts.
   int _zoneLookup = 0;
+
+  /// Save was tapped without a zone: say why under the zone.
+  bool _zoneRequired = false;
 
   bool get _isEditing => widget.existing != null;
 
   @override
   void initState() {
     super.initState();
-    _zonesFuture = context.read<OrdersRepository>().listDeliveryZones();
+    // An address being edited: its zone as the map stands today.
+    if (_pin != null) _detectZoneAt(_pin!);
   }
 
   @override
@@ -99,23 +104,23 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
   }
 
   Future<void> _detectZoneAt(LatLng point) async {
-    if (_zonePickedByHand) return;
     final lookup = ++_zoneLookup;
+    setState(() => _zoneStatus = _ZoneStatus.looking);
     DeliveryZoneOption? zone;
+    var status = _ZoneStatus.outside;
     try {
       zone = await context.read<OrdersRepository>().locateZone(
         point.latitude,
         point.longitude,
       );
+      if (zone != null) status = _ZoneStatus.found;
     } on Exception {
-      return; // Picked by hand then, as before.
+      status = _ZoneStatus.failed;
     }
-    if (!mounted || lookup != _zoneLookup || _zonePickedByHand) return;
-    // Outside every placed zone: keep what's there, the client picks.
-    if (zone == null) return;
+    if (!mounted || lookup != _zoneLookup) return;
     setState(() {
       _zone = zone;
-      _zoneDetected = true;
+      _zoneStatus = status;
     });
   }
 
@@ -142,8 +147,17 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
       : _labelChoice.text;
 
   Future<void> _save() async {
-    setState(() => _error = null);
-    if (!_formKey.currentState!.validate()) return;
+    setState(() {
+      _error = null;
+      _zoneRequired = true;
+    });
+    final formValid = _formKey.currentState!.validate();
+    // The lookup failed (no network): try once more before giving up.
+    if (_zoneStatus == _ZoneStatus.failed && _pin != null) {
+      await _detectZoneAt(_pin!);
+      if (!mounted) return;
+    }
+    if (!formValid || _zoneStatus != _ZoneStatus.found) return;
 
     if (!_saveForLater) {
       Navigator.of(context).pop(
@@ -312,47 +326,10 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
                                 : null,
                           ),
                           const SizedBox(height: 16),
-                          FutureBuilder<List<DeliveryZoneOption>>(
-                            future: _zonesFuture,
-                            builder: (context, snapshot) {
-                              if (snapshot.connectionState ==
-                                  ConnectionState.waiting) {
-                                return const LinearProgressIndicator();
-                              }
-                              final zones = snapshot.data ?? const [];
-                              return DropdownButtonFormField<
-                                DeliveryZoneOption
-                              >(
-                                // Rebuilt when the pin sets the zone.
-                                key: ValueKey(_zone?.id),
-                                initialValue: zones.contains(_zone)
-                                    ? _zone
-                                    : null,
-                                isExpanded: true,
-                                decoration: InputDecoration(
-                                  labelText: 'Zone de livraison',
-                                  helperText: _zoneDetected
-                                      ? 'Choisie d\'après la position sur la carte'
-                                      : null,
-                                ),
-                                items: [
-                                  for (final z in zones)
-                                    DropdownMenuItem(
-                                      value: z,
-                                      child: Text('${z.name} — ${z.fee} DT'),
-                                    ),
-                                ],
-                                validator: (v) =>
-                                    v == null ? 'Choisissez la zone' : null,
-                                onChanged: _saving
-                                    ? null
-                                    : (z) => setState(() {
-                                        _zone = z;
-                                        _zonePickedByHand = true;
-                                        _zoneDetected = false;
-                                      }),
-                              );
-                            },
+                          _ZoneDisplay(
+                            zone: _zone,
+                            status: _zoneStatus,
+                            required: _zoneRequired,
                           ),
                           const SizedBox(height: 16),
                           TextFormField(
@@ -422,6 +399,77 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+enum _ZoneStatus { needsPin, looking, found, outside, failed }
+
+/// The zone that prices deliveries to the pin — shown, never chosen.
+class _ZoneDisplay extends StatelessWidget {
+  const _ZoneDisplay({
+    required this.zone,
+    required this.status,
+    required this.required,
+  });
+
+  final DeliveryZoneOption? zone;
+  final _ZoneStatus status;
+
+  /// Save was tapped: a missing zone is an error now, not just a hint.
+  final bool required;
+
+  @override
+  Widget build(BuildContext context) {
+    final zone = this.zone;
+    final (String text, String? helper, String? error) = switch (status) {
+      _ZoneStatus.found when zone != null => (
+        '${zone.name} — ${zone.fee} DT',
+        "D'après la position sur la carte",
+        null,
+      ),
+      _ZoneStatus.looking => ('Recherche de la zone…', null, null),
+      _ZoneStatus.outside => (
+        'Hors zone',
+        null,
+        'Nous ne livrons pas encore à cette adresse.',
+      ),
+      _ZoneStatus.failed => (
+        'Zone introuvable',
+        null,
+        'Impossible de trouver la zone. Vérifiez votre connexion.',
+      ),
+      _ => (
+        'Selon le repère sur la carte',
+        required ? null : 'Touchez la carte à votre adresse',
+        required ? 'Placez le repère sur votre adresse' : null,
+      ),
+    };
+    final found = status == _ZoneStatus.found && zone != null;
+
+    return InputDecorator(
+      decoration: InputDecoration(
+        labelText: 'Zone de livraison',
+        helperText: helper,
+        errorText: error,
+        prefixIcon: const Icon(Icons.map_outlined),
+        suffixIcon: status == _ZoneStatus.looking
+            ? const Padding(
+                padding: EdgeInsets.all(14),
+                child: SizedBox.square(
+                  dimension: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              )
+            : null,
+      ),
+      child: Text(
+        text,
+        style: TextStyle(
+          fontWeight: found ? FontWeight.w700 : FontWeight.w500,
+          color: found ? null : mutedText,
         ),
       ),
     );

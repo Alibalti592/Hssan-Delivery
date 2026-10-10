@@ -31,6 +31,18 @@ final class DeliveryZoneLocateApiTest extends WebTestCase
         $this->lng = -120 + random_int(0, 100000) / 10000;
     }
 
+    /**
+     * Takes every zone off the map again: once one is placed, a pin outside
+     * all of them is refused, which would break the other suites' orders.
+     */
+    protected function tearDown(): void
+    {
+        $this->entityManager->getConnection()->executeStatement(
+            'UPDATE delivery_zone SET latitude = NULL, longitude = NULL, radius_km = NULL'
+        );
+        parent::tearDown();
+    }
+
     public function testAPinGetsTheZoneCoveringIt(): void
     {
         $centre = $this->placedZone('Centre', $this->lat, $this->lng, 1.0);
@@ -55,7 +67,7 @@ final class DeliveryZoneLocateApiTest extends WebTestCase
         $this->locate($this->login('ROLE_CLIENT'), $this->lat - 0.18, $this->lng);
 
         self::assertResponseStatusCodeSame(Response::HTTP_NOT_FOUND);
-        self::assertSame('Aucune zone ne couvre cette adresse. Choisissez-la.', $this->json()['message']);
+        self::assertSame('Nous ne livrons pas encore à cette adresse.', $this->json()['message']);
     }
 
     public function testAnInvalidPositionIsA400(): void
@@ -108,6 +120,82 @@ final class DeliveryZoneLocateApiTest extends WebTestCase
         ]));
 
         self::assertResponseStatusCodeSame(Response::HTTP_UNPROCESSABLE_ENTITY);
+    }
+
+    public function testAnAddressGetsTheZoneOfItsPinNotTheOneSent(): void
+    {
+        $centre = $this->placedZone('Centre', $this->lat, $this->lng, 1.0);
+        $other = $this->zone('Autre');
+        $token = $this->login('ROLE_CLIENT');
+
+        $this->client->request('POST', '/api/addresses', server: $this->auth($token) + ['CONTENT_TYPE' => 'application/json'], content: json_encode([
+            'label' => 'Maison',
+            'addressLine' => 'Rue X',
+            'deliveryZoneId' => $other->getId(),
+            'latitude' => $this->lat + 0.0027,
+            'longitude' => $this->lng,
+        ]));
+
+        self::assertResponseStatusCodeSame(Response::HTTP_CREATED);
+        self::assertSame($centre->getId(), $this->json()['deliveryZoneId']);
+
+        // 20 km away: nowhere we deliver.
+        $this->client->request('POST', '/api/addresses', server: $this->auth($token) + ['CONTENT_TYPE' => 'application/json'], content: json_encode([
+            'label' => 'Maison',
+            'addressLine' => 'Rue Y',
+            'deliveryZoneId' => $other->getId(),
+            'latitude' => $this->lat - 0.18,
+            'longitude' => $this->lng,
+        ]));
+
+        self::assertResponseStatusCodeSame(Response::HTTP_BAD_REQUEST);
+        self::assertSame('Nous ne livrons pas encore à cette adresse.', $this->json()['message']);
+    }
+
+    public function testAnOrderIsPricedByTheZoneOfItsDropOffPin(): void
+    {
+        $centre = $this->placedZone('Centre', $this->lat, $this->lng, 1.0);
+        $centre->setFee('6.500');
+        $this->entityManager->flush();
+        $cheaper = $this->zone('Moins chère');
+        $cheaper->setFee('1.000');
+        $this->entityManager->flush();
+        $token = $this->login('ROLE_CLIENT');
+
+        $this->client->request('POST', '/api/orders/parcels', server: $this->auth($token) + ['CONTENT_TYPE' => 'application/json'], content: json_encode($this->parcel($cheaper->getId(), $this->lat, $this->lng)));
+
+        self::assertResponseStatusCodeSame(Response::HTTP_CREATED);
+        self::assertSame($centre->getId(), $this->json()['deliveryZoneId']);
+        self::assertSame('6.500', $this->json()['deliveryFee']);
+
+        $this->client->request('POST', '/api/orders/parcels', server: $this->auth($token) + ['CONTENT_TYPE' => 'application/json'], content: json_encode($this->parcel($cheaper->getId(), $this->lat - 0.18, $this->lng)));
+
+        self::assertResponseStatusCodeSame(Response::HTTP_BAD_REQUEST);
+        self::assertSame('Nous ne livrons pas encore à cette adresse.', $this->json()['message']);
+    }
+
+    public function testWithNoZoneOnTheMapTheZoneSentStillCounts(): void
+    {
+        $zone = $this->zone('Pas placée');
+
+        $this->client->request('POST', '/api/orders/parcels', server: $this->auth($this->login('ROLE_CLIENT')) + ['CONTENT_TYPE' => 'application/json'], content: json_encode($this->parcel($zone->getId(), $this->lat, $this->lng)));
+
+        self::assertResponseStatusCodeSame(Response::HTTP_CREATED);
+        self::assertSame($zone->getId(), $this->json()['deliveryZoneId']);
+    }
+
+    /** @return array<string, mixed> */
+    private function parcel(int $zoneId, float $lat, float $lng): array
+    {
+        return [
+            'pickupAddress' => 'Rue de Marseille',
+            'deliveryAddress' => 'Corniche',
+            'deliveryLatitude' => $lat,
+            'deliveryLongitude' => $lng,
+            'recipientName' => 'Sami',
+            'recipientPhone' => '22123456',
+            'deliveryZoneId' => $zoneId,
+        ];
     }
 
     /** @return array<string, mixed> */

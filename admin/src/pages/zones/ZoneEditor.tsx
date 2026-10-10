@@ -117,7 +117,7 @@ export default function ZoneEditor({
       <p className="zone-hint">
         {center
           ? 'Click the map to move the center. Addresses inside the circle get this zone automatically in the app.'
-          : 'Click the map to place this zone. Until it is placed, clients choose it from the list themselves.'}
+          : 'Click the map to place this zone. Clients never choose a zone: the app gives each address the zone its pin falls in, so a zone that is not placed is never used.'}
       </p>
 
       <div className="zone-map">

@@ -14,7 +14,6 @@ use App\Enum\OrderStatus;
 use App\Exception\InvalidOperationException;
 use App\Pagination\PaginatedResult;
 use App\Pagination\Paginator;
-use App\Repository\DeliveryZoneRepository;
 use App\Repository\OrderRepository;
 use App\Repository\ProductRepository;
 use App\Repository\PromotionRepository;
@@ -29,7 +28,7 @@ final class OrderService
         private readonly OrderRepository $orderRepository,
         private readonly RestaurantRepository $restaurantRepository,
         private readonly ProductRepository $productRepository,
-        private readonly DeliveryZoneRepository $deliveryZoneRepository,
+        private readonly DeliveryZoneService $deliveryZoneService,
         private readonly DeliveryService $deliveryService,
         private readonly PromotionRepository $promotionRepository,
         private readonly PromotionPricing $promotionPricing,
@@ -82,11 +81,9 @@ final class OrderService
             throw new InvalidOperationException('Ce restaurant est fermé pour le moment.');
         }
 
-        $deliveryZone = $this->deliveryZoneRepository->find($dto->deliveryZoneId);
-
-        if (null === $deliveryZone) {
-            throw new InvalidOperationException('Cette zone de livraison n\'existe plus. Choisissez-en une autre.');
-        }
+        // The zone covering the drop-off pin, when there is one.
+        $deliveryZone = $this->deliveryZoneService->resolve($dto->deliveryZoneId, $dto->deliveryLatitude, $dto->deliveryLongitude)
+            ?? throw new InvalidOperationException('Choisissez la zone de livraison.');
 
         $order = new Order();
 
@@ -209,11 +206,9 @@ final class OrderService
         CreateParcelOrderRequest $dto,
         User $user,
     ): Order {
-        $deliveryZone = $this->deliveryZoneRepository->find($dto->deliveryZoneId);
-
-        if (null === $deliveryZone) {
-            throw new InvalidOperationException('Cette zone de livraison n\'existe plus. Choisissez-en une autre.');
-        }
+        // The zone covering the drop-off pin, when there is one.
+        $deliveryZone = $this->deliveryZoneService->resolve($dto->deliveryZoneId, $dto->deliveryLatitude, $dto->deliveryLongitude)
+            ?? throw new InvalidOperationException('Choisissez la zone de livraison.');
 
         $order = new Order();
 

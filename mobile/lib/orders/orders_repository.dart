@@ -21,13 +21,6 @@ class OrdersRepository {
 
   void notifyChanged(int orderId) => _changes.add(orderId);
 
-  Future<List<DeliveryZoneOption>> listDeliveryZones() async {
-    final body = await _api.get('/api/delivery-zones');
-    return (body as List<dynamic>)
-        .map((e) => DeliveryZoneOption.fromJson(e as Map<String, dynamic>))
-        .toList(growable: false);
-  }
-
   /// Where the courier is, while they're on this order (accepted it, until
   /// delivered); null otherwise, or before their app reports a position.
   Future<CourierPosition?> courierPosition(int orderId) async {
@@ -48,7 +41,7 @@ class OrdersRepository {
   }
 
   /// The zone an address pin falls in, from the zones the admin placed on
-  /// the map; null when none covers it (the client then picks one).
+  /// the map; null when none covers it (we don't deliver there).
   Future<DeliveryZoneOption?> locateZone(
     double latitude,
     double longitude,

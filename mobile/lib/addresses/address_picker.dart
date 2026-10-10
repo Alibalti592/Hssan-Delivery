@@ -248,7 +248,9 @@ class AddressTile extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      zone == null ? 'Zone à choisir' : zoneSummary(zone),
+                      zone == null
+                          ? 'Zone selon la position sur la carte'
+                          : zoneSummary(zone),
                       style: textTheme.bodySmall?.copyWith(
                         color: zone == null ? warnText : mutedText,
                         fontWeight: FontWeight.w600,
@@ -292,16 +294,24 @@ class _Pill extends StatelessWidget {
 }
 
 /// An address plus the zone that prices it — what an order form needs.
+/// Without a zone, [zoneProblem] says why.
 class AddressSelection {
-  const AddressSelection(this.address, this.zone);
+  const AddressSelection(this.address, this.zone, {this.zoneProblem});
 
   final SavedAddress address;
   final DeliveryZoneOption? zone;
+  final String? zoneProblem;
 }
 
+/// Why an address has no zone: no pin to place it by, or outside them all.
+const _needsPin = 'Placez cette adresse sur la carte';
+const _outside = 'Nous ne livrons pas encore à cette adresse.';
+const _locating = 'Recherche de la zone de livraison…';
+
 /// The address block of an order form: the chosen address as a card (tap
-/// to switch or add one), and — only when that address has no zone yet —
-/// a zone dropdown under it. Validates like any form field.
+/// to switch or add one) with the zone that prices it. The zone comes from
+/// the address's pin — the zones the admin placed on the map — never from
+/// the client. Validates like any form field.
 class AddressField extends FormField<AddressSelection> {
   AddressField({
     required String label,
@@ -315,11 +325,11 @@ class AddressField extends FormField<AddressSelection> {
   }) : super(
          initialValue: initialAddress == null
              ? null
-             : AddressSelection(initialAddress, initialAddress.zone),
+             : _selectionOf(initialAddress, needsZone),
          validator: (value) {
            if (value == null) return 'Choisissez une adresse';
            if (needsZone && value.zone == null) {
-             return 'Choisissez la zone de livraison';
+             return value.zoneProblem ?? _needsPin;
            }
            return null;
          },
@@ -332,6 +342,19 @@ class AddressField extends FormField<AddressSelection> {
            onChanged: onChanged,
          ),
        );
+}
+
+/// An address as just picked: with a pin, its zone is looked up again (it
+/// follows the map as it stands today); without one, its saved zone counts.
+AddressSelection _selectionOf(SavedAddress address, bool needsZone) {
+  if (needsZone && address.hasLocation) {
+    return AddressSelection(address, null, zoneProblem: _locating);
+  }
+  return AddressSelection(
+    address,
+    address.zone,
+    zoneProblem: address.zone == null ? _needsPin : null,
+  );
 }
 
 class _AddressFieldBody extends StatefulWidget {
@@ -356,8 +379,6 @@ class _AddressFieldBody extends StatefulWidget {
 }
 
 class _AddressFieldBodyState extends State<_AddressFieldBody> {
-  Future<List<DeliveryZoneOption>>? _zonesFuture;
-
   AddressSelection? get _value => widget.state.value;
 
   @override
@@ -368,39 +389,41 @@ class _AddressFieldBodyState extends State<_AddressFieldBody> {
     if (initial != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         widget.onChanged(initial);
-        _detectZone(initial);
+        _locateZone(initial.address);
       });
     }
   }
 
-  /// An address with a pin but no zone yet: the zone covering the pin, from
-  /// the zones the admin placed on the map. Left to the client otherwise.
-  Future<void> _detectZone(AddressSelection selection) async {
-    final address = selection.address;
-    if (!widget.needsZone ||
-        selection.zone != null ||
-        address.latitude == null ||
-        address.longitude == null) {
-      return;
-    }
-    DeliveryZoneOption? zone;
+  /// The zone covering the address's pin. If the lookup fails (no
+  /// network), the zone saved with the address stands in.
+  Future<void> _locateZone(SavedAddress address) async {
+    if (!widget.needsZone || !address.hasLocation) return;
+    AddressSelection located;
     try {
-      zone = await context.read<OrdersRepository>().locateZone(
+      final zone = await context.read<OrdersRepository>().locateZone(
         address.latitude!,
         address.longitude!,
       );
+      located = AddressSelection(
+        address,
+        zone,
+        zoneProblem: zone == null ? _outside : null,
+      );
     } on Exception {
-      return;
+      located = AddressSelection(
+        address,
+        address.zone,
+        zoneProblem: address.zone == null
+            ? 'Impossible de trouver la zone. Vérifiez votre connexion.'
+            : null,
+      );
     }
-    // Still that address, and the client hasn't picked a zone meanwhile.
-    if (!mounted || zone == null) return;
-    final now = _value;
-    if (now == null || now.address != address || now.zone != null) return;
-    _set(AddressSelection(address, zone));
+    // Still that address?
+    if (!mounted || _value?.address != address) return;
+    _set(located);
+    // Clear or show the error now that the zone is known.
+    if (widget.state.hasError || located.zone == null) widget.state.validate();
   }
-
-  Future<List<DeliveryZoneOption>> _zones() =>
-      _zonesFuture ??= context.read<OrdersRepository>().listDeliveryZones();
 
   void _set(AddressSelection? value) {
     widget.state.didChange(value);
@@ -415,9 +438,18 @@ class _AddressFieldBodyState extends State<_AddressFieldBody> {
       allowOneOff: widget.allowOneOff,
     );
     if (picked == null) return;
-    final selection = AddressSelection(picked, picked.zone);
-    _set(selection);
-    _detectZone(selection);
+    _set(_selectionOf(picked, widget.needsZone));
+    _locateZone(picked);
+  }
+
+  /// A saved address without a pin: place it on the map, then use it.
+  Future<void> _placeOnMap(SavedAddress address) async {
+    final placed = await Navigator.of(context).push<SavedAddress>(
+      MaterialPageRoute(builder: (_) => AddAddressScreen(existing: address)),
+    );
+    if (placed == null || !mounted) return;
+    _set(_selectionOf(placed, widget.needsZone));
+    _locateZone(placed);
   }
 
   @override
@@ -442,18 +474,17 @@ class _AddressFieldBodyState extends State<_AddressFieldBody> {
           )
         else
           AddressTile(
-            address: value.address.zone == null && value.zone != null
-                ? SavedAddress(
-                    id: value.address.id,
-                    label: value.address.label,
-                    addressLine: value.address.addressLine,
-                    instructions: value.address.instructions,
-                    isDefault: value.address.isDefault,
-                    zone: value.zone,
-                    latitude: value.address.latitude,
-                    longitude: value.address.longitude,
-                  )
-                : value.address,
+            // The zone shown is the one that prices this order.
+            address: SavedAddress(
+              id: value.address.id,
+              label: value.address.label,
+              addressLine: value.address.addressLine,
+              instructions: value.address.instructions,
+              isDefault: value.address.isDefault,
+              zone: widget.needsZone ? value.zone : value.address.zone,
+              latitude: value.address.latitude,
+              longitude: value.address.longitude,
+            ),
             onTap: enabled ? _pick : null,
             trailing: Padding(
               padding: const EdgeInsets.only(left: 8),
@@ -466,36 +497,22 @@ class _AddressFieldBodyState extends State<_AddressFieldBody> {
               ),
             ),
           ),
-        if (widget.needsZone && value != null && value.address.zone == null)
-          Padding(
-            padding: const EdgeInsets.only(top: 12),
-            child: FutureBuilder<List<DeliveryZoneOption>>(
-              future: _zones(),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const LinearProgressIndicator();
-                }
-                final zones = snapshot.data ?? const [];
-                return DropdownButtonFormField<DeliveryZoneOption>(
-                  // Rebuilt when the zone is filled in from the pin.
-                  key: ValueKey(value.zone?.id),
-                  initialValue: zones.contains(value.zone) ? value.zone : null,
-                  isExpanded: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Zone de livraison',
-                  ),
-                  items: [
-                    for (final z in zones)
-                      DropdownMenuItem(
-                        value: z,
-                        child: Text('${z.name} — ${z.fee} DT'),
-                      ),
-                  ],
-                  onChanged: enabled
-                      ? (z) => _set(AddressSelection(value.address, z))
-                      : null,
-                );
-              },
+        if (widget.needsZone && value != null && value.zoneProblem == _locating)
+          const Padding(
+            padding: EdgeInsets.only(top: 8),
+            child: LinearProgressIndicator(),
+          ),
+        if (widget.needsZone &&
+            value != null &&
+            value.zone == null &&
+            !value.address.hasLocation &&
+            value.address.isSaved)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: enabled ? () => _placeOnMap(value.address) : null,
+              icon: const Icon(Icons.add_location_alt_outlined),
+              label: const Text('Placer sur la carte'),
             ),
           ),
         if (widget.state.hasError)

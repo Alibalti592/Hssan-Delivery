@@ -60,14 +60,13 @@ void main() {
               'deliveryZoneId': null,
               'deliveryZoneName': null,
               'deliveryZoneFee': null,
+              'latitude': 37.256,
+              'longitude': 9.881,
             },
           ]);
         }
-        if (path == '/api/delivery-zones') {
-          return jsonResponse([
-            {'id': 1, 'name': 'Bizerte centre', 'fee': '4.000'},
-            {'id': 2, 'name': 'Zarzouna', 'fee': '6.000'},
-          ]);
+        if (path == '/api/delivery-zones/locate') {
+          return jsonResponse({'id': 2, 'name': 'Zarzouna', 'fee': '6.000'});
         }
         final body = jsonDecode(request.body) as Map<String, dynamic>;
         final code = body['promoCode'] as String?;
@@ -208,23 +207,16 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('25.600 DT'), findsOneWidget);
 
-    // An address with no zone yet: no fee to show, just the cart.
+    // Its zone comes from its pin. It can't be priced right now: its own
+    // fee, not the old one.
     await tester.tap(find.text('Changer'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Travail').last);
     await tester.pumpAndSettle();
 
+    expect(find.text('Zarzouna · 6.000 DT'), findsOneWidget);
     expect(find.text('25.600 DT'), findsNothing);
     expect(find.text('-2.400 DT'), findsNothing);
-    expect(find.text('24.000 DT'), findsNWidgets(2));
-    expect(find.text('0.000 DT'), findsOneWidget);
-
-    // Its zone can't be priced right now: its own fee, not the old one.
-    await tester.tap(find.text('Zone de livraison'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Zarzouna — 6.000 DT').last);
-    await tester.pumpAndSettle();
-
     expect(find.text('6.000 DT'), findsOneWidget);
     expect(find.text('30.000 DT'), findsOneWidget);
     expect(find.text('4.000 DT'), findsNothing);

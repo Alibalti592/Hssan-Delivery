@@ -53,7 +53,7 @@ final class DeliveryZoneController extends AbstractController
 
         if (null === $zone) {
             return $this->json(
-                ['message' => 'Aucune zone ne couvre cette adresse. Choisissez-la.'],
+                ['message' => DeliveryZoneService::OUTSIDE_ZONES],
                 Response::HTTP_NOT_FOUND
             );
         }

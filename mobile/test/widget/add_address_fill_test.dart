@@ -30,6 +30,7 @@ class _FakeGeocoder extends ReverseGeocoder {
 /// The zone the server says covers a pin (null: none, a 404).
 Map<String, dynamic>? _locatedZone;
 final _locateAsked = <String>[];
+var _saves = 0;
 
 Widget _app() {
   final api = ApiClient(
@@ -42,6 +43,7 @@ Widget _app() {
             ? jsonResponse({'message': 'Aucune zone'}, 404)
             : jsonResponse(_locatedZone!);
       }
+      if (request.method == 'POST') _saves++;
       return jsonResponse([
         {'id': 1, 'name': 'Bizerte centre', 'fee': '4.000'},
         {'id': 2, 'name': 'Corniche', 'fee': '5.000'},
@@ -55,6 +57,13 @@ Widget _app() {
     ],
     child: const MaterialApp(home: AddAddressScreen()),
   );
+}
+
+/// Tall enough that the save button is on screen to tap.
+void _useTallViewport(WidgetTester tester) {
+  tester.view.physicalSize = const Size(800, 1800);
+  tester.view.devicePixelRatio = 1.0;
+  addTearDown(tester.view.reset);
 }
 
 Finder get _addressField => find.widgetWithText(TextFormField, 'Adresse');
@@ -78,6 +87,7 @@ void main() {
     real = ReverseGeocoder.instance;
     _locatedZone = null;
     _locateAsked.clear();
+    _saves = 0;
   });
   tearDown(() => ReverseGeocoder.instance = real);
 
@@ -126,33 +136,31 @@ void main() {
 
     expect(_locateAsked, hasLength(1));
     expect(find.text('Corniche — 5.000 DT'), findsOneWidget);
-    expect(
-      find.text("Choisie d'après la position sur la carte"),
-      findsOneWidget,
-    );
+    expect(find.text("D'après la position sur la carte"), findsOneWidget);
+    // Shown, never chosen.
+    expect(find.byType(DropdownButtonFormField), findsNothing);
   });
 
-  testWidgets('a zone the client picked stays when the pin moves', (
-    tester,
-  ) async {
+  testWidgets('the zone follows the pin', (tester) async {
     ReverseGeocoder.instance = _FakeGeocoder('Bizerte');
     _locatedZone = {'id': 2, 'name': 'Corniche', 'fee': '5.000'};
     await tester.pumpWidget(_app());
     await tester.pumpAndSettle();
 
-    await tester.ensureVisible(find.text('Zone de livraison'));
-    await tester.tap(find.text('Zone de livraison'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Bizerte centre — 4.000 DT').last);
-    await tester.pumpAndSettle();
-
     await _tapMap(tester, const Offset(40, 30));
+    expect(find.text('Corniche — 5.000 DT'), findsOneWidget);
+
+    _locatedZone = {'id': 1, 'name': 'Bizerte centre', 'fee': '4.000'};
+    await _tapMap(tester, const Offset(-30, -20));
 
     expect(find.text('Bizerte centre — 4.000 DT'), findsOneWidget);
     expect(find.text('Corniche — 5.000 DT'), findsNothing);
   });
 
-  testWidgets('outside every zone, the client picks it', (tester) async {
+  testWidgets('outside every zone, the address cannot be saved', (
+    tester,
+  ) async {
+    _useTallViewport(tester);
     ReverseGeocoder.instance = _FakeGeocoder('Menzel Jemil');
     await tester.pumpWidget(_app());
     await tester.pumpAndSettle();
@@ -160,8 +168,28 @@ void main() {
     await _tapMap(tester, const Offset(40, 30));
 
     expect(_locateAsked, hasLength(1));
-    expect(find.textContaining('DT'), findsNothing);
-    expect(find.text("Choisie d'après la position sur la carte"), findsNothing);
+    expect(
+      find.text('Nous ne livrons pas encore à cette adresse.'),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.text('ENREGISTRER'));
+    await tester.pumpAndSettle();
+    expect(_saves, 0);
+  });
+
+  testWidgets('without a pin, saving asks to place it', (tester) async {
+    _useTallViewport(tester);
+    ReverseGeocoder.instance = _FakeGeocoder(null);
+    await tester.pumpWidget(_app());
+    await tester.pumpAndSettle();
+
+    await tester.enterText(_addressField, 'Rue de Marseille');
+    await tester.tap(find.text('ENREGISTRER'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Placez le repère sur votre adresse'), findsOneWidget);
+    expect(_saves, 0);
   });
 
   test('formats a Nominatim result as number street, area, town', () {
