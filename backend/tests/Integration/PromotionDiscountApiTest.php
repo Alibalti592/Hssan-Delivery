@@ -90,6 +90,30 @@ final class PromotionDiscountApiTest extends WebTestCase
         self::assertSame('10.000', $order['totalAmount']);
     }
 
+    public function testACodeSavedWithStraySpacesStillWorks(): void
+    {
+        $code = $this->uniqueCode();
+
+        // Typed on a phone, with the keyboard's trailing space.
+        self::assertSame($code, $this->adminCreatesPromotion(' '.$code.' ')['promoCode']);
+
+        $order = $this->placeOrder(quantity: 1, code: $code);
+
+        self::assertResponseStatusCodeSame(Response::HTTP_CREATED);
+        self::assertSame('5.000', $order['discountAmount']);
+        self::assertSame($code, $order['promoCode']);
+    }
+
+    public function testABlankCodeMeansThePromotionAppliesByItself(): void
+    {
+        self::assertNull($this->adminCreatesPromotion('   ')['promoCode']);
+
+        $order = $this->placeOrder(quantity: 1);
+
+        self::assertResponseStatusCodeSame(Response::HTTP_CREATED);
+        self::assertSame('5.000', $order['discountAmount']);
+    }
+
     public function testAWrongOrMisplacedCodeIsRefusedWithAReason(): void
     {
         $this->placeOrder(quantity: 1, code: 'NOPE'.random_int(1000, 9999));
@@ -214,6 +238,29 @@ final class PromotionDiscountApiTest extends WebTestCase
             'deliveryZoneId' => $this->zone->getId(),
             'promoCode' => $code,
         ]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function adminCreatesPromotion(string $promoCode): array
+    {
+        $adminToken = $this->login($this->createUser('ROLE_ADMIN'));
+        $this->client->request('POST', '/api/admin/promotions', server: [
+            'CONTENT_TYPE' => 'application/json',
+            'HTTP_AUTHORIZATION' => 'Bearer '.$adminToken,
+        ], content: json_encode([
+            'title' => '-5 DT',
+            'discountType' => 'FIXED_AMOUNT',
+            'discountValue' => '5',
+            'promoCode' => $promoCode,
+            'restaurantId' => $this->restaurant->getId(),
+            'startAt' => (new \DateTimeImmutable('-1 day'))->format(\DateTimeInterface::ATOM),
+            'isActive' => true,
+        ]));
+        self::assertResponseStatusCodeSame(Response::HTTP_CREATED);
+
+        return json_decode((string) $this->client->getResponse()->getContent(), true);
     }
 
     private function createPromotion(string $title, DiscountType $type, string $value, ?string $code = null, ?Restaurant $restaurant = null): Promotion

@@ -1,0 +1,26 @@
+# HTTPS certificates come from Let's Encrypt automatically, once both
+# domains point at this server (DNS A record) and ports 80/443 are open.
+{
+	email {$ACME_EMAIL}
+}
+
+# The API the mobile app talks to.
+{$API_DOMAIN} {
+	encode zstd gzip
+	reverse_proxy backend:80
+}
+
+# The admin dashboard. /api and /uploads go to the backend on this same
+# domain, so the login cookie is first-party (same as Vercel's rewrites).
+{$ADMIN_DOMAIN} {
+	encode zstd gzip
+	handle /api/* {
+		reverse_proxy backend:80
+	}
+	handle /uploads/* {
+		reverse_proxy backend:80
+	}
+	handle {
+		reverse_proxy admin:80
+	}
+}
