@@ -21,6 +21,27 @@ const mutedText = Color(0xFF8B93A0);
 const fieldFill = Color(0xFFEAF0F7);
 const cardBorder = Color(0xFFEDF0F4);
 
+/// Dark-mode counterparts of [fieldFill] / [cardBorder].
+const _fieldFillDark = Color(0xFF2A2A2A);
+const _cardBorderDark = Color(0xFF2E2E2E);
+
+/// [fieldFill] resolved for the current brightness — the literal is a light
+/// tint that white dark-mode text can't be read on.
+Color fieldFillOf(BuildContext context) =>
+    Theme.of(context).brightness == Brightness.dark
+    ? _fieldFillDark
+    : fieldFill;
+
+/// [cardBorder] resolved for the current brightness.
+Color cardBorderOf(BuildContext context) =>
+    Theme.of(context).brightness == Brightness.dark
+    ? _cardBorderDark
+    : cardBorder;
+
+/// The brand accent ([navy]) resolved for the current brightness: black on
+/// light surfaces, white on dark ones.
+Color accentOf(BuildContext context) => Theme.of(context).colorScheme.primary;
+
 ThemeData buildTheme(Brightness brightness) {
   // ColorScheme.fromSeed(seedColor: Colors.black) doesn't stay neutral —
   // Material 3's tonal palette algorithm falls back to a low-chroma pink/
@@ -55,6 +76,10 @@ ThemeData buildTheme(Brightness brightness) {
           outline: const Color(0xFF5A5A5A),
         );
 
+  final isDark = brightness == Brightness.dark;
+  final fill = isDark ? _fieldFillDark : fieldFill;
+  final border = isDark ? _cardBorderDark : cardBorder;
+
   return ThemeData(
     colorScheme: scheme,
     useMaterial3: true,
@@ -88,8 +113,8 @@ ThemeData buildTheme(Brightness brightness) {
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
         minimumSize: const Size.fromHeight(50),
-        side: const BorderSide(color: navy, width: 1.2),
-        foregroundColor: navy,
+        side: BorderSide(color: scheme.primary, width: 1.2),
+        foregroundColor: scheme.primary,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         textStyle: const TextStyle(
           fontSize: 13,
@@ -114,13 +139,13 @@ ThemeData buildTheme(Brightness brightness) {
       margin: EdgeInsets.zero,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(10),
-        side: const BorderSide(color: cardBorder),
+        side: BorderSide(color: border),
       ),
     ),
     chipTheme: ChipThemeData(
-      backgroundColor: fieldFill,
-      labelStyle: const TextStyle(
-        color: Color(0xFF6B7787),
+      backgroundColor: fill,
+      labelStyle: TextStyle(
+        color: isDark ? mutedText : const Color(0xFF6B7787),
         fontWeight: FontWeight.w600,
         fontSize: 12,
       ),
@@ -152,7 +177,7 @@ ThemeData buildTheme(Brightness brightness) {
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
-      fillColor: fieldFill,
+      fillColor: fill,
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
         borderSide: BorderSide.none,
@@ -163,7 +188,7 @@ ThemeData buildTheme(Brightness brightness) {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
-        borderSide: const BorderSide(color: navy, width: 1.4),
+        borderSide: BorderSide(color: scheme.primary, width: 1.4),
       ),
       labelStyle: const TextStyle(color: mutedText),
     ),
