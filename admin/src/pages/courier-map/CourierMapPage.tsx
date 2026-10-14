@@ -211,7 +211,11 @@ export default function CourierMapPage() {
                             />
                             {courier.name}
                           </td>
-                          <td>{STATUS_LABEL[courier.status]}</td>
+                          <td>
+                            {STATUS_LABEL[courier.status]}
+                            {(courier.activeDeliveries ?? 0) > 0 &&
+                              ` · ${courier.activeDeliveries} order${courier.activeDeliveries === 1 ? '' : 's'}`}
+                          </td>
                           <td>{hasPosition ? timeAgo(courier.updatedAt) : 'No position yet'}</td>
                           <td style={{ whiteSpace: 'nowrap', textAlign: 'right' }}>
                             {courier.currentDeliveryId && (

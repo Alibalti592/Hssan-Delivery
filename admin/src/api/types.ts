@@ -238,6 +238,8 @@ export interface CourierLocationEntry {
   longitude: number | null;
   updatedAt: string | null;
   currentDeliveryId: number | null;
+  /** How many orders they carry right now. */
+  activeDeliveries?: number;
 }
 
 export interface CurrentUser {

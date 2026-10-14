@@ -443,7 +443,7 @@ final class DeliveryApiTest extends WebTestCase
      * in-progress delivery — so an admin could pile several concurrent
      * deliveries onto one courier.
      */
-    public function testAdminCannotAssignDeliveryToCourierWithAnActiveDelivery(): void
+    public function testACourierCanBeGivenSeveralOrders(): void
     {
         $client = static::createClient();
 
@@ -478,14 +478,8 @@ final class DeliveryApiTest extends WebTestCase
             ]
         );
 
-        self::assertResponseStatusCodeSame(Response::HTTP_BAD_REQUEST);
-
-        $response = json_decode($client->getResponse()->getContent(), true);
-
-        self::assertSame(
-            'This courier already has an active delivery.',
-            $response['message']
-        );
+        // Already on one: they take this one too.
+        self::assertResponseStatusCodeSame(Response::HTTP_OK);
 
         $this->entityManager->clear();
 
@@ -493,8 +487,8 @@ final class DeliveryApiTest extends WebTestCase
             ->getRepository(Delivery::class)
             ->find($secondDelivery->getId());
 
-        self::assertSame(DeliveryStatus::PENDING, $savedSecondDelivery->getStatus());
-        self::assertNull($savedSecondDelivery->getCourier());
+        self::assertSame(DeliveryStatus::ASSIGNED, $savedSecondDelivery->getStatus());
+        self::assertSame($courier->getId(), $savedSecondDelivery->getCourier()->getId());
     }
 
     public function testCourierCanCompleteDeliveryLifecycle(): void
@@ -1018,12 +1012,9 @@ final class DeliveryApiTest extends WebTestCase
 
             self::assertResponseStatusCodeSame(Response::HTTP_OK);
 
-            // A courier can only have one active delivery at a time (see
-            // testAdminCannotAssignDeliveryToCourierWithAnActiveDelivery) —
-            // cancel each one before assigning the next so this test can
-            // still put 3 delivery rows under the same courier. Cancelling
-            // doesn't clear the courier reference, so all 3 still show up
-            // in /deliveries/mine below, which is all this test cares about.
+            // Cancel all but the last, so the list below mixes finished and
+            // active deliveries. Cancelling doesn't clear the courier
+            // reference, so all 3 still show up in /deliveries/mine.
             if ($index < count($deliveries) - 1) {
                 $client->request(
                     'POST',
@@ -1368,7 +1359,7 @@ final class DeliveryApiTest extends WebTestCase
         );
     }
 
-    public function testAdminCannotReassignToCourierWithAnActiveDelivery(): void
+    public function testAnOrderCanBeReassignedToABusyCourier(): void
     {
         $client = static::createClient();
 
@@ -1415,14 +1406,8 @@ final class DeliveryApiTest extends WebTestCase
             ]
         );
 
-        self::assertResponseStatusCodeSame(Response::HTTP_BAD_REQUEST);
-
-        $response = json_decode($client->getResponse()->getContent(), true);
-
-        self::assertSame(
-            'This courier already has an active delivery.',
-            $response['message']
-        );
+        // Busy with another order: they can take this one too.
+        self::assertResponseStatusCodeSame(Response::HTTP_OK);
     }
 
     public function testNonAdminCannotReassignDelivery(): void

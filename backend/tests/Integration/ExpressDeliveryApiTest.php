@@ -70,30 +70,22 @@ final class ExpressDeliveryApiTest extends WebTestCase
         self::assertNotEmpty($standard['id']);
     }
 
-    public function testACourierOnAStandardDeliveryCanTakeOneExpressOnTop(): void
+    public function testACourierCanCarrySeveralOrdersExpressOrNot(): void
     {
         $client = $this->login('ROLE_CLIENT');
         $admin = $this->login('ROLE_ADMIN');
         $courierId = $this->courier();
 
-        $first = $this->parcel($client);
-        $this->assign($admin, $first['deliveryId'], $courierId);
-        self::assertResponseIsSuccessful();
+        foreach (['STANDARD', 'STANDARD', 'EXPRESS', 'EXPRESS'] as $speed) {
+            $order = $this->parcel($client, $speed);
+            $this->assign($admin, $order['deliveryId'], $courierId);
+            self::assertResponseIsSuccessful();
+        }
 
-        // A second standard order: they're busy.
-        $second = $this->parcel($client);
-        $this->assign($admin, $second['deliveryId'], $courierId);
-        self::assertResponseStatusCodeSame(Response::HTTP_BAD_REQUEST);
-
-        // An express one: on top, done first.
-        $express = $this->parcel($client, 'EXPRESS');
-        $this->assign($admin, $express['deliveryId'], $courierId);
-        self::assertResponseIsSuccessful();
-
-        // But never a second express.
-        $another = $this->parcel($client, 'EXPRESS');
-        $this->assign($admin, $another['deliveryId'], $courierId);
-        self::assertResponseStatusCodeSame(Response::HTTP_BAD_REQUEST);
+        // The admin map counts what they carry.
+        $this->client->request('GET', '/api/admin/couriers/locations', server: $this->auth($admin));
+        $entry = array_values(array_filter($this->json(), static fn ($c) => $c['courierId'] === $courierId))[0];
+        self::assertSame(4, $entry['activeDeliveries']);
     }
 
     /** @return array<string, mixed> */

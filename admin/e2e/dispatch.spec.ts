@@ -94,7 +94,7 @@ test('orders waiting for a courier are assigned to the nearest one in one click'
   await expect(page).toHaveTitle('Hssan Delivery Admin');
 });
 
-test('an express order is flagged and can go to a courier already on a delivery', async ({ page }) => {
+test('an express order is flagged; a busy courier can still take it', async ({ page }) => {
   const express = waitingDelivery(9, 2);
   express.order = { ...express.order, deliverySpeed: 'EXPRESS' } as typeof express.order;
 
@@ -104,7 +104,7 @@ test('an express order is flagged and can go to a courier already on a delivery'
   );
   await page.route('**/api/admin/couriers/locations', (route) =>
     json(route, [
-      { courierId: 3, name: 'Awa', status: 'ON_DELIVERY', latitude: 37.2771, longitude: 9.8739, updatedAt: new Date().toISOString(), currentDeliveryId: 4 },
+      { courierId: 3, name: 'Awa', status: 'ON_DELIVERY', latitude: 37.2771, longitude: 9.8739, updatedAt: new Date().toISOString(), currentDeliveryId: 4, activeDeliveries: 2 },
     ]),
   );
   await mockLogin(page, ['ROLE_ADMIN']);
@@ -115,7 +115,10 @@ test('an express order is flagged and can go to a courier already on a delivery'
   await page.getByRole('button', { name: 'Sign in' }).click();
 
   await expect(page.getByText('⚡ Express · 15–20 min')).toBeVisible();
-  // Nobody is free, but Awa can take it on top of her delivery.
+  // Nobody is free, but Awa can take it on top of her two orders.
   await expect(page.getByLabel('Courier for delivery 9')).toHaveValue('3');
+  await expect(page.getByLabel('Courier for delivery 9').locator('option').nth(1)).toHaveText(
+    'Awa · 2 orders on hand · 300 m away (nearest)',
+  );
   await expect(page.getByRole('button', { name: 'Assign Awa' })).toBeEnabled();
 });

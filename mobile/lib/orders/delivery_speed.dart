@@ -3,8 +3,7 @@ import 'package:flutter/material.dart';
 import '../theme.dart';
 
 /// Standard (30–40 min) or express (15–20 min, 1 DT more). Express orders
-/// go first: on top of the admin's queue, and a courier already on a
-/// standard delivery can take one on top of it.
+/// go first: on top of the admin's queue, and first in the courier's list.
 enum DeliverySpeed {
   standard('STANDARD', 'Standard', '30–40 min', 0),
   express('EXPRESS', 'Express', '15–20 min', 1);

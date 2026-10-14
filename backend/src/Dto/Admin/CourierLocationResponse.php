@@ -14,7 +14,7 @@ use App\Entity\User;
  */
 final class CourierLocationResponse
 {
-    public static function fromCourier(User $courier, string $status, ?float $latitude, ?float $longitude, ?\DateTimeImmutable $updatedAt, ?Delivery $currentDelivery): array
+    public static function fromCourier(User $courier, string $status, ?float $latitude, ?float $longitude, ?\DateTimeImmutable $updatedAt, ?Delivery $currentDelivery, int $activeDeliveries = 0): array
     {
         return [
             'courierId' => $courier->getId(),
@@ -24,6 +24,8 @@ final class CourierLocationResponse
             'longitude' => $longitude,
             'updatedAt' => $updatedAt?->format(\DateTimeInterface::ATOM),
             'currentDeliveryId' => $currentDelivery?->getId(),
+            // How many orders they carry right now (several at once is fine).
+            'activeDeliveries' => $activeDeliveries,
         ];
     }
 }

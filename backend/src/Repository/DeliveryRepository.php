@@ -65,32 +65,13 @@ class DeliveryRepository extends ServiceEntityRepository
     }
 
     /**
-     * Every delivery the courier has under way: one, or two when an express
-     * order came on top of a standard one (see DeliveryService).
-     *
-     * @return Delivery[]
-     */
-    public function findAllActiveForCourier(User $courier): array
-    {
-        return $this->createQueryBuilder('d')
-            ->addSelect('o')
-            ->leftJoin('d.order', 'o')
-            ->andWhere('d.courier = :courier')
-            ->andWhere('d.status IN (:statuses)')
-            ->setParameter('courier', $courier)
-            ->setParameter('statuses', self::ACTIVE_STATUSES)
-            ->getQuery()
-            ->getResult();
-    }
-
-    /**
      * Batches findActiveForCourier() across a whole courier set — see
      * CourierLocationService::listForAdmin(), which otherwise issues one
      * query per courier on top of the one that lists them.
      *
      * @param User[] $couriers
      *
-     * @return array<int, Delivery> keyed by courier id
+     * @return array<int, Delivery[]> keyed by courier id, most recent first
      */
     public function findActiveForCouriers(array $couriers): array
     {
@@ -110,9 +91,8 @@ class DeliveryRepository extends ServiceEntityRepository
 
         $byCourierId = [];
         foreach ($deliveries as $delivery) {
-            // A courier with an express order on top of a standard one has
-            // two: keep the first (most recent, per the ORDER BY above).
-            $byCourierId[$delivery->getCourier()->getId()] ??= $delivery;
+            // A courier may carry several: most recent first (ORDER BY above).
+            $byCourierId[$delivery->getCourier()->getId()][] = $delivery;
         }
 
         return $byCourierId;

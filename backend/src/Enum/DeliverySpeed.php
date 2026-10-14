@@ -4,9 +4,8 @@ namespace App\Enum;
 
 /**
  * How fast the client wants it: standard (30–40 min) or express (15–20 min,
- * for a flat extra on the delivery fee). An express order goes first: the
- * dispatch queue lists it on top, and a courier already on a standard
- * delivery can take one express order on top of it.
+ * for a flat extra on the delivery fee). An express order goes first: on
+ * top of the dispatch queue, and first in the courier's list.
  */
 enum DeliverySpeed: string
 {
