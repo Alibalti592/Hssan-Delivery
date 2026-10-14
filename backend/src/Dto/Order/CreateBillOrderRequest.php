@@ -15,6 +15,7 @@ use Symfony\Component\Validator\Constraints as Assert;
 final class CreateBillOrderRequest
 {
     use DeliveryLocationFields;
+    use DeliverySpeedField;
 
     #[Assert\NotNull]
     #[Assert\Positive]

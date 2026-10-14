@@ -121,13 +121,29 @@ final class DeliveryService
 
         $this->entityManager->lock($courier, LockMode::PESSIMISTIC_WRITE);
 
-        $activeDelivery = $this->deliveryRepository->findActiveForCourier($courier);
-
         // Excluding the delivery being (re)assigned matters for reassignCourier:
         // it's already this courier's "active" delivery when reassigning it
         // back to the same courier, which must not read as "already busy".
-        if (null !== $activeDelivery && $activeDelivery->getId() !== $excludingDelivery->getId()) {
+        $others = array_values(array_filter(
+            $this->deliveryRepository->findAllActiveForCourier($courier),
+            static fn (Delivery $d) => $d->getId() !== $excludingDelivery->getId(),
+        ));
+
+        if ([] === $others) {
+            return;
+        }
+
+        // An express order may come on top of one standard delivery: the
+        // courier does it first. Never two express ones, nor a third order.
+        $isExpress = true === $excludingDelivery->getOrder()?->isExpress();
+        $othersExpress = array_filter($others, static fn (Delivery $d) => true === $d->getOrder()?->isExpress());
+
+        if (!$isExpress || 1 < count($others)) {
             throw new InvalidOperationException('This courier already has an active delivery.');
+        }
+
+        if ([] !== $othersExpress) {
+            throw new InvalidOperationException('This courier already has an express delivery.');
         }
     }
 

@@ -9,6 +9,8 @@ import '../widgets/status_chip.dart';
 import 'deliveries_controller.dart';
 import 'delivery.dart';
 import 'delivery_confirmed_screen.dart';
+import '../orders/delivery_speed.dart';
+import '../theme.dart';
 
 class DeliveryDetailScreen extends StatelessWidget {
   const DeliveryDetailScreen({required this.deliveryId, super.key});
@@ -53,9 +55,23 @@ class DeliveryDetailScreen extends StatelessWidget {
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
                     const Spacer(),
+                    if (order?.speed.isExpress == true) ...[
+                      const ExpressBadge(),
+                      const SizedBox(width: 8),
+                    ],
                     StatusChip(delivery.status),
                   ],
                 ),
+                if (order?.speed.isExpress == true) ...[
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Course express : à livrer en 15–20 min, avant vos autres courses.',
+                    style: TextStyle(
+                      color: warnText,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 16),
                 if (order != null) ...[
                   if (order.bill != null) ...[

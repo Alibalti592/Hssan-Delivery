@@ -6,6 +6,7 @@ use App\Entity\Delivery;
 use App\Entity\Order;
 use App\Entity\Restaurant;
 use App\Entity\User;
+use App\Enum\DeliverySpeed;
 use App\Enum\DeliveryStatus;
 use App\Pagination\PaginatedResult;
 use App\Pagination\Paginator;
@@ -64,6 +65,25 @@ class DeliveryRepository extends ServiceEntityRepository
     }
 
     /**
+     * Every delivery the courier has under way: one, or two when an express
+     * order came on top of a standard one (see DeliveryService).
+     *
+     * @return Delivery[]
+     */
+    public function findAllActiveForCourier(User $courier): array
+    {
+        return $this->createQueryBuilder('d')
+            ->addSelect('o')
+            ->leftJoin('d.order', 'o')
+            ->andWhere('d.courier = :courier')
+            ->andWhere('d.status IN (:statuses)')
+            ->setParameter('courier', $courier)
+            ->setParameter('statuses', self::ACTIVE_STATUSES)
+            ->getQuery()
+            ->getResult();
+    }
+
+    /**
      * Batches findActiveForCourier() across a whole courier set — see
      * CourierLocationService::listForAdmin(), which otherwise issues one
      * query per courier on top of the one that lists them.
@@ -90,9 +110,8 @@ class DeliveryRepository extends ServiceEntityRepository
 
         $byCourierId = [];
         foreach ($deliveries as $delivery) {
-            // A courier has at most one active delivery at a time (see
-            // findActiveForCourier's doc) — keep the first (most recent,
-            // per the ORDER BY above) if that invariant is ever violated.
+            // A courier with an express order on top of a standard one has
+            // two: keep the first (most recent, per the ORDER BY above).
             $byCourierId[$delivery->getCourier()->getId()] ??= $delivery;
         }
 
@@ -146,7 +165,11 @@ class DeliveryRepository extends ServiceEntityRepository
             ->leftJoin('o.user', 'u')
             ->andWhere('d.status = :pending')
             ->setParameter('pending', DeliveryStatus::PENDING)
-            ->orderBy('d.createdAt', 'ASC')
+            // Express orders first, then the oldest.
+            ->addSelect('CASE WHEN o.deliverySpeed = :express THEN 0 ELSE 1 END AS HIDDEN speedRank')
+            ->setParameter('express', DeliverySpeed::EXPRESS)
+            ->orderBy('speedRank', 'ASC')
+            ->addOrderBy('d.createdAt', 'ASC')
             ->addOrderBy('d.id', 'ASC')
             ->setMaxResults($limit)
             ->getQuery()

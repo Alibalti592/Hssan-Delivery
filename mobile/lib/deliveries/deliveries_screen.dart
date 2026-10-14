@@ -7,6 +7,7 @@ import 'deliveries_controller.dart';
 import 'delivery.dart';
 import 'delivery_detail_screen.dart';
 import '../widgets/status_chip.dart';
+import '../orders/delivery_speed.dart';
 
 class DeliveriesScreen extends StatefulWidget {
   const DeliveriesScreen({super.key});
@@ -234,6 +235,10 @@ class _DeliveryCard extends StatelessWidget {
                             ),
                           ),
                         ),
+                        if (order?.speed.isExpress == true) ...[
+                          const SizedBox(width: 8),
+                          const ExpressBadge(),
+                        ],
                         const SizedBox(width: 8),
                         StatusChip(delivery.status),
                       ],

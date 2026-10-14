@@ -176,6 +176,8 @@ export interface DeliveryOrderSummary {
   deliveryAddress: string;
   totalAmount: string;
   bill: OrderBill | null;
+  /** Standard (30–40 min) or express (15–20 min, +1 DT). */
+  deliverySpeed?: 'STANDARD' | 'EXPRESS';
   pickupLatitude?: number | null;
   pickupLongitude?: number | null;
   deliveryLatitude?: number | null;

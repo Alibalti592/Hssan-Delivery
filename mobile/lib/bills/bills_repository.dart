@@ -32,8 +32,10 @@ class BillsRepository {
     String? note,
     double? latitude,
     double? longitude,
+    DeliverySpeed speed = DeliverySpeed.standard,
   }) async {
     final body = await _api.post('/api/orders/bills', {
+      if (speed.isExpress) 'deliverySpeed': speed.apiValue,
       'deliveryLatitude': ?latitude,
       'deliveryLongitude': ?longitude,
       'providerId': providerId,

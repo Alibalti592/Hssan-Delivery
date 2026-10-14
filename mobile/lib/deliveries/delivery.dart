@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart' show IconData, Icons;
 
 import '../bills/bill_models.dart';
+import '../orders/delivery_speed.dart';
 
 /// Delivery lifecycle, mirrors the backend `DeliveryStatus` enum.
 enum DeliveryStatus {
@@ -156,7 +157,11 @@ class DeliveryOrder {
     this.pickupLongitude,
     this.deliveryLatitude,
     this.deliveryLongitude,
+    this.speed = DeliverySpeed.standard,
   });
+
+  /// Standard or express: an express job goes first.
+  final DeliverySpeed speed;
 
   final int id;
 
@@ -276,6 +281,7 @@ class DeliveryOrder {
       pickupLongitude: (json['pickupLongitude'] as num?)?.toDouble(),
       deliveryLatitude: (json['deliveryLatitude'] as num?)?.toDouble(),
       deliveryLongitude: (json['deliveryLongitude'] as num?)?.toDouble(),
+      speed: DeliverySpeed.fromApi(json['deliverySpeed'] as String?),
     );
   }
 }

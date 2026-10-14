@@ -44,6 +44,7 @@ final class OrderResponse
             'promoCode' => $order->getPromoCode(),
             'status' => $order->getStatus()->value,
             'deliveryType' => $order->getDeliveryType()->value,
+            'deliverySpeed' => $order->getDeliverySpeed()->value,
             'deliveryId' => $order->getDelivery()?->getId(),
             'pickupLatitude' => $order->getPickupLatitude(),
             'pickupLongitude' => $order->getPickupLongitude(),

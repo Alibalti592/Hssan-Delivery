@@ -54,6 +54,15 @@ function formatKm(km: number): string {
   return km < 1 ? `${Math.max(50, Math.round(km * 20) * 50)} m` : `${km.toFixed(1)} km`;
 }
 
+function isExpress(delivery: WaitingDelivery): boolean {
+  return delivery.order?.deliverySpeed === 'EXPRESS';
+}
+
+/** "Express" next to the order, so it's picked first. */
+function ExpressTag() {
+  return <span className="badge warn express-tag">⚡ Express · 15–20 min</span>;
+}
+
 /** Where the courier goes first: the pickup pin, else the drop-off pin. */
 function firstStop(delivery: WaitingDelivery): [number, number] | null {
   const o = delivery.order;
@@ -194,7 +203,11 @@ function QueueRow({
   const queryClient = useQueryClient();
   // Null: follow the suggestion, which moves as couriers come online.
   const [picked, setPicked] = useState<string | null>(null);
-  const suggestion = options.find((o) => o.status === 'ONLINE') ?? null;
+  // A free courier first; an express order can also go on top of a
+  // courier's standard delivery (they do it first).
+  const suggestion =
+    options.find((o) => o.status === 'ONLINE') ??
+    (isExpress(delivery) ? (options.find((o) => o.status === 'ON_DELIVERY') ?? null) : null);
   const courierId = picked ?? (suggestion ? String(suggestion.courier.id) : '');
   const chosen = options.find((o) => String(o.courier.id) === courierId) ?? null;
   const assign = useMutation({
@@ -216,6 +229,7 @@ function QueueRow({
         <div className="rmeta">
           #{delivery.orderId} · {delivery.order?.customerName ?? ''}
         </div>
+        {isExpress(delivery) && <ExpressTag />}
       </td>
       <td>{delivery.order?.deliveryAddress ?? '—'}</td>
       <td>{delivery.order ? money(delivery.order.totalAmount) : '—'}</td>
@@ -310,6 +324,7 @@ export function OnTheirWay() {
                     <div className="rmeta">
                       #{delivery.orderId} · {delivery.order?.customerName ?? ''}
                     </div>
+                    {isExpress(delivery) && <ExpressTag />}
                   </td>
                   <td>{delivery.order?.deliveryAddress ?? '—'}</td>
                   <td>{delivery.courierName ?? '—'}</td>
