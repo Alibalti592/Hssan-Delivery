@@ -95,6 +95,7 @@ final class OrderService
         $order->setDeliveryLocation($dto->deliveryLatitude, $dto->deliveryLongitude);
         $order->setStatus(OrderStatus::PENDING);
         $order->setDeliveryType($restaurant->getType()->toDeliveryType());
+        $order->setDeliverySpeed($dto->speed());
 
         $totalMillimes = 0;
         // What a promotion may take off: not the fixed-price offers, which
@@ -185,7 +186,9 @@ final class OrderService
             $order->applyDiscount($discount['promotion'], Money::fromMillimes($discountMillimes));
         }
 
-        $deliveryFeeMillimes = Money::toMillimes($deliveryZone->getFee());
+        // The zone's fee, plus the express extra when chosen.
+        $deliveryFeeMillimes = Money::toMillimes($deliveryZone->getFee())
+            + Money::toMillimes($order->getDeliverySpeed()->extraFee());
 
         $order->setDeliveryFee(
             Money::fromMillimes($deliveryFeeMillimes)
@@ -227,8 +230,10 @@ final class OrderService
         $order->setStatus(OrderStatus::PENDING);
         $order->setDeliveryType(DeliveryType::PARCEL);
         $order->setPickupLocation($dto->pickupLatitude, $dto->pickupLongitude);
+        $order->setDeliverySpeed($dto->speed());
 
-        $deliveryFeeMillimes = Money::toMillimes($deliveryZone->getFee());
+        $deliveryFeeMillimes = Money::toMillimes($deliveryZone->getFee())
+            + Money::toMillimes($dto->speed()->extraFee());
 
         $order->setDeliveryFee(
             Money::fromMillimes($deliveryFeeMillimes)

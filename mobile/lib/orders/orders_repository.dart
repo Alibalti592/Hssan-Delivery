@@ -66,10 +66,12 @@ class OrdersRepository {
     double? deliveryLatitude,
     double? deliveryLongitude,
     String? promoCode,
+    DeliverySpeed speed = DeliverySpeed.standard,
   }) async {
     final body = await _api.post(
       '/api/orders',
       _orderBody(
+        speed: speed,
         restaurantId: restaurantId,
         items: items,
         deliveryAddress: deliveryAddress,
@@ -90,10 +92,12 @@ class OrdersRepository {
     required List<CartLine> items,
     required int deliveryZoneId,
     String? promoCode,
+    DeliverySpeed speed = DeliverySpeed.standard,
   }) async {
     final body = await _api.post(
       '/api/orders/quote',
       _orderBody(
+        speed: speed,
         restaurantId: restaurantId,
         items: items,
         // Not priced; the endpoint only needs it to be there.
@@ -114,7 +118,10 @@ class OrdersRepository {
     double? deliveryLatitude,
     double? deliveryLongitude,
     String? promoCode,
+    DeliverySpeed speed = DeliverySpeed.standard,
   }) => {
+    // Standard is the server's default: only express is sent.
+    if (speed.isExpress) 'deliverySpeed': speed.apiValue,
     'deliveryLatitude': ?deliveryLatitude,
     'deliveryLongitude': ?deliveryLongitude,
     'restaurantId': restaurantId,
@@ -145,8 +152,10 @@ class OrdersRepository {
     double? pickupLongitude,
     double? deliveryLatitude,
     double? deliveryLongitude,
+    DeliverySpeed speed = DeliverySpeed.standard,
   }) async {
     final body = await _api.post('/api/orders/parcels', {
+      if (speed.isExpress) 'deliverySpeed': speed.apiValue,
       'pickupLatitude': ?pickupLatitude,
       'pickupLongitude': ?pickupLongitude,
       'deliveryLatitude': ?deliveryLatitude,

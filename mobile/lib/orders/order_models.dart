@@ -3,6 +3,9 @@ import 'package:latlong2/latlong.dart';
 
 import '../bills/bill_models.dart';
 import '../deliveries/delivery.dart' show DeliveryStatus;
+import 'delivery_speed.dart';
+
+export 'delivery_speed.dart' show DeliverySpeed;
 
 /// Client order lifecycle, mirrors the backend `OrderStatus` enum.
 enum OrderStatus {
@@ -87,9 +90,13 @@ class ClientOrder {
     this.pickupLongitude,
     this.deliveryLatitude,
     this.deliveryLongitude,
+    this.speed = DeliverySpeed.standard,
   });
 
   final int id;
+
+  /// Standard or express; express is included in [deliveryFee].
+  final DeliverySpeed speed;
 
   /// Null for a Colis (parcel) order, which has no restaurant.
   final int? restaurantId;
@@ -213,6 +220,7 @@ class ClientOrder {
       pickupLongitude: (json['pickupLongitude'] as num?)?.toDouble(),
       deliveryLatitude: (json['deliveryLatitude'] as num?)?.toDouble(),
       deliveryLongitude: (json['deliveryLongitude'] as num?)?.toDouble(),
+      speed: DeliverySpeed.fromApi(json['deliverySpeed'] as String?),
     );
   }
 }

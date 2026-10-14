@@ -132,6 +132,45 @@ void main() {
     },
   );
 
+  testWidgets('express costs 1 DT more and is sent with the order', (
+    tester,
+  ) async {
+    _useTallViewport(tester);
+    Map<String, dynamic>? posted;
+    final mock = MockClient((request) async {
+      if (request.url.path == '/api/delivery-zones/locate') {
+        return jsonResponse({'id': 2, 'name': 'Corniche', 'fee': '6.000'});
+      }
+      posted = jsonDecode(request.body) as Map<String, dynamic>;
+      return jsonResponse(_parcelOrder(), 201);
+    });
+
+    await tester.pumpWidget(_app(mock, current: _home));
+    await tester.pumpAndSettle();
+    expect(find.text('Frais de livraison : 6.000 DT'), findsOneWidget);
+
+    await tester.tap(find.text('Express'));
+    await tester.pumpAndSettle();
+    expect(find.text('Frais de livraison : 7.000 DT'), findsOneWidget);
+
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Nom du destinataire'),
+      'Sami Client',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Téléphone du destinataire'),
+      '22000000',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Adresse du destinataire'),
+      'Rue X',
+    );
+    await tester.tap(find.text('ENVOYER LE COLIS'));
+    await tester.pumpAndSettle();
+
+    expect(posted, containsPair('deliverySpeed', 'EXPRESS'));
+  });
+
   testWidgets("a pickup outside every zone can't be sent from", (tester) async {
     _useTallViewport(tester);
     final mock = MockClient((request) async {

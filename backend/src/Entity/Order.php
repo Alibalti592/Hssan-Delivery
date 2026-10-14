@@ -2,6 +2,7 @@
 
 namespace App\Entity;
 
+use App\Enum\DeliverySpeed;
 use App\Enum\DeliveryType;
 use App\Enum\OrderStatus;
 use App\Repository\OrderRepository;
@@ -145,6 +146,10 @@ class Order
 
     #[ORM\Column(length: 20, enumType: DeliveryType::class, options: ['default' => 'RESTAURANT'])]
     private DeliveryType $deliveryType = DeliveryType::RESTAURANT;
+
+    /** Standard or express; express is included in deliveryFee. */
+    #[ORM\Column(length: 20, enumType: DeliverySpeed::class, options: ['default' => 'STANDARD'])]
+    private DeliverySpeed $deliverySpeed = DeliverySpeed::STANDARD;
 
     #[ORM\Column]
     private ?\DateTimeImmutable $createdAt = null;
@@ -368,6 +373,23 @@ class Order
         $this->status = $status;
 
         return $this;
+    }
+
+    public function getDeliverySpeed(): DeliverySpeed
+    {
+        return $this->deliverySpeed;
+    }
+
+    public function setDeliverySpeed(DeliverySpeed $deliverySpeed): static
+    {
+        $this->deliverySpeed = $deliverySpeed;
+
+        return $this;
+    }
+
+    public function isExpress(): bool
+    {
+        return DeliverySpeed::EXPRESS === $this->deliverySpeed;
     }
 
     public function getDeliveryType(): DeliveryType

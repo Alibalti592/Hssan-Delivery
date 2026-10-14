@@ -5,6 +5,7 @@ import '../addresses/address_picker.dart';
 import '../addresses/selected_address.dart';
 import '../core/api_exception.dart';
 import '../core/phone_format.dart';
+import '../orders/delivery_speed.dart';
 import '../orders/orders_repository.dart';
 import '../widgets/dark_header.dart';
 import 'order_confirmed_screen.dart';
@@ -23,6 +24,7 @@ class ParcelFormScreen extends StatefulWidget {
 class _ParcelFormScreenState extends State<ParcelFormScreen> {
   final _formKey = GlobalKey<FormState>();
   AddressSelection? _pickup;
+  DeliverySpeed _speed = DeliverySpeed.standard;
   final _recipientName = TextEditingController();
   final _recipientPhone = TextEditingController();
   final _recipientAddress = TextEditingController();
@@ -54,6 +56,7 @@ class _ParcelFormScreenState extends State<ParcelFormScreen> {
         recipientName: _recipientName.text.trim(),
         recipientPhone: _recipientPhone.text.trim(),
         deliveryZoneId: _pickup!.zone!.id,
+        speed: _speed,
         note: _note.text.trim(),
       );
       if (!mounted) return;
@@ -145,6 +148,20 @@ class _ParcelFormScreenState extends State<ParcelFormScreen> {
                             ? 'Adresse requise'
                             : null,
                       ),
+                      const SizedBox(height: 16),
+                      DeliverySpeedPicker(
+                        value: _speed,
+                        enabled: !_submitting,
+                        onChanged: (v) => setState(() => _speed = v),
+                      ),
+                      if (_pickup?.zone != null) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          'Frais de livraison : '
+                          '${((double.tryParse(_pickup!.zone!.fee) ?? 0) + _speed.extraFee).toStringAsFixed(3)} DT',
+                          style: const TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                      ],
                       const SizedBox(height: 16),
                       TextFormField(
                         controller: _note,

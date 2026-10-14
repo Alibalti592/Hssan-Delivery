@@ -9,6 +9,7 @@ import '../addresses/route_map.dart';
 import '../bills/bill_widgets.dart';
 import '../core/api_exception.dart';
 import '../deliveries/delivery.dart';
+import '../orders/delivery_speed.dart';
 import '../orders/courier_position.dart';
 import '../orders/order_models.dart';
 import '../orders/order_tracking.dart';
@@ -262,6 +263,11 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                       label: orderStatusText(order),
                     ),
                   ],
+                ),
+                const SizedBox(height: 8),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: DeliverySpeedLine(order.speed),
                 ),
                 const SizedBox(height: 16),
                 if (tracking) ...[

@@ -54,6 +54,15 @@ function formatKm(km: number): string {
   return km < 1 ? `${Math.max(50, Math.round(km * 20) * 50)} m` : `${km.toFixed(1)} km`;
 }
 
+function isExpress(delivery: WaitingDelivery): boolean {
+  return delivery.order?.deliverySpeed === 'EXPRESS';
+}
+
+/** "Express" next to the order, so it's picked first. */
+function ExpressTag() {
+  return <span className="badge warn express-tag">⚡ Express · 15–20 min</span>;
+}
+
 /** Where the courier goes first: the pickup pin, else the drop-off pin. */
 function firstStop(delivery: WaitingDelivery): [number, number] | null {
   const o = delivery.order;
@@ -67,14 +76,15 @@ type Candidate = {
   courier: Courier;
   status: CourierMapStatus;
   position: [number, number] | null;
+  /** Orders they already carry. */
+  load: number;
 };
 
 type Option = Candidate & { km: number | null };
 
 /**
- * The couriers for one order, best first: online (free) before busy before
- * offline, and nearest first among the online ones when both positions are
- * known. The first online one is the suggestion.
+ * The couriers for one order, best first: free before busy (fewest orders
+ * first) before offline, then nearest when both positions are known.
  */
 function rank(candidates: Candidate[], stop: [number, number] | null): Option[] {
   return candidates
@@ -82,6 +92,7 @@ function rank(candidates: Candidate[], stop: [number, number] | null): Option[] 
     .sort((a, b) => {
       const byStatus = STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status);
       if (byStatus !== 0) return byStatus;
+      if (a.load !== b.load) return a.load - b.load;
       if (a.km !== null && b.km !== null) return a.km - b.km;
       if (a.km !== null) return -1;
       if (b.km !== null) return 1;
@@ -120,6 +131,7 @@ export function DispatchQueue() {
         courier: c,
         status: l?.status ?? ('OFFLINE' as CourierMapStatus),
         position: l && l.latitude !== null && l.longitude !== null ? [l.latitude, l.longitude] : null,
+        load: l?.activeDeliveries ?? (l?.currentDeliveryId ? 1 : 0),
       };
     });
   const onlineCount = candidates.filter((c) => c.status === 'ONLINE').length;
@@ -176,8 +188,9 @@ export function DispatchQueue() {
   );
 }
 
-function optionLabel({ courier, status, km }: Option): string {
-  return [courier.name, STATUS_LABEL[status], km !== null ? `${formatKm(km)} away` : null]
+function optionLabel({ courier, status, km, load }: Option): string {
+  const state = status === 'ON_DELIVERY' && load > 0 ? `${load} order${load === 1 ? '' : 's'} on hand` : STATUS_LABEL[status];
+  return [courier.name, state, km !== null ? `${formatKm(km)} away` : null]
     .filter(Boolean)
     .join(' · ');
 }
@@ -194,7 +207,9 @@ function QueueRow({
   const queryClient = useQueryClient();
   // Null: follow the suggestion, which moves as couriers come online.
   const [picked, setPicked] = useState<string | null>(null);
-  const suggestion = options.find((o) => o.status === 'ONLINE') ?? null;
+  // A free courier first, else the least busy one: couriers can carry
+  // several orders at once.
+  const suggestion = options.find((o) => o.status === 'ONLINE') ?? options.find((o) => o.status === 'ON_DELIVERY') ?? null;
   const courierId = picked ?? (suggestion ? String(suggestion.courier.id) : '');
   const chosen = options.find((o) => String(o.courier.id) === courierId) ?? null;
   const assign = useMutation({
@@ -216,6 +231,7 @@ function QueueRow({
         <div className="rmeta">
           #{delivery.orderId} · {delivery.order?.customerName ?? ''}
         </div>
+        {isExpress(delivery) && <ExpressTag />}
       </td>
       <td>{delivery.order?.deliveryAddress ?? '—'}</td>
       <td>{delivery.order ? money(delivery.order.totalAmount) : '—'}</td>
@@ -310,6 +326,7 @@ export function OnTheirWay() {
                     <div className="rmeta">
                       #{delivery.orderId} · {delivery.order?.customerName ?? ''}
                     </div>
+                    {isExpress(delivery) && <ExpressTag />}
                   </td>
                   <td>{delivery.order?.deliveryAddress ?? '—'}</td>
                   <td>{delivery.courierName ?? '—'}</td>

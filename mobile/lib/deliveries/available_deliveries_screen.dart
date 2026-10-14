@@ -5,6 +5,7 @@ import '../widgets/dark_header.dart';
 import 'deliveries_controller.dart';
 import 'delivery.dart';
 import 'delivery_detail_screen.dart';
+import '../orders/delivery_speed.dart';
 
 class AvailableDeliveriesScreen extends StatefulWidget {
   const AvailableDeliveriesScreen({super.key});
@@ -147,6 +148,10 @@ class _ProposalCard extends StatelessWidget {
                     ),
                   ),
                 ),
+                if (order?.speed.isExpress == true) ...[
+                  const ExpressBadge(),
+                  const SizedBox(width: 8),
+                ],
                 if (order != null)
                   Text(
                     '${order.totalAmount} DT',

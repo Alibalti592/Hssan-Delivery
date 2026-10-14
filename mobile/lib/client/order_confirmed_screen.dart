@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../notifications/notification_prompt.dart';
+import '../orders/delivery_speed.dart';
 import '../orders/order_models.dart';
 import '../theme.dart';
 import 'client_home_screen.dart';
@@ -51,6 +52,8 @@ class OrderConfirmedScreen extends StatelessWidget {
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
+              const SizedBox(height: 12),
+              DeliverySpeedLine(order.speed),
               const SizedBox(height: 24),
               Card(
                 child: Padding(

@@ -6,6 +6,7 @@ use App\Entity\Delivery;
 use App\Entity\Order;
 use App\Entity\Restaurant;
 use App\Entity\User;
+use App\Enum\DeliverySpeed;
 use App\Enum\DeliveryStatus;
 use App\Pagination\PaginatedResult;
 use App\Pagination\Paginator;
@@ -70,7 +71,7 @@ class DeliveryRepository extends ServiceEntityRepository
      *
      * @param User[] $couriers
      *
-     * @return array<int, Delivery> keyed by courier id
+     * @return array<int, Delivery[]> keyed by courier id, most recent first
      */
     public function findActiveForCouriers(array $couriers): array
     {
@@ -90,10 +91,8 @@ class DeliveryRepository extends ServiceEntityRepository
 
         $byCourierId = [];
         foreach ($deliveries as $delivery) {
-            // A courier has at most one active delivery at a time (see
-            // findActiveForCourier's doc) — keep the first (most recent,
-            // per the ORDER BY above) if that invariant is ever violated.
-            $byCourierId[$delivery->getCourier()->getId()] ??= $delivery;
+            // A courier may carry several: most recent first (ORDER BY above).
+            $byCourierId[$delivery->getCourier()->getId()][] = $delivery;
         }
 
         return $byCourierId;
@@ -146,7 +145,11 @@ class DeliveryRepository extends ServiceEntityRepository
             ->leftJoin('o.user', 'u')
             ->andWhere('d.status = :pending')
             ->setParameter('pending', DeliveryStatus::PENDING)
-            ->orderBy('d.createdAt', 'ASC')
+            // Express orders first, then the oldest.
+            ->addSelect('CASE WHEN o.deliverySpeed = :express THEN 0 ELSE 1 END AS HIDDEN speedRank')
+            ->setParameter('express', DeliverySpeed::EXPRESS)
+            ->orderBy('speedRank', 'ASC')
+            ->addOrderBy('d.createdAt', 'ASC')
             ->addOrderBy('d.id', 'ASC')
             ->setMaxResults($limit)
             ->getQuery()

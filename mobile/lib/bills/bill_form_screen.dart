@@ -10,6 +10,7 @@ import '../client/order_confirmed_screen.dart';
 import '../core/api_exception.dart';
 import '../core/phone_format.dart';
 import '../theme.dart';
+import '../orders/delivery_speed.dart';
 import '../widgets/dark_header.dart';
 import 'bill_models.dart';
 import 'bill_widgets.dart';
@@ -43,6 +44,7 @@ class _BillFormScreenState extends State<BillFormScreen> {
   final _recipientPhone = TextEditingController();
   final _note = TextEditingController();
   AddressSelection? _selection;
+  DeliverySpeed _speed = DeliverySpeed.standard;
   XFile? _photo;
   Uint8List? _photoBytes;
   bool _submitting = false;
@@ -132,6 +134,7 @@ class _BillFormScreenState extends State<BillFormScreen> {
         recipientName: _isTransfer ? _recipientName.text.trim() : null,
         recipientPhone: _isTransfer ? _recipientPhone.text.trim() : null,
         note: _note.text.trim(),
+        speed: _speed,
       );
 
       if (_photoBytes != null) {
@@ -281,6 +284,12 @@ class _BillFormScreenState extends State<BillFormScreen> {
                             .current,
                         onChanged: (v) => setState(() => _selection = v),
                       ),
+                      const SizedBox(height: 20),
+                      DeliverySpeedPicker(
+                        value: _speed,
+                        enabled: !_submitting,
+                        onChanged: (v) => setState(() => _speed = v),
+                      ),
                       const SizedBox(height: 16),
                       TextFormField(
                         controller: _note,
@@ -293,8 +302,13 @@ class _BillFormScreenState extends State<BillFormScreen> {
                       const SizedBox(height: 20),
                       _CashSummary(
                         amount: _normalizeAmount(_amount.text),
-                        fee: _selection?.zone?.fee,
+                        fee: _selection?.zone == null
+                            ? null
+                            : ((double.tryParse(_selection!.zone!.fee) ?? 0) +
+                                      _speed.extraFee)
+                                  .toStringAsFixed(3),
                         isTransfer: _isTransfer,
+                        express: _speed.isExpress,
                       ),
                       if (_error != null) ...[
                         const SizedBox(height: 16),
@@ -443,11 +457,13 @@ class _CashSummary extends StatelessWidget {
     required this.amount,
     required this.fee,
     required this.isTransfer,
+    this.express = false,
   });
 
   final String? amount;
   final String? fee;
   final bool isTransfer;
+  final bool express;
 
   @override
   Widget build(BuildContext context) {
@@ -491,7 +507,10 @@ class _CashSummary extends StatelessWidget {
             isTransfer ? 'Montant du mandat' : 'Montant de la facture',
             amountValue == null ? '—' : '${amountValue.toStringAsFixed(3)} DT',
           ),
-          row('Frais de livraison', fee == null ? '—' : '$fee DT'),
+          row(
+            express ? 'Livraison express' : 'Frais de livraison',
+            fee == null ? '—' : '$fee DT',
+          ),
           const Divider(height: 18),
           row(
             'À remettre au livreur',

@@ -15,6 +15,7 @@ import '../notifications/notification_prompt.dart';
 import '../theme.dart';
 import '../widgets/dark_header.dart';
 import '../widgets/status_chip.dart';
+import '../orders/delivery_speed.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -363,6 +364,10 @@ class _InProgressCard extends StatelessWidget {
                     ),
                   ),
                 ),
+                if (order?.speed.isExpress == true) ...[
+                  const ExpressBadge(),
+                  const SizedBox(width: 8),
+                ],
                 StatusChip(delivery.status),
               ],
             ),

@@ -108,7 +108,9 @@ final class BillOrderService
         $order->setPickupLocation($dto->deliveryLatitude, $dto->deliveryLongitude);
         $order->setStatus(OrderStatus::PENDING);
 
-        $feeMillimes = Money::toMillimes($deliveryZone->getFee());
+        $order->setDeliverySpeed($dto->speed());
+        $feeMillimes = Money::toMillimes($deliveryZone->getFee())
+            + Money::toMillimes($dto->speed()->extraFee());
 
         $order->setDeliveryFee(Money::fromMillimes($feeMillimes));
         $order->setTotalAmount(Money::fromMillimes($amountMillimes + $feeMillimes));

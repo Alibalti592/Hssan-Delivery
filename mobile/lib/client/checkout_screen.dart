@@ -2,6 +2,7 @@ import '../addresses/address_picker.dart';
 import '../addresses/selected_address.dart';
 import '../cart/cart.dart';
 import '../core/api_exception.dart';
+import '../orders/delivery_speed.dart';
 import '../orders/order_models.dart';
 import '../orders/orders_repository.dart';
 import '../theme.dart';
@@ -24,6 +25,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   final _note = TextEditingController();
   final _code = TextEditingController();
   AddressSelection? _selection;
+  DeliverySpeed _speed = DeliverySpeed.standard;
   bool _submitting = false;
   String? _error;
 
@@ -79,6 +81,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         items: cart.lines,
         deliveryZoneId: zone.id,
         promoCode: code ?? _appliedCode,
+        speed: _speed,
       );
       if (mounted && generation == _quoteGeneration) {
         setState(() => _quote = quote);
@@ -112,6 +115,17 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     });
   }
 
+  void _setSpeed(DeliverySpeed speed) {
+    if (speed == _speed) return;
+    setState(() {
+      _speed = speed;
+      // The fee changes: show it at once, then the backend's price.
+      _quote = null;
+      _quoteGeneration++;
+    });
+    _refreshQuote();
+  }
+
   void _removeCode() {
     setState(() {
       _appliedCode = null;
@@ -136,6 +150,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         deliveryLongitude: selection.address.longitude,
         note: _note.text.trim(),
         promoCode: _appliedCode,
+        speed: _speed,
       );
       cart.clear();
       if (!mounted) return;
@@ -186,6 +201,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                         allowOneOff: true,
                         onChanged: _onAddressChanged,
                       ),
+                      const SizedBox(height: 20),
+                      DeliverySpeedPicker(
+                        value: _speed,
+                        enabled: !_submitting,
+                        onChanged: _setSpeed,
+                      ),
                       const SizedBox(height: 16),
                       TextFormField(
                         controller: _note,
@@ -212,7 +233,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       _Summary(
                         quote: _quote,
                         localSubtotal: cart.subtotal,
-                        localFee: double.tryParse(_selection?.zone?.fee ?? ''),
+                        localFee: _selection?.zone == null
+                            ? null
+                            : (double.tryParse(_selection!.zone!.fee) ?? 0) +
+                                  _speed.extraFee,
+                        express: _speed.isExpress,
                       ),
                       const SizedBox(height: 12),
                       const CashPaymentNote(),
@@ -394,11 +419,13 @@ class _Summary extends StatelessWidget {
     required this.quote,
     required this.localSubtotal,
     required this.localFee,
+    this.express = false,
   });
 
   final OrderQuote? quote;
   final double localSubtotal;
   final double? localFee;
+  final bool express;
 
   @override
   Widget build(BuildContext context) {
@@ -428,7 +455,10 @@ class _Summary extends StatelessWidget {
               ),
             ],
             const SizedBox(height: 6),
-            _TotalRow(label: 'Frais de livraison', value: fee),
+            _TotalRow(
+              label: express ? 'Livraison express' : 'Frais de livraison',
+              value: fee,
+            ),
             const Divider(height: 20),
             _TotalRow(label: 'Total', value: total, bold: true),
             if (discount > 0) ...[

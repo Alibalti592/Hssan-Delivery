@@ -150,6 +150,10 @@ class DeliveriesController extends ChangeNotifier {
       if (a.status.isTerminal != b.status.isTerminal) {
         return a.status.isTerminal ? 1 : -1;
       }
+      // An express job comes first: the courier does it before the others.
+      final aExpress = !a.status.isTerminal && a.order?.speed.isExpress == true;
+      final bExpress = !b.status.isTerminal && b.order?.speed.isExpress == true;
+      if (aExpress != bExpress) return aExpress ? -1 : 1;
       final aDate = a.assignedAt ?? DateTime(0);
       final bDate = b.assignedAt ?? DateTime(0);
       return bDate.compareTo(aDate);

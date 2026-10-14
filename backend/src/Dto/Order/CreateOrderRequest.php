@@ -8,6 +8,7 @@ use Symfony\Component\Validator\Constraints as Assert;
 final class CreateOrderRequest
 {
     use DeliveryLocationFields;
+    use DeliverySpeedField;
 
     #[Assert\NotNull]
     #[Assert\Positive]

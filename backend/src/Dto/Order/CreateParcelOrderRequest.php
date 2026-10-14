@@ -10,6 +10,7 @@ use Symfony\Component\Validator\Constraints as Assert;
 final class CreateParcelOrderRequest
 {
     use DeliveryLocationFields;
+    use DeliverySpeedField;
     use PickupLocationFields;
 
     #[Assert\NotBlank]

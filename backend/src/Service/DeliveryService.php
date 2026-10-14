@@ -37,7 +37,7 @@ final class DeliveryService
                 throw new InvalidOperationException('Only pending deliveries can be assigned.');
             }
 
-            $this->assertCourierAvailableForAssignment($courier, $delivery);
+            $this->assertCourierAvailableForAssignment($courier);
 
             $delivery->setCourier($courier);
             $delivery->setStatus(DeliveryStatus::ASSIGNED);
@@ -68,7 +68,7 @@ final class DeliveryService
                 throw new InvalidOperationException('This delivery cannot be reassigned at its current status.');
             }
 
-            $this->assertCourierAvailableForAssignment($courier, $delivery);
+            $this->assertCourierAvailableForAssignment($courier);
 
             $delivery->setCourier($courier);
             $delivery->setStatus(DeliveryStatus::ASSIGNED);
@@ -81,18 +81,12 @@ final class DeliveryService
     }
 
     /**
-     * Shared by assignCourier and reassignCourier. Locking the courier row
-     * (not just the delivery row the caller already locked) closes a race
-     * two concurrent assignments to the *same* courier but *different*
-     * deliveries would otherwise have: both could pass the capacity check
-     * below before either commits, since neither delivery's row lock
-     * protects the other delivery's insert. Serializing on the courier row
-     * makes the second request see the first one's delivery once it commits.
+     * Shared by assignCourier and reassignCourier: the courier must be a
+     * verified, active courier who is available. How many orders they
+     * already carry doesn't matter.
      */
-    private function assertCourierAvailableForAssignment(
-        User $courier,
-        Delivery $excludingDelivery,
-    ): void {
+    private function assertCourierAvailableForAssignment(User $courier): void
+    {
         if (!in_array('ROLE_LIVREUR', $courier->getRoles(), true)) {
             throw new InvalidOperationException('The selected user is not a courier.');
         }
@@ -119,16 +113,8 @@ final class DeliveryService
             throw new InvalidOperationException('This courier is currently unavailable.');
         }
 
-        $this->entityManager->lock($courier, LockMode::PESSIMISTIC_WRITE);
-
-        $activeDelivery = $this->deliveryRepository->findActiveForCourier($courier);
-
-        // Excluding the delivery being (re)assigned matters for reassignCourier:
-        // it's already this courier's "active" delivery when reassigning it
-        // back to the same courier, which must not read as "already busy".
-        if (null !== $activeDelivery && $activeDelivery->getId() !== $excludingDelivery->getId()) {
-            throw new InvalidOperationException('This courier already has an active delivery.');
-        }
+        // A courier can carry several orders at once: no limit here. They
+        // do express ones first (their app lists those on top).
     }
 
     public function acceptDelivery(

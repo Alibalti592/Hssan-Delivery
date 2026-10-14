@@ -80,7 +80,8 @@ final class CourierLocationService
         return array_map(
             function (User $courier) use ($now, $locationsByCourierId, $activeDeliveriesByCourierId) {
                 $location = $locationsByCourierId[$courier->getId()] ?? null;
-                $currentDelivery = $activeDeliveriesByCourierId[$courier->getId()] ?? null;
+                $active = $activeDeliveriesByCourierId[$courier->getId()] ?? [];
+                $currentDelivery = $active[0] ?? null;
 
                 return CourierLocationResponse::fromCourier(
                     $courier,
@@ -88,7 +89,8 @@ final class CourierLocationService
                     $location?->getLatitude(),
                     $location?->getLongitude(),
                     $location?->getUpdatedAt(),
-                    $currentDelivery
+                    $currentDelivery,
+                    count($active),
                 );
             },
             $couriers
