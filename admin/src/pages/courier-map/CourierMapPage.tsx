@@ -156,7 +156,7 @@ export default function CourierMapPage() {
             </div>
 
             <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-              <MapContainer center={DEFAULT_CENTER} zoom={13} style={{ height: 480, width: '100%' }}>
+              <MapContainer center={DEFAULT_CENTER} zoom={13} className="courier-map">
                 <FrameCouriers located={located} focus={focus} />
                 <TileLayer
                   attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
