@@ -114,7 +114,7 @@ a { color: inherit; text-decoration: none; }
 }
 
 /* ---- tables ---- */
-.card { background: #fff; border-radius: 8px; border: 1px solid #edf0f4; overflow: hidden; }
+.card { background: #fff; border-radius: 8px; border: 1px solid #edf0f4; overflow: hidden; overflow-x: auto; }
 .toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; gap: 12px; }
 .toolbar .field-select { min-width: 220px; }
 
@@ -238,3 +238,79 @@ tr.row-link:hover td { background: #fafbfc; }
 }
 
 .express-tag { display: inline-block; margin-top: 4px; }
+
+.courier-map { height: 480px; width: 100%; }
+
+/* ---- phones and tablets ---- */
+.mobile-bar, .nav-backdrop { display: none; }
+
+@media (max-width: 900px) {
+  .app-shell { flex-direction: column; }
+
+  /* A slim bar on top; the sidebar slides in over the page. */
+  .mobile-bar {
+    display: flex; align-items: center; gap: 8px; position: sticky; top: 0; z-index: 1100;
+    background: #1b2437; padding: 8px 14px; min-height: 56px;
+  }
+  .mobile-bar .monogram { width: 46px; margin: -4px -4px -4px 0; }
+  .mobile-bar .brand-name { font-size: 13px; white-space: nowrap; }
+  .menu-btn {
+    width: 40px; height: 40px; border: none; background: none; cursor: pointer; padding: 10px 8px;
+    display: flex; flex-direction: column; justify-content: space-between;
+  }
+  .menu-btn span { display: block; height: 2px; border-radius: 1px; background: #fff; }
+  .mobile-waiting {
+    margin-left: auto; background: #e53e3e; color: #fff; font-size: 11px; font-weight: 700;
+    padding: 5px 10px; border-radius: 12px; white-space: nowrap;
+  }
+
+  .side {
+    position: fixed; top: 0; bottom: 0; left: 0; width: 270px; max-width: 85vw; z-index: 1200;
+    transform: translateX(-100%); transition: transform 0.2s ease; overflow-y: auto;
+  }
+  .app-shell.nav-open .side { transform: none; box-shadow: 0 0 40px rgba(0, 0, 0, 0.35); }
+  .nav-backdrop { display: block; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.4); z-index: 1150; }
+  /* Finger-sized menu entries. */
+  .sitem { font-size: 14px; padding: 13px 20px; }
+  .snav-count { font-size: 11px; }
+  .sfoot, .sfoot button, .sfoot-link { font-size: 12.5px; }
+  .sfoot button, .sfoot-link { padding-top: 10px; }
+
+  .topbar { padding: 14px 16px; flex-wrap: wrap; gap: 10px; }
+  .content { padding: 16px; overflow-y: visible; }
+  .stats { flex-wrap: wrap; gap: 10px; }
+  .stcard { flex: 1 1 calc(50% - 5px); }
+  .toolbar { flex-wrap: wrap; }
+  .toolbar .field-select { min-width: 0; flex: 1 1 100%; }
+  .form-card { max-width: none; }
+  .detail-grid { grid-template-columns: 1fr; }
+  .login-card { width: calc(100vw - 32px); max-width: 360px; }
+  /* Wide tables scroll sideways inside their card instead of the page. */
+  .card table:not(.stack) { min-width: 640px; }
+  .courier-map { height: 58vh; }
+  /* Portrait tablets: the courier picker and its button share the cell. */
+  .dispatch-assign { flex-wrap: wrap; }
+  .dispatch-assign select { min-width: 0; flex: 1 1 170px; }
+  table.stack td[data-label="Total"], table.stack td[data-label="Since"] { white-space: nowrap; }
+  .zone-map { height: 300px; }
+  .btn.sm { padding: 8px 12px; font-size: 11px; }
+}
+
+/* Dashboard lists: on phones each row becomes a card, its label above each value. */
+@media (max-width: 700px) {
+  table.stack thead { display: none; }
+  table.stack, table.stack tbody, table.stack tr, table.stack td { display: block; width: 100%; }
+  table.stack tr { padding: 12px 14px; border-bottom: 1px solid #edf0f4; }
+  table.stack tr:last-child { border-bottom: none; }
+  table.stack td { border: none; padding: 3px 0; font-size: 13px; }
+  table.stack td[data-label]::before {
+    content: attr(data-label); display: block; font-size: 9.5px; color: #9aa0a6;
+    text-transform: uppercase; letter-spacing: 0.4px; margin-top: 6px;
+  }
+  table.stack td:first-child { padding-top: 0; }
+  .dispatch-head { flex-wrap: wrap; gap: 8px; }
+  .dispatch-online { display: block; margin: 4px 0 0 0; }
+  .dispatch-assign { flex-wrap: wrap; }
+  .dispatch-assign select { min-width: 0; flex: 1 1 100%; font-size: 14px; padding: 10px 11px; }
+  .dispatch-assign .btn { flex: 1 1 100%; justify-content: center; padding: 12px; font-size: 12px; }
+}

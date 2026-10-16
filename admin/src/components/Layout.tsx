@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { useDispatchAlert, useDispatchSound } from './dispatch';
@@ -21,6 +22,18 @@ export default function Layout() {
   const navigate = useNavigate();
   const [soundOn, toggleSound] = useDispatchSound();
   const waiting = useDispatchAlert(soundOn);
+  // Phones and portrait tablets: the sidebar slides in from a menu button.
+  const [navOpen, setNavOpen] = useState(false);
+  const closeNav = () => setNavOpen(false);
+
+  useEffect(() => {
+    if (!navOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setNavOpen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [navOpen]);
 
   function handleLogout() {
     logout();
@@ -28,7 +41,28 @@ export default function Layout() {
   }
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell${navOpen ? ' nav-open' : ''}`}>
+      <header className="mobile-bar">
+        <button
+          type="button"
+          className="menu-btn"
+          aria-label="Open menu"
+          aria-expanded={navOpen}
+          onClick={() => setNavOpen(true)}
+        >
+          <span />
+          <span />
+          <span />
+        </button>
+        <img className="monogram" src={monogramUrl} alt="" aria-hidden="true" />
+        <div className="brand-name">Delivery Hassen</div>
+        {waiting > 0 && (
+          <NavLink to="/" className="mobile-waiting" title="Orders waiting for a courier" onClick={closeNav}>
+            {waiting} waiting
+          </NavLink>
+        )}
+      </header>
+      {navOpen && <div className="nav-backdrop" onClick={closeNav} aria-hidden="true" />}
       <div className="side">
         <div className="sbrand">
           <img className="monogram" src={monogramUrl} alt="" aria-hidden="true" />
@@ -44,6 +78,7 @@ export default function Layout() {
               to={item.to}
               end={item.end}
               className={({ isActive }) => `sitem${isActive ? ' on' : ''}`}
+              onClick={closeNav}
             >
               {item.label}
               {item.to === '/' && waiting > 0 && (
@@ -57,7 +92,7 @@ export default function Layout() {
         <div className="sfoot">
           {user?.name}
           <br />
-          <NavLink to="/account/password" className="sfoot-link">
+          <NavLink to="/account/password" className="sfoot-link" onClick={closeNav}>
             Change password
           </NavLink>
           <br />

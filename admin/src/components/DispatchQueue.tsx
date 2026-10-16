@@ -161,7 +161,7 @@ export function DispatchQueue() {
             {waiting.isLoading ? 'Loading…' : 'No order is waiting: every order has a courier.'}
           </div>
         ) : (
-          <table>
+          <table className="stack">
             <thead>
               <tr>
                 <th>Order</th>
@@ -233,14 +233,14 @@ function QueueRow({
         </div>
         {isExpress(delivery) && <ExpressTag />}
       </td>
-      <td>{delivery.order?.deliveryAddress ?? '—'}</td>
-      <td>{delivery.order ? money(delivery.order.totalAmount) : '—'}</td>
-      <td>
+      <td data-label="Deliver to">{delivery.order?.deliveryAddress ?? '—'}</td>
+      <td data-label="Total">{delivery.order ? money(delivery.order.totalAmount) : '—'}</td>
+      <td data-label="Waiting">
         <span className={`badge${minutes >= 10 ? ' closed' : minutes >= 5 ? ' warn' : ' muted'}`}>
           {waitingFor(delivery.createdAt, now)}
         </span>
       </td>
-      <td>
+      <td data-label="Courier">
         <div className="dispatch-assign">
           <select
             className="field-select"
@@ -306,7 +306,7 @@ export function OnTheirWay() {
             {active.isLoading ? 'Loading…' : active.error ? 'Could not load these orders.' : 'No order is out for delivery right now.'}
           </div>
         ) : (
-          <table>
+          <table className="stack">
             <thead>
               <tr>
                 <th>Order</th>
@@ -328,14 +328,14 @@ export function OnTheirWay() {
                     </div>
                     {isExpress(delivery) && <ExpressTag />}
                   </td>
-                  <td>{delivery.order?.deliveryAddress ?? '—'}</td>
-                  <td>{delivery.courierName ?? '—'}</td>
-                  <td>
+                  <td data-label="Deliver to">{delivery.order?.deliveryAddress ?? '—'}</td>
+                  <td data-label="Courier">{delivery.courierName ?? '—'}</td>
+                  <td data-label="Step">
                     <span className={`badge${delivery.status === 'ASSIGNED' ? ' warn' : ''}`}>
                       {STEP_LABEL[delivery.status] ?? delivery.status}
                     </span>
                   </td>
-                  <td>{waitingFor(delivery.createdAt, now)}</td>
+                  <td data-label="Since">{waitingFor(delivery.createdAt, now)}</td>
                 </tr>
               ))}
             </tbody>
