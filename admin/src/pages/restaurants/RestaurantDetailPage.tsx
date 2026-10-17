@@ -40,14 +40,12 @@ export default function RestaurantDetailPage() {
   });
 
   const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
   const [type, setType] = useState<RestaurantType>('RESTAURANT');
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
     if (data) {
       setName(data.name);
-      setDescription(data.description ?? '');
       setType(data.type);
     }
   }, [data]);
@@ -63,7 +61,7 @@ export default function RestaurantDetailPage() {
     mutationFn: () =>
       restaurantsApi.update(restaurantId, {
         name,
-        description: description || null,
+        description: null,
         isAvailable: data!.isAvailable,
         type,
       }),
@@ -158,7 +156,7 @@ export default function RestaurantDetailPage() {
     { label: 'Open it to clients', done: data.isAvailable },
   ];
   const remaining = steps.filter((s) => !s.done).length;
-  const dirty = name !== data.name || description !== (data.description ?? '') || type !== data.type;
+  const dirty = name !== data.name || type !== data.type;
 
   return (
     <>
@@ -221,18 +219,6 @@ export default function RestaurantDetailPage() {
                   Name
                 </label>
                 <input id="name" className="field-input" value={name} onChange={(e) => setName(e.target.value)} required />
-              </div>
-              <div className="field-group">
-                <label className="field-label" htmlFor="description">
-                  Description <span className="optional">optional</span>
-                </label>
-                <textarea
-                  id="description"
-                  className="field-textarea"
-                  rows={3}
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                />
               </div>
               <div className="field-group">
                 <label className="field-label" htmlFor="type">

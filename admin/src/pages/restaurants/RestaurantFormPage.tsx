@@ -18,7 +18,6 @@ export default function RestaurantFormPage() {
   const queryClient = useQueryClient();
   const fileRef = useRef<HTMLInputElement>(null);
   const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
   const [type, setType] = useState<RestaurantType>('RESTAURANT');
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
@@ -34,7 +33,7 @@ export default function RestaurantFormPage() {
     mutationFn: async () => {
       const restaurant = await restaurantsApi.create({
         name: name.trim(),
-        description: description.trim() || null,
+        description: null,
         isAvailable: false,
         type,
       });
@@ -124,19 +123,6 @@ export default function RestaurantFormPage() {
                 <option value="RESTAURANT">Restaurant</option>
                 <option value="GROCERY">Grocery store</option>
               </select>
-            </div>
-            <div className="field-group">
-              <label className="field-label" htmlFor="description">
-                Description <span className="optional">optional</span>
-              </label>
-              <textarea
-                id="description"
-                className="field-textarea"
-                rows={3}
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Wood-fired pizzas, pasta, desserts"
-              />
             </div>
             <p className="rmeta" style={{ margin: '0 0 14px' }}>
               It stays closed to clients until you open it, once its menu is in.

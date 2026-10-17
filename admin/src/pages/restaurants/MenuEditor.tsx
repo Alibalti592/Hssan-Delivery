@@ -97,7 +97,7 @@ export const MenuEditor = forwardRef<MenuEditorHandle, { restaurantId: number }>
   const allProducts = products.data ?? [];
   const query = search.trim().toLowerCase();
   const shown = query
-    ? allProducts.filter((p) => `${p.name} ${p.description ?? ''}`.toLowerCase().includes(query))
+    ? allProducts.filter((p) => p.name.toLowerCase().includes(query))
     : allProducts;
   const unavailable = allProducts.filter((p) => !p.isAvailable).length;
 
@@ -246,7 +246,6 @@ export const MenuEditor = forwardRef<MenuEditorHandle, { restaurantId: number }>
                         </span>
                         <span className="menu-product-text">
                           <span className="rname">{p.name}</span>
-                          {p.description && <span className="rmeta menu-desc">{p.description}</span>}
                           {p.options?.length > 0 && (
                             <span className="rmeta">{p.options.map((o) => `${o.name} ${o.price}`).join(' · ')}</span>
                           )}

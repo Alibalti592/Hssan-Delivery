@@ -83,7 +83,6 @@ export default function RestaurantsListPage() {
                   <th></th>
                   <th>Name</th>
                   <th>Type</th>
-                  <th>Description</th>
                   <th>Status</th>
                   <th>Created</th>
                   <th></th>
@@ -109,7 +108,6 @@ export default function RestaurantsListPage() {
                       </Link>
                     </td>
                     <td>{TYPE_LABEL[r.type]}</td>
-                    <td>{r.description ?? '—'}</td>
                     <td>
                       <AvailabilityBadge isAvailable={r.isAvailable} />
                     </td>

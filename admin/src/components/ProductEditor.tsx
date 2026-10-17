@@ -36,7 +36,6 @@ export function ProductEditor({
   const fileRef = useRef<HTMLInputElement>(null);
 
   const [name, setName] = useState(product?.name ?? '');
-  const [description, setDescription] = useState(product?.description ?? '');
   const [price, setPrice] = useState(product?.price ?? '');
   const [options, setOptions] = useState<ProductOption[]>(product?.options ?? []);
   const [categoryId, setCategoryId] = useState<number | ''>(
@@ -76,7 +75,7 @@ export function ProductEditor({
     mutationFn: async (_addAnother: boolean) => {
       const payload = {
         name: name.trim(),
-        description: description.trim() || null,
+        description: null,
         price: options.length > 0 ? null : price,
         options: options.map((o) => ({ name: o.name.trim(), price: o.price })),
         categoryId: Number(categoryId),
@@ -96,7 +95,6 @@ export function ProductEditor({
         // Same category, blank form: ready for the next dish.
         setAddedNote(`“${saved.name}” added.`);
         setName('');
-        setDescription('');
         setPrice('');
         setOptions([]);
         setPendingFile(null);
@@ -280,20 +278,6 @@ export function ProductEditor({
                 />
               </div>
             )}
-          </div>
-
-          <div className="field-group">
-            <label className="field-label" htmlFor="product-description">
-              Description <span className="optional">optional</span>
-            </label>
-            <textarea
-              id="product-description"
-              className="field-textarea"
-              rows={2}
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Tomato, mozzarella, basil"
-            />
           </div>
 
           <div className="field-group">

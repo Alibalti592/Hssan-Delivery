@@ -30,7 +30,6 @@ export default function ProductFormPage() {
   });
 
   const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
   const [price, setPrice] = useState('');
   // Sizes/portions ("M", "L", "Familiale", "6 pièces"...), each with its own
   // price. Empty = the product is sold at the single `price` above.
@@ -41,7 +40,6 @@ export default function ProductFormPage() {
   useEffect(() => {
     if (existing.data) {
       setName(existing.data.name);
-      setDescription(existing.data.description ?? '');
       setPrice(existing.data.price);
       setOptions(existing.data.options ?? []);
       setCategoryId(existing.data.categoryId);
@@ -59,7 +57,7 @@ export default function ProductFormPage() {
     mutationFn: () => {
       const payload = {
         name,
-        description: description || null,
+        description: null,
         price: options.length > 0 ? null : price,
         options: options.map((o) => ({ name: o.name.trim(), price: o.price })),
         categoryId: Number(categoryId),
@@ -164,18 +162,6 @@ export default function ProductFormPage() {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 required
-              />
-            </div>
-            <div className="field-group">
-              <label className="field-label" htmlFor="description">
-                Description
-              </label>
-              <textarea
-                id="description"
-                className="field-textarea"
-                rows={3}
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
               />
             </div>
             {options.length === 0 && (
