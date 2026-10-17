@@ -74,6 +74,16 @@ final class AdminStatsApiTest extends WebTestCase
         self::assertSame($baseline['couriers'] + 1, $after['couriers']);
         self::assertSame($baseline['totalOrders'] + 2, $after['totalOrders']);
         self::assertSame($baseline['activeOrders'] + 1, $after['activeOrders']);
+
+        // Both were placed today; one is delivered. Sales: 10 DT + the
+        // zone's fee each.
+        self::assertSame($baseline['todayOrders'] + 2, $after['todayOrders']);
+        self::assertSame($baseline['todayCompleted'] + 1, $after['todayCompleted']);
+        self::assertEqualsWithDelta(
+            (float) $baseline['todaySales'] + 2 * (10 + (float) $zone->getFee()),
+            (float) $after['todaySales'],
+            0.0005,
+        );
     }
 
     public function testNonAdminCannotSeeStats(): void

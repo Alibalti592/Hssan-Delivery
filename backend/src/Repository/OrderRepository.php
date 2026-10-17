@@ -86,4 +86,30 @@ class OrderRepository extends ServiceEntityRepository
             ->getQuery()
             ->getSingleScalarResult();
     }
+
+    /**
+     * Orders placed since [since]: how many, how many were delivered, and
+     * what they sold (cancelled ones left out), for the dashboard's day.
+     *
+     * @return array{orders: int, completed: int, sales: string}
+     */
+    public function summarySince(\DateTimeImmutable $since): array
+    {
+        $row = $this->createQueryBuilder('o')
+            ->select('COUNT(o.id) AS orders')
+            ->addSelect('SUM(CASE WHEN o.status = :completed THEN 1 ELSE 0 END) AS completed')
+            ->addSelect('SUM(CASE WHEN o.status != :cancelled THEN o.totalAmount ELSE 0 END) AS sales')
+            ->andWhere('o.createdAt >= :since')
+            ->setParameter('since', $since)
+            ->setParameter('completed', OrderStatus::COMPLETED)
+            ->setParameter('cancelled', OrderStatus::CANCELLED)
+            ->getQuery()
+            ->getSingleResult();
+
+        return [
+            'orders' => (int) $row['orders'],
+            'completed' => (int) ($row['completed'] ?? 0),
+            'sales' => number_format((float) ($row['sales'] ?? 0), 3, '.', ''),
+        ];
+    }
 }

@@ -31,12 +31,20 @@ final class AdminStatsController extends AbstractController
     #[Route('', name: 'api_admin_stats', methods: ['GET'])]
     public function summary(): JsonResponse
     {
+        // "Today" is the day in Tunisia, whatever the server's clock zone.
+        $startOfDay = (new \DateTimeImmutable('today', new \DateTimeZone('Africa/Tunis')))
+            ->setTimezone(new \DateTimeZone(date_default_timezone_get()));
+        $today = $this->orderRepository->summarySince($startOfDay);
+
         return $this->json([
             'restaurants' => $this->restaurantRepository->count([]),
             'deliveryZones' => $this->deliveryZoneRepository->count([]),
             'couriers' => $this->userRepository->countCouriers(),
             'totalOrders' => $this->orderRepository->count([]),
             'activeOrders' => $this->orderRepository->countActive(),
+            'todayOrders' => $today['orders'],
+            'todayCompleted' => $today['completed'],
+            'todaySales' => $today['sales'],
         ]);
     }
 }

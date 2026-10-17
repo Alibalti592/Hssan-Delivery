@@ -3,6 +3,7 @@
 namespace App\Tests\Integration;
 
 use App\Entity\Category;
+use App\Entity\Product;
 use App\Entity\Restaurant;
 use App\Entity\User;
 use Doctrine\ORM\EntityManagerInterface;
@@ -576,6 +577,35 @@ final class AdminCategoryApiTest extends WebTestCase
         self::assertResponseStatusCodeSame(
             Response::HTTP_FORBIDDEN
         );
+    }
+
+    public function testAnEmptyCategoryCanBeDeletedButNotOneWithProducts(): void
+    {
+        $client = static::createClient();
+        $this->entityManager = self::getContainer()->get(EntityManagerInterface::class);
+        $token = $this->authenticateClient($client, $this->createTestUser('ROLE_ADMIN', 'Test Admin'));
+        $restaurant = $this->createRestaurant('Delete Restaurant');
+        $empty = $this->createCategory($restaurant, 'Empty');
+        $full = $this->createCategory($restaurant, 'Full');
+        $product = (new Product())
+            ->setName('Still here')
+            ->setPrice('5.000')
+            ->setIsAvailable(true)
+            ->setRestaurant($restaurant)
+            ->setCategory($full);
+        $this->entityManager->persist($product);
+        $this->entityManager->flush();
+        $emptyId = $empty->getId();
+
+        $client->request('DELETE', '/api/admin/categories/'.$full->getId(), server: ['HTTP_AUTHORIZATION' => 'Bearer '.$token]);
+        self::assertResponseStatusCodeSame(Response::HTTP_CONFLICT);
+
+        $client->request('DELETE', '/api/admin/categories/'.$emptyId, server: ['HTTP_AUTHORIZATION' => 'Bearer '.$token]);
+        self::assertResponseStatusCodeSame(Response::HTTP_NO_CONTENT);
+
+        $this->entityManager->clear();
+        self::assertNull($this->entityManager->getRepository(Category::class)->find($emptyId));
+        self::assertNotNull($this->entityManager->getRepository(Category::class)->find($full->getId()));
     }
 
     private function createRestaurant(string $name): Restaurant

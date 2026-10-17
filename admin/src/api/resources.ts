@@ -88,6 +88,8 @@ export const categoriesApi = {
     api.post<Category>(`/api/admin/restaurants/${restaurantId}/categories`, data),
   update: (id: number, data: { name: string }) =>
     api.put<Category>(`/api/admin/categories/${id}`, data),
+  /** Only an empty category can go (the backend answers 409 otherwise). */
+  delete: (id: number) => api.delete<void>(`/api/admin/categories/${id}`),
 };
 
 // Products
@@ -106,6 +108,17 @@ export const productsApi = {
   listForRestaurant: (restaurantId: number, params?: PageParams) =>
     api.get<Paginated<Product>>(`/api/admin/restaurants/${restaurantId}/products${toQuery(params)}`),
   get: (id: number) => api.get<Product>(`/api/admin/products/${id}`),
+  /** Every product of a restaurant, page after page: the whole menu. */
+  listAll: async (restaurantId: number): Promise<Product[]> => {
+    const all: Product[] = [];
+    for (let page = 1; ; page++) {
+      const result = await api.get<Paginated<Product>>(
+        `/api/admin/restaurants/${restaurantId}/products${toQuery({ page, limit: 100 })}`,
+      );
+      all.push(...result.items);
+      if (page >= result.meta.pages) return all;
+    }
+  },
   create: (restaurantId: number, data: ProductPayload) =>
     api.post<Product>(`/api/admin/restaurants/${restaurantId}/products`, data),
   update: (id: number, data: ProductPayload) => api.put<Product>(`/api/admin/products/${id}`, data),
@@ -218,6 +231,10 @@ export interface AdminStats {
   couriers: number;
   totalOrders: number;
   activeOrders: number;
+  /** Placed today (Tunisia time); completed ones; their total, cancelled left out. */
+  todayOrders?: number;
+  todayCompleted?: number;
+  todaySales?: string;
 }
 
 export const statsApi = {

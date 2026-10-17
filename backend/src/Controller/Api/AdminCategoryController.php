@@ -137,4 +137,25 @@ final class AdminCategoryController extends AbstractApiController
             CategoryResponse::fromEntity($category)
         );
     }
+
+    #[Route(
+        '/categories/{id}',
+        name: 'api_admin_category_delete',
+        methods: ['DELETE']
+    )]
+    public function delete(int $id): JsonResponse
+    {
+        $category = $this->categoryService->get($id);
+
+        if (null === $category) {
+            return $this->json(
+                ['message' => 'Category not found.'],
+                Response::HTTP_NOT_FOUND
+            );
+        }
+
+        $this->categoryService->delete($category);
+
+        return $this->json(null, Response::HTTP_NO_CONTENT);
+    }
 }
