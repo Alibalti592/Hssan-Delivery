@@ -218,6 +218,10 @@ export interface AdminStats {
   couriers: number;
   totalOrders: number;
   activeOrders: number;
+  /** Placed today (Tunisia time); completed ones; their total, cancelled left out. */
+  todayOrders?: number;
+  todayCompleted?: number;
+  todaySales?: string;
 }
 
 export const statsApi = {

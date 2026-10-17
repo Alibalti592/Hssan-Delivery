@@ -122,3 +122,42 @@ test('an express order is flagged; a busy courier can still take it', async ({ p
   );
   await expect(page.getByRole('button', { name: 'Assign Awa' })).toBeEnabled();
 });
+
+test('"Assign all to nearest" spreads the waiting orders over the free couriers', async ({ page }) => {
+  let queue = [waitingDelivery(11, 3), waitingDelivery(12, 1)];
+  const assigned: string[] = [];
+
+  await mockStats(page);
+  await page.route('**/api/admin/couriers?*', (route) =>
+    json(route, {
+      items: [courier(3, { name: 'Awa' }), courier(5, { name: 'Nour' })],
+      meta: { page: 1, limit: 100, total: 2, pages: 1 },
+    }),
+  );
+  await page.route('**/api/admin/couriers/locations', (route) =>
+    json(route, [
+      { courierId: 3, name: 'Awa', status: 'ONLINE', latitude: 37.2771, longitude: 9.8739, updatedAt: new Date().toISOString(), currentDeliveryId: null, activeDeliveries: 0 },
+      { courierId: 5, name: 'Nour', status: 'ONLINE', latitude: 37.3014, longitude: 9.8739, updatedAt: new Date().toISOString(), currentDeliveryId: null, activeDeliveries: 0 },
+    ]),
+  );
+  await page.route('**/api/deliveries/*/assign/*', (route) => {
+    const [, deliveryId, courierId] = route.request().url().match(/deliveries\/(\d+)\/assign\/(\d+)/)!;
+    assigned.push(`${deliveryId}->${courierId}`);
+    queue = queue.filter((d) => String(d.id) !== deliveryId);
+    return json(route, { ...waitingDelivery(Number(deliveryId), 0), status: 'ASSIGNED', courierId: Number(courierId) });
+  });
+  await mockLogin(page, ['ROLE_ADMIN']);
+  await page.route('**/api/admin/deliveries/waiting', (route) => json(route, queue));
+  await page.goto('/login');
+  await page.getByLabel('Phone').fill('+21622000000');
+  await page.getByLabel('Password').fill('secret1234');
+  await page.getByRole('button', { name: 'Sign in' }).click();
+
+  page.once('dialog', (dialog) => dialog.accept());
+  await page.getByRole('button', { name: 'Assign all 2 to nearest' }).click();
+
+  // The nearest takes the first, the other free courier the second.
+  await expect.poll(() => assigned).toEqual(['11->3', '12->5']);
+  await expect(page.getByRole('status')).toContainText('Assigned #111 → Awa, #112 → Nour');
+  await expect(page.getByText('No order is waiting: every order has a courier.')).toBeVisible();
+});

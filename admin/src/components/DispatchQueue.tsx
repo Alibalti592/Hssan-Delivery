@@ -14,6 +14,38 @@ const STATUS_LABEL: Record<CourierMapStatus, string> = {
 
 const STATUS_ORDER: CourierMapStatus[] = ['ONLINE', 'ON_DELIVERY', 'OFFLINE'];
 
+/** Where every courier is and how busy, refreshed every 15 s. */
+export function useCourierLocations() {
+  return useQuery({
+    queryKey: ['courier-locations'],
+    queryFn: courierLocationsApi.list,
+    refetchInterval: 15_000,
+  });
+}
+
+/** Orders a courier has but hasn't delivered yet, refreshed every 20 s. */
+export function useActiveDeliveries() {
+  return useQuery({
+    queryKey: ['deliveries', 'active'],
+    queryFn: deliveriesApi.active,
+    refetchInterval: 20_000,
+  });
+}
+
+function minutesSince(iso: string | null, now: number): number {
+  return iso ? Math.max(0, (now - new Date(iso).getTime()) / 60_000) : 0;
+}
+
+/** Waiting too long for a courier: 5 min for express, 10 for standard. */
+function isLateToAssign(delivery: WaitingDelivery, now: number): boolean {
+  return minutesSince(delivery.createdAt, now) >= (isExpress(delivery) ? 5 : 10);
+}
+
+/** Past the time promised to the client: 20 min express, 40 standard. */
+function isLateToDeliver(delivery: WaitingDelivery, now: number): boolean {
+  return minutesSince(delivery.createdAt, now) > (isExpress(delivery) ? 20 : 40);
+}
+
 /** The time now, ticking every 30 s so waiting times keep counting up. */
 function useNow(): number {
   const [now, setNow] = useState(() => Date.now());
@@ -100,6 +132,30 @@ function rank(candidates: Candidate[], stop: [number, number] | null): Option[] 
     });
 }
 
+/** A free courier first, else the least busy one (couriers can carry several orders). */
+function suggest(options: Option[]): Option | null {
+  return options.find((o) => o.status === 'ONLINE') ?? options.find((o) => o.status === 'ON_DELIVERY') ?? null;
+}
+
+/**
+ * Who gets what if every waiting order goes to its nearest courier at once:
+ * each pick counts toward that courier's load, so the orders spread out
+ * instead of all landing on the same person.
+ */
+function planAll(queue: WaitingDelivery[], candidates: Candidate[]): { delivery: WaitingDelivery; option: Option }[] {
+  const pool = candidates.map((c) => ({ ...c }));
+  const plan: { delivery: WaitingDelivery; option: Option }[] = [];
+  for (const delivery of queue) {
+    const option = suggest(rank(pool, firstStop(delivery)));
+    if (!option) continue;
+    plan.push({ delivery, option });
+    const picked = pool.find((c) => c.courier.id === option.courier.id)!;
+    picked.status = 'ON_DELIVERY';
+    picked.load += 1;
+  }
+  return plan;
+}
+
 /**
  * Orders no courier has yet, oldest first, each with the nearest available
  * courier already chosen: one click on "Assign" gives it to them. Another
@@ -115,12 +171,15 @@ export function DispatchQueue() {
     queryFn: () => couriersApi.list({ limit: 100 }),
     enabled: hasWaiting,
   });
-  const locations = useQuery({
-    queryKey: ['courier-locations'],
-    queryFn: courierLocationsApi.list,
-    refetchInterval: 15_000,
-    enabled: hasWaiting,
-  });
+  const locations = useCourierLocations();
+  const queryClient = useQueryClient();
+  // "Order #7 → Karim": what was just assigned, shown for a few seconds.
+  const [flash, setFlash] = useState<string | null>(null);
+  useEffect(() => {
+    if (!flash) return;
+    const timer = setTimeout(() => setFlash(null), 6000);
+    return () => clearTimeout(timer);
+  }, [flash]);
 
   const locationById = new Map(locations.data?.map((l) => [l.courierId, l]) ?? []);
   const candidates: Candidate[] = (couriers.data?.items ?? [])
@@ -137,6 +196,31 @@ export function DispatchQueue() {
   const onlineCount = candidates.filter((c) => c.status === 'ONLINE').length;
 
   const now = useNow();
+  const plan = planAll(queue, candidates);
+
+  const assignAll = useMutation({
+    mutationFn: async () => {
+      const done: string[] = [];
+      for (const { delivery, option } of plan) {
+        await deliveriesApi.assign(delivery.id, option.courier.id);
+        done.push(`#${delivery.orderId} → ${option.courier.name.split(' ')[0]}`);
+      }
+      return done;
+    },
+    onSuccess: (done) => setFlash(`Assigned ${done.join(', ')}`),
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['deliveries'] });
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      queryClient.invalidateQueries({ queryKey: ['courier-locations'] });
+    },
+  });
+
+  function confirmAssignAll() {
+    const lines = plan.map(({ delivery, option }) => `#${delivery.orderId} ${describe(delivery)} → ${option.courier.name}`);
+    if (window.confirm(`Assign ${plan.length} order${plan.length === 1 ? '' : 's'}?\n\n${lines.join('\n')}`)) {
+      assignAll.mutate();
+    }
+  }
 
   return (
     <section className="dispatch">
@@ -150,15 +234,34 @@ export function DispatchQueue() {
             </span>
           )}
         </h2>
-        <Link to="/deliveries" className="btn ghost sm">
-          All deliveries
-        </Link>
+        <div className="dispatch-actions">
+          {plan.length > 1 && (
+            <button type="button" className="btn sm" onClick={confirmAssignAll} disabled={assignAll.isPending}>
+              {assignAll.isPending ? 'Assigning…' : `Assign all ${plan.length} to nearest`}
+            </button>
+          )}
+          <Link to="/deliveries" className="btn ghost sm">
+            All deliveries
+          </Link>
+        </div>
       </div>
-      <ErrorBanner error={waiting.error} />
+      {flash && (
+        <div className="dispatch-flash" role="status">
+          ✓ {flash}
+        </div>
+      )}
+      <ErrorBanner error={waiting.error || assignAll.error} />
       <div className="card">
         {queue.length === 0 ? (
           <div className="dispatch-empty">
-            {waiting.isLoading ? 'Loading…' : 'No order is waiting: every order has a courier.'}
+            {waiting.isLoading ? (
+              'Loading…'
+            ) : (
+              <>
+                <span className="dispatch-empty-icon" aria-hidden="true">✓</span>
+                No order is waiting: every order has a courier.
+              </>
+            )}
           </div>
         ) : (
           <table className="stack">
@@ -178,6 +281,7 @@ export function DispatchQueue() {
                   delivery={delivery}
                   now={now}
                   options={rank(candidates, firstStop(delivery))}
+                  onAssigned={(name) => setFlash(`Order #${delivery.orderId} assigned to ${name}`)}
                 />
               ))}
             </tbody>
@@ -199,31 +303,33 @@ function QueueRow({
   delivery,
   now,
   options,
+  onAssigned,
 }: {
   delivery: WaitingDelivery;
   now: number;
   options: Option[];
+  onAssigned: (courierName: string) => void;
 }) {
   const queryClient = useQueryClient();
   // Null: follow the suggestion, which moves as couriers come online.
   const [picked, setPicked] = useState<string | null>(null);
-  // A free courier first, else the least busy one: couriers can carry
-  // several orders at once.
-  const suggestion = options.find((o) => o.status === 'ONLINE') ?? options.find((o) => o.status === 'ON_DELIVERY') ?? null;
+  const suggestion = suggest(options);
   const courierId = picked ?? (suggestion ? String(suggestion.courier.id) : '');
   const chosen = options.find((o) => String(o.courier.id) === courierId) ?? null;
   const assign = useMutation({
     mutationFn: () => deliveriesApi.assign(delivery.id, Number(courierId)),
     onSuccess: () => {
+      if (chosen) onAssigned(chosen.courier.name);
       queryClient.invalidateQueries({ queryKey: ['deliveries'] });
       queryClient.invalidateQueries({ queryKey: ['orders'] });
       queryClient.invalidateQueries({ queryKey: ['courier-locations'] });
     },
   });
-  const minutes = delivery.createdAt ? (now - new Date(delivery.createdAt).getTime()) / 60_000 : 0;
+  const minutes = minutesSince(delivery.createdAt, now);
+  const late = isLateToAssign(delivery, now);
 
   return (
-    <tr>
+    <tr className={late ? 'row-late' : undefined}>
       <td>
         <Link to={`/deliveries/${delivery.id}`} className="rname">
           {describe(delivery)}
@@ -236,7 +342,7 @@ function QueueRow({
       <td data-label="Deliver to">{delivery.order?.deliveryAddress ?? '—'}</td>
       <td data-label="Total">{delivery.order ? money(delivery.order.totalAmount) : '—'}</td>
       <td data-label="Waiting">
-        <span className={`badge${minutes >= 10 ? ' closed' : minutes >= 5 ? ' warn' : ' muted'}`}>
+        <span className={`badge${late ? ' closed' : minutes >= 5 ? ' warn' : ' muted'}`}>
           {waitingFor(delivery.createdAt, now)}
         </span>
       </td>
@@ -272,6 +378,20 @@ function QueueRow({
   );
 }
 
+const STEPS: WaitingDelivery['status'][] = ['ASSIGNED', 'ACCEPTED', 'PICKED_UP', 'ON_THE_WAY'];
+
+/** Four little bars, filled up to the step the courier is at. */
+function StepBar({ status }: { status: WaitingDelivery['status'] }) {
+  const reached = STEPS.indexOf(status);
+  return (
+    <span className="stepbar" aria-hidden="true">
+      {STEPS.map((step, i) => (
+        <span key={step} className={i <= reached ? 'on' : undefined} />
+      ))}
+    </span>
+  );
+}
+
 const STEP_LABEL: Partial<Record<WaitingDelivery['status'], string>> = {
   ASSIGNED: 'Not accepted yet',
   ACCEPTED: 'Going to pick up',
@@ -281,11 +401,7 @@ const STEP_LABEL: Partial<Record<WaitingDelivery['status'], string>> = {
 
 /** Orders a courier has, until delivered: who has it and how far along. */
 export function OnTheirWay() {
-  const active = useQuery({
-    queryKey: ['deliveries', 'active'],
-    queryFn: deliveriesApi.active,
-    refetchInterval: 20_000,
-  });
+  const active = useActiveDeliveries();
   const now = useNow();
   const list = active.data ?? [];
 
@@ -318,7 +434,7 @@ export function OnTheirWay() {
             </thead>
             <tbody>
               {list.map((delivery) => (
-                <tr key={delivery.id}>
+                <tr key={delivery.id} className={isLateToDeliver(delivery, now) ? 'row-late' : undefined}>
                   <td>
                     <Link to={`/deliveries/${delivery.id}`} className="rname">
                       {describe(delivery)}
@@ -331,11 +447,15 @@ export function OnTheirWay() {
                   <td data-label="Deliver to">{delivery.order?.deliveryAddress ?? '—'}</td>
                   <td data-label="Courier">{delivery.courierName ?? '—'}</td>
                   <td data-label="Step">
+                    <StepBar status={delivery.status} />
                     <span className={`badge${delivery.status === 'ASSIGNED' ? ' warn' : ''}`}>
                       {STEP_LABEL[delivery.status] ?? delivery.status}
                     </span>
                   </td>
-                  <td data-label="Since">{waitingFor(delivery.createdAt, now)}</td>
+                  <td data-label="Since">
+                    {waitingFor(delivery.createdAt, now)}
+                    {isLateToDeliver(delivery, now) && <span className="badge closed late-tag">Late</span>}
+                  </td>
                 </tr>
               ))}
             </tbody>
