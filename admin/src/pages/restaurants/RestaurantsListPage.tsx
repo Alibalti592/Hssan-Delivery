@@ -103,7 +103,11 @@ export default function RestaurantsListPage() {
                         )}
                       </div>
                     </td>
-                    <td className="rname">{r.name}</td>
+                    <td>
+                      <Link to={`/restaurants/${r.id}`} className="rname">
+                        {r.name}
+                      </Link>
+                    </td>
                     <td>{TYPE_LABEL[r.type]}</td>
                     <td>{r.description ?? '—'}</td>
                     <td>
@@ -122,7 +126,7 @@ export default function RestaurantsListPage() {
                         {r.isAvailable ? 'Close' : 'Open'}
                       </button>
                       <Link to={`/restaurants/${r.id}`} className="btn sm">
-                        Manage
+                        Menu
                       </Link>
                     </td>
                   </tr>
