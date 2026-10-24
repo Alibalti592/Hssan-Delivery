@@ -67,12 +67,14 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         widget.orderId,
       );
       if (!mounted) return;
+      final statusChanged =
+          _order != null && _order!.deliveryStatus != order.deliveryStatus;
       setState(() {
         _order = order;
         _error = null;
       });
       _scheduleNextPoll(order);
-      _followCourier(order);
+      _followCourier(order, statusChanged: statusChanged);
     } on ApiException catch (e) {
       if (mounted && !silent) setState(() => _error = e.message);
     } on NetworkException catch (e) {
@@ -92,21 +94,32 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     _pollTimer = Timer(const Duration(seconds: 15), () => _load(silent: true));
   }
 
-  /// From the courier accepting until delivery: where they are, every 10 s.
+  /// From the courier accepting until delivery: where they are, every 10 s
+  /// — and at once when the status changes, since the courier's app reports
+  /// its position as they tap it (once more a few seconds later, for a slow
+  /// GPS fix).
   static bool _courierOnTheJob(ClientOrder order) => const {
     DeliveryStatus.accepted,
     DeliveryStatus.pickedUp,
     DeliveryStatus.onTheWay,
   }.contains(order.deliveryStatus);
 
-  void _followCourier(ClientOrder order) {
+  void _followCourier(ClientOrder order, {bool statusChanged = false}) {
     if (!_courierOnTheJob(order)) {
       _courierTimer?.cancel();
       _courierTimer = null;
       if (_courier != null) setState(() => _courier = null);
       return;
     }
-    if (_courierTimer != null) return;
+    if (_courierTimer != null) {
+      if (statusChanged) {
+        _fetchCourier();
+        Timer(const Duration(seconds: 4), () {
+          if (mounted) _fetchCourier();
+        });
+      }
+      return;
+    }
     _fetchCourier();
     _courierTimer = Timer.periodic(
       const Duration(seconds: 10),
@@ -224,12 +237,13 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       onRefresh: () => _load(silent: true),
       child: Column(
         children: [
-          if (tracking && RouteMap.canShow(pickup, dropOff))
+          // The client's map: their address and, once on the job, the
+          // courier heading to it — nothing else.
+          if (tracking && RouteMap.canShow(null, dropOff))
             RouteMap(
-              pickup: pickup,
               dropOff: dropOff,
               courier: courier?.point,
-              heading: courier == null ? null : heading,
+              heading: courier == null ? null : dropOff,
               height: courier != null ? 300 : 200,
             ),
           Expanded(
@@ -544,7 +558,9 @@ LatLng? _headingTo(ClientOrder order, LatLng? pickup, LatLng? dropOff) {
   }
 }
 
-/// "Votre livreur arrive · à 1,2 km · environ 5 min", under the map.
+/// Under the map, while the courier is on the order: where they're going,
+/// the order's steps as an amber bar, and "Arrivée estimée ≈ 5 min". The
+/// pill says the map is live; the order's status chip is further down.
 class _CourierProgress extends StatelessWidget {
   const _CourierProgress({
     required this.order,
@@ -576,58 +592,140 @@ class _CourierProgress extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     final courier = this.courier;
     final heading = this.heading;
+    final steps = trackingSteps(order);
 
-    final String detail;
+    // No arrival time without a position or somewhere to go: one line.
+    String? note;
+    String? label;
+    String? value;
+    String? distance;
     if (courier == null) {
-      detail = 'Sa position s\'affichera sur la carte dans un instant.';
+      note = 'Sa position s\'affichera sur la carte dans un instant.';
     } else if (heading == null) {
-      detail = 'Suivez-le sur la carte.';
+      note = 'Suivez-le sur la carte.';
     } else {
       final km = courier.distanceKmTo(heading);
-      final where = goingToPickup
-          ? 'à ${formatDistance(km)} du point de retrait'
-          : 'à ${formatDistance(km)} · environ ${estimatedMinutes(km)} min';
+      label = goingToPickup ? 'Au point de retrait dans' : 'Arrivée estimée';
+      value = '≈ ${estimatedMinutes(km)} min';
+      distance = formatDistance(km);
       final age = courier.updatedAt == null
           ? null
           : DateTime.now().difference(courier.updatedAt!).inMinutes;
-      detail = age != null && age >= 2
-          ? '$where · position d\'il y a $age min'
-          : where;
+      if (age != null && age >= 2) note = 'Position d\'il y a $age min';
     }
 
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Row(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: const BoxDecoration(
-                color: navy,
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.delivery_dining, color: Colors.white),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
                     _title,
-                    style: textTheme.titleSmall?.copyWith(
+                    style: textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w800,
                     ),
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    detail,
-                    style: textTheme.bodySmall?.copyWith(color: mutedText),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: trackAmberBg,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: const Text(
+                    'En direct',
+                    style: TextStyle(
+                      color: trackAmberText,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                for (var i = 0; i < steps.length; i++) ...[
+                  if (i > 0) const SizedBox(width: 6),
+                  Expanded(
+                    child: Container(
+                      height: 6,
+                      decoration: BoxDecoration(
+                        color: steps[i].isDone || steps[i].isCurrent
+                            ? trackAmber
+                            : const Color(0xFFE9ECF1),
+                        borderRadius: BorderRadius.circular(3),
+                      ),
+                    ),
                   ),
                 ],
-              ),
+              ],
             ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Container(
+                  width: 46,
+                  height: 46,
+                  decoration: const BoxDecoration(
+                    color: navy,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.delivery_dining, color: Colors.white),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: value == null
+                      ? Text(
+                          note!,
+                          style: textTheme.bodyMedium?.copyWith(
+                            color: mutedText,
+                          ),
+                        )
+                      : Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              label!,
+                              style: textTheme.bodySmall?.copyWith(
+                                color: mutedText,
+                              ),
+                            ),
+                            Text(
+                              value,
+                              style: textTheme.titleLarge?.copyWith(
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ],
+                        ),
+                ),
+                if (distance != null)
+                  Text(
+                    distance,
+                    style: textTheme.bodyMedium?.copyWith(
+                      color: mutedText,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+              ],
+            ),
+            if (value != null && note != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                note,
+                style: textTheme.bodySmall?.copyWith(color: mutedText),
+              ),
+            ],
           ],
         ),
       ),

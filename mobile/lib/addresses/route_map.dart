@@ -5,14 +5,15 @@ import 'package:latlong2/latlong.dart';
 import '../theme.dart';
 import 'pin_map.dart';
 
-/// A map of an order's pins: where the courier collects (when the client
-/// placed a pin there) and where they drop off, joined by a dashed line.
+/// A map of an order's pins: A where the courier collects (when the client
+/// placed a pin there) and B where they drop off, joined by a dotted line.
 /// With neither pin — an address that was only typed — it shows nothing.
 ///
 /// With [courier] (the client following their order), the courier shows
-/// too, joined to [heading] (the stop they're on their way to), and the map
-/// follows them as they move — until the client moves the map themselves;
-/// then a button brings it back onto them.
+/// too: the stretch from A already covered in amber, what's left to
+/// [heading] (the stop they're on their way to) dotted. The map follows them
+/// as they move — until the client moves the map themselves; then a button
+/// brings it back onto them. Tiles are softened so the route stands out.
 class RouteMap extends StatefulWidget {
   const RouteMap({
     this.pickup,
@@ -44,12 +45,16 @@ class _RouteMapState extends State<RouteMap> {
   /// Off once the client pans or zooms; the recenter button turns it back on.
   bool _following = true;
 
-  /// What the camera frames: the courier and where they're heading, or
-  /// every pin when there's no courier.
+  /// What the camera frames: the courier and where they're heading — and,
+  /// once past the pickup, the pickup too, so the amber stretch shows whole —
+  /// or every pin when there's no courier.
   List<LatLng> get _framed {
     final courier = widget.courier;
     if (courier != null) {
-      return [courier, ?widget.heading];
+      final pickup = widget.pickup;
+      final pastPickup =
+          pickup != null && widget.heading != null && widget.heading != pickup;
+      return [courier, ?widget.heading, if (pastPickup) pickup];
     }
     return [?widget.pickup, ?widget.dropOff];
   }
@@ -74,7 +79,7 @@ class _RouteMapState extends State<RouteMap> {
     _controller.fitCamera(
       CameraFit.coordinates(
         coordinates: points,
-        padding: const EdgeInsets.fromLTRB(48, 48, 48, 56),
+        padding: const EdgeInsets.fromLTRB(56, 56, 56, 84),
         maxZoom: 17,
       ),
     );
@@ -105,7 +110,7 @@ class _RouteMapState extends State<RouteMap> {
               initialCameraFit: framed.length > 1
                   ? CameraFit.coordinates(
                       coordinates: framed,
-                      padding: const EdgeInsets.fromLTRB(48, 48, 48, 56),
+                      padding: const EdgeInsets.fromLTRB(56, 56, 56, 84),
                       maxZoom: 17,
                     )
                   : null,
@@ -126,38 +131,31 @@ class _RouteMapState extends State<RouteMap> {
                 TileLayer(
                   urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                   userAgentPackageName: 'tn.hssan.delivery',
+                  tileBuilder: _softTile,
                 )
               else
-                const ColoredBox(color: Color(0xFFE8ECF2)),
-              PolylineLayer(
-                polylines: [
-                  if (pins.length > 1)
-                    Polyline(
-                      points: pins,
-                      strokeWidth: 3,
-                      color: navy.withValues(alpha: 0.25),
-                      pattern: StrokePattern.dashed(segments: const [10, 8]),
-                    ),
-                  if (courier != null && heading != null)
-                    Polyline(
-                      points: [courier, heading],
-                      strokeWidth: 4,
-                      color: navy,
-                      pattern: StrokePattern.dashed(segments: const [8, 6]),
-                    ),
-                ],
-              ),
+                const ColoredBox(color: Color(0xFFECEEE9)),
+              PolylineLayer(polylines: _route(pins, courier, heading)),
               MarkerLayer(
                 markers: [
                   if (widget.pickup != null)
-                    _pin(
+                    _letterPin(
                       widget.pickup!,
-                      successText,
+                      'A',
+                      navy,
+                      Colors.white,
                       'Départ',
-                      Icons.inventory_2,
                     ),
                   if (widget.dropOff != null)
-                    _pin(widget.dropOff!, navy, 'Arrivée', Icons.home_rounded),
+                    widget.pickup != null
+                        ? _letterPin(
+                            widget.dropOff!,
+                            'B',
+                            trackAmber,
+                            navy,
+                            'Arrivée',
+                          )
+                        : _homePin(widget.dropOff!),
                   if (courier != null) _courierPin(courier),
                 ],
               ),
@@ -203,14 +201,80 @@ class _RouteMapState extends State<RouteMap> {
     );
   }
 
-  Marker _pin(LatLng point, Color color, String tooltip, IconData icon) {
+  /// A to B dotted; once the courier is out, the part of the trip they've
+  /// covered in amber and what's left to [heading] dotted in black. With
+  /// only a drop-off (the client's own map), an amber dashed line from the
+  /// courier to it.
+  List<Polyline> _route(List<LatLng> pins, LatLng? courier, LatLng? heading) {
+    final pickup = widget.pickup;
+    final dotted = StrokePattern.dotted(spacingFactor: 2);
+    if (courier == null || heading == null) {
+      return [
+        if (pins.length > 1)
+          Polyline(
+            points: pins,
+            strokeWidth: 5,
+            color: navy.withValues(alpha: 0.3),
+            pattern: dotted,
+          ),
+      ];
+    }
+    // No pickup on the map (the client's view): the courier's way to them.
+    if (pickup == null) {
+      return [
+        Polyline(
+          points: [courier, heading],
+          strokeWidth: 6,
+          color: trackAmber,
+          borderStrokeWidth: 2,
+          borderColor: Colors.white,
+          pattern: StrokePattern.dashed(segments: const [14, 10]),
+        ),
+      ];
+    }
+    final toPickup = heading == pickup;
+    return [
+      // Still to come after the pickup: A to B, faint.
+      if (toPickup && widget.dropOff != null)
+        Polyline(
+          points: [pickup, widget.dropOff!],
+          strokeWidth: 5,
+          color: navy.withValues(alpha: 0.18),
+          pattern: dotted,
+        ),
+      // Covered since the pickup.
+      if (!toPickup)
+        Polyline(
+          points: [pickup, courier],
+          strokeWidth: 6,
+          color: trackAmber,
+          borderStrokeWidth: 2,
+          borderColor: Colors.white,
+        ),
+      Polyline(
+        points: [courier, heading],
+        strokeWidth: 6,
+        color: navy.withValues(alpha: 0.45),
+        pattern: dotted,
+      ),
+    ];
+  }
+
+  Marker _letterPin(
+    LatLng point,
+    String letter,
+    Color color,
+    Color textColor,
+    String tooltip,
+  ) {
     return Marker(
       point: point,
-      width: 36,
-      height: 36,
+      width: 40,
+      height: 40,
       child: Tooltip(
         message: tooltip,
         child: Container(
+          alignment: Alignment.center,
           decoration: BoxDecoration(
             color: color,
             shape: BoxShape.circle,
@@ -219,36 +283,66 @@ class _RouteMapState extends State<RouteMap> {
               BoxShadow(color: Color(0x44000000), blurRadius: 6),
             ],
           ),
-          child: Icon(icon, size: 16, color: Colors.white),
+          child: Text(
+            letter,
+            style: TextStyle(
+              color: textColor,
+              fontSize: 15,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
         ),
       ),
     );
   }
 
-  /// The courier: bigger than the pins, with a soft halo so the eye finds
-  /// them first.
+  /// The only pin (a bill: the courier comes back to the client's door).
+  Marker _homePin(LatLng point) {
+    return Marker(
+      point: point,
+      width: 40,
+      height: 40,
+      child: Tooltip(
+        message: 'Arrivée',
+        child: Container(
+          decoration: BoxDecoration(
+            color: trackAmber,
+            shape: BoxShape.circle,
+            border: Border.all(color: Colors.white, width: 3),
+            boxShadow: const [
+              BoxShadow(color: Color(0x44000000), blurRadius: 6),
+            ],
+          ),
+          child: const Icon(Icons.home_rounded, size: 18, color: navy),
+        ),
+      ),
+    );
+  }
+
+  /// The courier: bigger than the pins, black with a white ring and a soft
+  /// amber halo, so the eye finds them first.
   Marker _courierPin(LatLng point) {
     return Marker(
       point: point,
-      width: 58,
-      height: 58,
+      width: 66,
+      height: 66,
       child: Tooltip(
         message: 'Votre livreur',
         child: Container(
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: navy.withValues(alpha: 0.12),
+            color: trackAmber.withValues(alpha: 0.22),
           ),
           alignment: Alignment.center,
           child: Container(
-            width: 40,
-            height: 40,
+            width: 46,
+            height: 46,
             decoration: BoxDecoration(
               color: navy,
               shape: BoxShape.circle,
-              border: Border.all(color: Colors.white, width: 3),
+              border: Border.all(color: Colors.white, width: 4),
               boxShadow: const [
-                BoxShadow(color: Color(0x55000000), blurRadius: 8),
+                BoxShadow(color: Color(0x55000000), blurRadius: 10),
               ],
             ),
             child: const Icon(
@@ -262,3 +356,18 @@ class _RouteMapState extends State<RouteMap> {
     );
   }
 }
+
+/// Softer, lighter map tiles: mostly grey with a hint of their colours, so
+/// the amber route and the pins carry the screen.
+Widget _softTile(BuildContext context, Widget tile, TileImage image) {
+  return ColorFiltered(colorFilter: _soften, child: tile);
+}
+
+// Saturation down to 30% (towards each pixel's luminance), then 15% of
+// the way to white.
+const _soften = ColorFilter.matrix(<double>[
+  0.381, 0.426, 0.043, 0, 38, //
+  0.127, 0.681, 0.043, 0, 38, //
+  0.127, 0.426, 0.298, 0, 38, //
+  0, 0, 0, 1, 0, //
+]);

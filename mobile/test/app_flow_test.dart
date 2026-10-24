@@ -1124,6 +1124,56 @@ void main() {
       ]);
     });
 
+    test('reports again at once when a delivery changes status', () async {
+      final calls = <Map<String, dynamic>>[];
+      Map<String, dynamic> delivery(String status) => {
+        'id': 1,
+        'status': status,
+        'courierId': 3,
+        'order': {'id': 10, 'status': 'READY_FOR_PICKUP', 'items': []},
+      };
+      final mock = MockClient((request) async {
+        if (request.url.path == '/api/deliveries/mine') {
+          return _json(_pagedBody([delivery('ACCEPTED')]));
+        }
+        if (request.url.path == '/api/deliveries/1/pickup') {
+          return _json(delivery('PICKED_UP'));
+        }
+        calls.add(jsonDecode(request.body) as Map<String, dynamic>);
+        return http.Response('', 204);
+      });
+
+      final api = ApiClient(
+        tokenProvider: () => 'jwt',
+        onUnauthorized: () {},
+        httpClient: mock,
+      );
+      final deliveries = DeliveriesController(DeliveryRepository(api));
+      var lat = 36.8;
+      final service = CourierLocationService(
+        CourierLocationRepository(api),
+        deliveries,
+        // Far longer than the test: any second report is the status change.
+        interval: const Duration(minutes: 5),
+        ensurePermission: () async => true,
+        getPosition: () async => fakePosition(lat, 10.18),
+      );
+      addTearDown(service.dispose);
+
+      await deliveries.refresh();
+      await Future<void>.delayed(Duration.zero);
+      expect(calls, hasLength(1));
+
+      lat = 36.81;
+      await deliveries.perform(deliveries.active.single, DeliveryAction.pickup);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(calls, [
+        {'latitude': 36.8, 'longitude': 10.18},
+        {'latitude': 36.81, 'longitude': 10.18},
+      ]);
+    });
+
     test(
       'reports while the courier is available, even with no delivery',
       () async {
