@@ -31,6 +31,12 @@ const dangerBg = Color(0xFFF7EAEA);
 const warnText = Color(0xFF9C4221);
 const warnBg = Color(0xFFFDF1E4);
 
+/// The amber of the launch videos, for live tracking: the stretch of the
+/// route already covered, the drop-off pin and the "En cours" pill.
+const trackAmber = Color(0xFFFFB020);
+const trackAmberBg = Color(0xFFFFF4DD);
+const trackAmberText = Color(0xFF9A5B00);
+
 /// Muted text / field-fill tokens used across cards and form fields.
 const mutedText = Color(0xFF8B93A0);
 const fieldFill = Color(0xFFEAF0F7);

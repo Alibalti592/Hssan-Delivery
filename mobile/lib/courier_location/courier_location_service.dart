@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 
 import '../deliveries/deliveries_controller.dart';
+import '../deliveries/delivery.dart';
 import 'courier_location_repository.dart';
 
 /// Reports the courier's current GPS position to the backend while they
@@ -15,6 +16,11 @@ import 'courier_location_repository.dart';
 /// app is open: there is no background service, and Android's background
 /// location permissions/configuration are NOT set up, so a courier who
 /// backgrounds the app simply stops reporting until they return to it.
+///
+/// It also reports at once when one of their deliveries changes status
+/// (accepted, picked up, on the way…), so the client following the order
+/// sees the courier where they really are at that moment, not up to one
+/// interval earlier.
 ///
 /// Every failure mode here — permission denied, location services off, GPS
 /// timeout, offline, a backend error — is swallowed rather than surfaced:
@@ -53,8 +59,20 @@ class CourierLocationService {
   Timer? _timer;
   bool _reporting = false;
 
+  /// A status change arrived mid-report: report once more after it.
+  bool _again = false;
+
+  /// Each active delivery's status, as of the last change seen.
+  Map<int, DeliveryStatus> _statuses = const {};
+
   void _onDeliveriesChanged() {
-    final shouldReport = _isOnDuty() || _deliveries.active.isNotEmpty;
+    final active = _deliveries.active;
+    final shouldReport = _isOnDuty() || active.isNotEmpty;
+    final statuses = {for (final d in active) d.id: d.status};
+    final statusChanged = statuses.entries.any(
+      (e) => _statuses.containsKey(e.key) && _statuses[e.key] != e.value,
+    );
+    _statuses = statuses;
 
     if (shouldReport && _timer == null) {
       _reportOnce();
@@ -62,12 +80,18 @@ class CourierLocationService {
     } else if (!shouldReport && _timer != null) {
       _timer?.cancel();
       _timer = null;
+    } else if (shouldReport && statusChanged) {
+      _reportOnce(urgent: true);
     }
   }
 
-  Future<void> _reportOnce() async {
-    // Avoid overlapping calls if a slow GPS fix outlives the next tick.
-    if (_reporting) return;
+  Future<void> _reportOnce({bool urgent = false}) async {
+    // Avoid overlapping calls if a slow GPS fix outlives the next tick; a
+    // status change during one gets its own report right after.
+    if (_reporting) {
+      if (urgent) _again = true;
+      return;
+    }
     _reporting = true;
 
     try {
@@ -78,6 +102,10 @@ class CourierLocationService {
       // Best-effort only — see class doc.
     } finally {
       _reporting = false;
+      if (_again) {
+        _again = false;
+        unawaited(_reportOnce());
+      }
     }
   }
 

@@ -292,8 +292,14 @@ void main() {
       await tester.pump();
 
       expect(find.text('Votre livreur arrive'), findsOneWidget);
-      expect(find.text('à 1,2 km · environ 5 min'), findsOneWidget);
+      expect(find.text('Arrivée estimée'), findsOneWidget);
+      expect(find.text('≈ 5 min'), findsOneWidget);
+      expect(find.text('1,2 km'), findsOneWidget);
+      expect(find.text('En direct'), findsOneWidget);
       expect(find.byTooltip('Votre livreur'), findsOneWidget);
+      // Only the courier and the client's address on the client's map.
+      expect(find.byTooltip('Départ'), findsNothing);
+      expect(find.byTooltip('Arrivée'), findsOneWidget);
     });
 
     testWidgets('before pickup: heading to the pickup point', (tester) async {
@@ -317,7 +323,7 @@ void main() {
         find.text('Votre livreur va chercher votre commande'),
         findsOneWidget,
       );
-      expect(find.textContaining('du point de retrait'), findsOneWidget);
+      expect(find.text('Au point de retrait dans'), findsOneWidget);
     });
 
     testWidgets('no position yet: says it is coming', (tester) async {
