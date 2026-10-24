@@ -1,4 +1,7 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
@@ -14,12 +17,17 @@ import 'pin_map.dart';
 /// [heading] (the stop they're on their way to) dotted. The map follows them
 /// as they move — until the client moves the map themselves; then a button
 /// brings it back onto them. Tiles are softened so the route stands out.
+///
+/// The courier never jumps: each new position is glided to. With
+/// [creepToward], between two positions they also move slowly towards it at
+/// a scooter's pace (see [creepTowards]) — the client sees them coming.
 class RouteMap extends StatefulWidget {
   const RouteMap({
     this.pickup,
     this.dropOff,
     this.courier,
     this.heading,
+    this.creepToward,
     this.height = 180,
     super.key,
   });
@@ -28,6 +36,10 @@ class RouteMap extends StatefulWidget {
   final LatLng? dropOff;
   final LatLng? courier;
   final LatLng? heading;
+
+  /// Where the courier is driving to right now, for the slow move between
+  /// two positions; null keeps them where their app last put them.
+  final LatLng? creepToward;
   final double height;
 
   /// Whether there's anything to draw.
@@ -38,9 +50,97 @@ class RouteMap extends StatefulWidget {
   State<RouteMap> createState() => _RouteMapState();
 }
 
-class _RouteMapState extends State<RouteMap> {
+class _RouteMapState extends State<RouteMap>
+    with SingleTickerProviderStateMixin {
   final _controller = MapController();
   bool _ready = false;
+
+  /// Where the courier is drawn: [RouteMap.courier], glided and crept.
+  final _shown = ValueNotifier<LatLng?>(null);
+
+  /// Frames while the courier moves on screen; muted (no frames) otherwise.
+  late final Ticker _ticker = createTicker((_) => _tick());
+
+  /// The time base for the motion; the ticker's own restarts when unmuted.
+  final _clock = Stopwatch()..start();
+
+  /// The last real position, and when it arrived.
+  LatLng? _fix;
+  Duration _fixAt = Duration.zero;
+
+  /// A glide in progress from where the courier was drawn.
+  LatLng? _glideFrom;
+  Duration? _glideStart;
+  Duration _lastPaint = Duration.zero;
+
+  static const _glideFor = Duration(milliseconds: 1200);
+
+  @override
+  void initState() {
+    super.initState();
+    _fix = widget.courier;
+    _shown.value = widget.courier;
+    _ticker
+      ..muted = true
+      ..start();
+    if (_fix != null) _wake();
+  }
+
+  @override
+  void dispose() {
+    _ticker.dispose();
+    _shown.dispose();
+    super.dispose();
+  }
+
+  /// A new position, or a new place to creep to: glide from where the
+  /// courier is drawn now.
+  void _moved() {
+    final now = _clock.elapsed;
+    if (widget.courier != _fix) {
+      _fix = widget.courier;
+      _fixAt = now;
+    }
+    if (_fix == null) {
+      _glideStart = null;
+      _shown.value = null;
+      _ticker.muted = true;
+      return;
+    }
+    _glideFrom = _shown.value ?? _fix;
+    _glideStart = now;
+    _wake();
+  }
+
+  void _wake() => _ticker.muted = false;
+
+  LatLng? _target(Duration now) {
+    final fix = _fix;
+    final toward = widget.creepToward;
+    if (fix == null) return null;
+    return toward == null ? fix : creepTowards(fix, toward, now - _fixAt);
+  }
+
+  void _tick() {
+    final now = _clock.elapsed;
+    final target = _target(now);
+    if (target == null) return;
+    final glideStart = _glideStart, glideFrom = _glideFrom;
+    if (glideStart != null && glideFrom != null) {
+      final k = ((now - glideStart).inMilliseconds / _glideFor.inMilliseconds)
+          .clamp(0.0, 1.0);
+      _shown.value = _lerp(glideFrom, target, Curves.easeInOut.transform(k));
+      if (k >= 1) _glideStart = null;
+    } else if (now - _lastPaint >= const Duration(milliseconds: 250)) {
+      // Creeping is slow: a few frames a second are plenty.
+      _shown.value = target;
+    } else {
+      return;
+    }
+    _lastPaint = now;
+    final creeping = widget.creepToward != null && now - _fixAt <= creepLasts;
+    if (_glideStart == null && !creeping) _ticker.muted = true;
+  }
 
   /// Off once the client pans or zooms; the recenter button turns it back on.
   bool _following = true;
@@ -62,6 +162,10 @@ class _RouteMapState extends State<RouteMap> {
   @override
   void didUpdateWidget(RouteMap old) {
     super.didUpdateWidget(old);
+    if (old.courier != widget.courier ||
+        old.creepToward != widget.creepToward) {
+      _moved();
+    }
     if (_following &&
         _ready &&
         (old.courier != widget.courier || old.heading != widget.heading)) {
@@ -135,7 +239,11 @@ class _RouteMapState extends State<RouteMap> {
                 )
               else
                 const ColoredBox(color: Color(0xFFECEEE9)),
-              PolylineLayer(polylines: _route(pins, courier, heading)),
+              ValueListenableBuilder<LatLng?>(
+                valueListenable: _shown,
+                builder: (context, shown, _) =>
+                    PolylineLayer(polylines: _route(pins, shown, heading)),
+              ),
               MarkerLayer(
                 markers: [
                   if (widget.pickup != null)
@@ -156,8 +264,13 @@ class _RouteMapState extends State<RouteMap> {
                             'Arrivée',
                           )
                         : _homePin(widget.dropOff!),
-                  if (courier != null) _courierPin(courier),
                 ],
+              ),
+              ValueListenableBuilder<LatLng?>(
+                valueListenable: _shown,
+                builder: (context, shown, _) => MarkerLayer(
+                  markers: [if (shown != null) _courierPin(shown)],
+                ),
               ),
               const SimpleAttributionWidget(
                 source: Text('OpenStreetMap', style: TextStyle(fontSize: 10)),
@@ -371,3 +484,35 @@ const _soften = ColorFilter.matrix(<double>[
   0.127, 0.426, 0.298, 0, 38, //
   0, 0, 0, 1, 0, //
 ]);
+
+LatLng _lerp(LatLng a, LatLng b, double t) => LatLng(
+  a.latitude + (b.latitude - a.latitude) * t,
+  a.longitude + (b.longitude - a.longitude) * t,
+);
+
+/// About 15 km/h in a straight line: the scooter pace estimatedMinutes
+/// assumes (20 km/h along streets about 30 % longer than the line).
+const creepMetersPerSecond = 20 / 3.6 / 1.3;
+
+/// How long the courier keeps creeping after their last real position:
+/// past that, the map stops guessing.
+const creepLasts = Duration(seconds: 60);
+
+/// Never shown arriving by guesswork: the creep stops this far short.
+const creepStopsShortMeters = 40.0;
+
+/// Where a courier last seen at [from] probably is, [sinceFix] later, riding
+/// straight towards [to] at [creepMetersPerSecond] — for at most
+/// [creepLasts], and never closer than [creepStopsShortMeters].
+LatLng creepTowards(LatLng from, LatLng to, Duration sinceFix) {
+  final total = const Distance().as(LengthUnit.Meter, from, to);
+  final room = total - creepStopsShortMeters;
+  if (room <= 0) return from;
+  final seconds =
+      sinceFix.inMilliseconds.clamp(0, creepLasts.inMilliseconds) / 1000;
+  return _lerp(
+    from,
+    to,
+    math.min(room, seconds * creepMetersPerSecond) / total,
+  );
+}

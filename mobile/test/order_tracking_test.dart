@@ -96,4 +96,29 @@ void main() {
       'En cours',
     );
   });
+
+  test('the courier is heading to the client, in every service', () {
+    bool heads(String type, String deliveryStatus) => courierHeadsToClient(
+      _order(
+        type: type,
+        deliveryStatus: deliveryStatus,
+        bill: type == 'BILL' ? _steg : null,
+      ),
+    );
+
+    // A meal, groceries, a parcel: once collected.
+    for (final type in ['RESTAURANT', 'GROCERY', 'PARCEL']) {
+      expect(heads(type, 'ACCEPTED'), isFalse, reason: type);
+      expect(heads(type, 'PICKED_UP'), isTrue, reason: type);
+      expect(heads(type, 'ON_THE_WAY'), isTrue, reason: type);
+    }
+    // A bill: on the way to collect it, and back with the receipt — not
+    // at the counter.
+    expect(heads('BILL', 'ACCEPTED'), isTrue);
+    expect(heads('BILL', 'PICKED_UP'), isFalse);
+    expect(heads('BILL', 'ON_THE_WAY'), isTrue);
+    // Not before a courier is on it, nor once it's over.
+    expect(heads('RESTAURANT', 'PENDING'), isFalse);
+    expect(heads('RESTAURANT', 'DELIVERED'), isFalse);
+  });
 }

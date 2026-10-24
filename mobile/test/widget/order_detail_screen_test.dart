@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/testing.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:mobile/addresses/pin_map.dart';
+import 'package:mobile/addresses/route_map.dart';
 import 'package:mobile/client/order_detail_screen.dart';
 import 'package:mobile/core/api_client.dart';
 import 'package:mobile/orders/courier_position.dart';
@@ -340,6 +342,33 @@ void main() {
         findsOneWidget,
       );
       expect(find.byTooltip('Votre livreur'), findsNothing);
+    });
+
+    test('between two positions the courier creeps towards the client', () {
+      const from = LatLng(37.2638, 9.8739);
+      const to = LatLng(37.2746, 9.8739); // About 1.2 km north.
+      double metersFrom(LatLng p) =>
+          const Distance().as(LengthUnit.Meter, from, p);
+      double metersLeft(LatLng p) =>
+          const Distance().as(LengthUnit.Meter, p, to);
+
+      // A scooter's pace: about 43 m in 10 s, straight at the client.
+      final after10s = creepTowards(from, to, const Duration(seconds: 10));
+      expect(metersFrom(after10s), closeTo(10 * creepMetersPerSecond, 2));
+      expect(after10s.longitude, closeTo(9.8739, 1e-9));
+
+      // No more guessing after a minute without news.
+      expect(
+        creepTowards(from, to, const Duration(minutes: 5)),
+        creepTowards(from, to, creepLasts),
+      );
+
+      // Never shown arriving: it stops 40 m short, and doesn't move closer.
+      const near = LatLng(37.2737, 9.8739); // About 100 m away.
+      final waited = creepTowards(near, to, creepLasts);
+      expect(metersLeft(waited), closeTo(creepStopsShortMeters, 1));
+      const veryNear = LatLng(37.2744, 9.8739); // About 22 m away.
+      expect(creepTowards(veryNear, to, creepLasts), veryNear);
     });
 
     test('distances and arrival times read naturally', () {
