@@ -104,6 +104,15 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     DeliveryStatus.onTheWay,
   }.contains(order.deliveryStatus);
 
+  /// "En route vers vous" with a recent position: the map moves the
+  /// courier slowly towards the client between two positions.
+  static bool _comingToClient(ClientOrder order, CourierPosition? courier) {
+    final at = courier?.updatedAt;
+    return order.deliveryStatus == DeliveryStatus.onTheWay &&
+        at != null &&
+        DateTime.now().difference(at) < creepLasts;
+  }
+
   void _followCourier(ClientOrder order, {bool statusChanged = false}) {
     if (!_courierOnTheJob(order)) {
       _courierTimer?.cancel();
@@ -244,6 +253,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               dropOff: dropOff,
               courier: courier?.point,
               heading: courier == null ? null : dropOff,
+              creepToward: _comingToClient(order, courier) ? dropOff : null,
               height: courier != null ? 300 : 200,
             ),
           Expanded(
