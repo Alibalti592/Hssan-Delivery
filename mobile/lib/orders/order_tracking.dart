@@ -90,6 +90,23 @@ List<String> _labels(ClientOrder order) {
   ];
 }
 
+/// Whether the courier's current leg ends at the client's address — the
+/// one place on the client's map: a meal, groceries or a parcel once
+/// collected; a bill's courier on the way to collect it, and on the way back
+/// with the receipt (not while paying at the counter).
+bool courierHeadsToClient(ClientOrder order) {
+  switch (order.deliveryStatus) {
+    case DeliveryStatus.accepted:
+      return order.isBill;
+    case DeliveryStatus.pickedUp:
+      return !order.isBill;
+    case DeliveryStatus.onTheWay:
+      return true;
+    default:
+      return false;
+  }
+}
+
 List<TrackingStep> trackingSteps(ClientOrder order) {
   final labels = _labels(order);
   final progress = _progress(order);

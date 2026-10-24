@@ -104,11 +104,11 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     DeliveryStatus.onTheWay,
   }.contains(order.deliveryStatus);
 
-  /// "En route vers vous" with a recent position: the map moves the
-  /// courier slowly towards the client between two positions.
+  /// Heading to the client, in any service, with a recent position: the
+  /// map moves the courier slowly towards them between two positions.
   static bool _comingToClient(ClientOrder order, CourierPosition? courier) {
     final at = courier?.updatedAt;
-    return order.deliveryStatus == DeliveryStatus.onTheWay &&
+    return courierHeadsToClient(order) &&
         at != null &&
         DateTime.now().difference(at) < creepLasts;
   }
