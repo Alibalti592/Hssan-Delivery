@@ -20,8 +20,8 @@ dependencies:
   # Keep firebase_core and firebase_messaging on the same FlutterFire
   # release: on iOS each pins an exact firebase-ios-sdk version (Swift
   # Package Manager), and Xcode refuses two different ones.
-  firebase_core: ^4.15.0
-  firebase_messaging: ^16.7.0
+  firebase_core: ^5.0.0
+  firebase_messaging: ^17.0.0
   geolocator: ^14.1.1
   image_picker: ^1.1.2
   flutter_map: ^8.2.1
