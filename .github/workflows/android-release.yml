@@ -35,8 +35,8 @@ jobs:
     env:
       # The API the app talks to, baked into the build: the repo variable
       # API_BASE_URL (Settings > Secrets and variables > Actions >
-      # Variables), e.g. https://api.your-domain.tn. Railway until it's set.
-      API_BASE_URL: ${{ vars.API_BASE_URL || 'https://hssan-delivery-production.up.railway.app' }}
+      # Variables) overrides it; by default the app's own domain.
+      API_BASE_URL: ${{ vars.API_BASE_URL || 'https://api.deliveryhassan.tn' }}
       # Firebase (push notifications) -- public client identifiers from
       # android/app/google-services.json, not secrets. The server-side
       # key that actually sends pushes is the backend's FIREBASE_CREDENTIALS.
