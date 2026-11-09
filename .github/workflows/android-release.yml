@@ -16,6 +16,11 @@ on:
       - 'mobile/**'
       - '.github/workflows/android-release.yml'
   workflow_dispatch:
+    inputs:
+      api_base_url:
+        description: 'API the build talks to (empty: the default below)'
+        required: false
+        default: ''
 
 permissions:
   contents: write
@@ -33,10 +38,10 @@ jobs:
         working-directory: mobile
 
     env:
-      # The API the app talks to, baked into the build: the repo variable
-      # API_BASE_URL (Settings > Secrets and variables > Actions >
-      # Variables) overrides it; by default the app's own domain.
-      API_BASE_URL: ${{ vars.API_BASE_URL || 'https://api.deliveryhassan.tn' }}
+      # The API the app talks to, baked into the build: a manual run's
+      # api_base_url input, else the repo variable API_BASE_URL (Settings >
+      # Secrets and variables > Actions > Variables), else the app's own domain.
+      API_BASE_URL: ${{ inputs.api_base_url || vars.API_BASE_URL || 'https://api.deliveryhassan.tn' }}
       # Firebase (push notifications) -- public client identifiers from
       # android/app/google-services.json, not secrets. The server-side
       # key that actually sends pushes is the backend's FIREBASE_CREDENTIALS.
