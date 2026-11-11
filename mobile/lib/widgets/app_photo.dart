@@ -34,19 +34,35 @@ class AppPhoto extends StatelessWidget {
     final path = this.path;
     if (path == null || path.isEmpty) return _placeholder();
 
-    // Decode at the size shown, not the full upload: lighter on memory.
+    // Decode at the size shown, never the full upload: a restaurant logo
+    // can be several thousand pixels wide, and decoding a few of those at
+    // full size makes the home feed stutter, then freeze the phone. Without
+    // an explicit width, the space the parent gives is the size shown.
     final ratio = MediaQuery.maybeDevicePixelRatioOf(context) ?? 2;
-    return CachedNetworkImage(
-      imageUrl: AppConfig.resolvePhotoUrl(path),
-      width: width,
-      height: height,
-      fit: fit,
-      alignment: alignment,
-      memCacheWidth: width?.isFinite == true ? (width! * ratio).round() : null,
-      fadeInDuration: const Duration(milliseconds: 200),
-      placeholder: (_, _) => _placeholder(),
-      errorWidget: (_, _, _) => _placeholder(),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final shown = width?.isFinite == true ? width! : constraints.maxWidth;
+        return CachedNetworkImage(
+          imageUrl: AppConfig.resolvePhotoUrl(path),
+          width: width,
+          height: height,
+          fit: fit,
+          alignment: alignment,
+          memCacheWidth: decodeWidth(shown, ratio),
+          fadeInDuration: const Duration(milliseconds: 200),
+          placeholder: (_, _) => _placeholder(),
+          errorWidget: (_, _, _) => _placeholder(),
+        );
+      },
     );
+  }
+
+  /// The width, in pixels, to decode a photo shown [shown] logical pixels
+  /// wide; null (full size) only when nothing bounds it.
+  @visibleForTesting
+  static int? decodeWidth(double shown, double devicePixelRatio) {
+    if (!shown.isFinite || shown <= 0) return null;
+    return (shown * devicePixelRatio).round();
   }
 
   Widget _placeholder() {

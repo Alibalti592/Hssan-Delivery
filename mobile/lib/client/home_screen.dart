@@ -201,68 +201,77 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // One scroll view built whole, not a lazy ListView: a lazy list drops
+    // the sections that scroll out of sight and rebuilds them on the way
+    // back, so each one flashed its loading spinner (a different height)
+    // and reloaded its photos -- the feed jumped under the finger. The feed
+    // is short (four restaurants at most), so building it all is cheap.
     return RefreshIndicator(
       onRefresh: _refresh,
-      child: ListView(
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.only(bottom: 24),
-        children: [
-          const _TopBar(),
-          const SizedBox(height: 18),
-          const _Greeting(),
-          ActiveOrderBanner(
-            orders: _activeOrders,
-            onOpen: (order) => Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => OrderDetailScreen(orderId: order.id),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const _TopBar(),
+            const SizedBox(height: 18),
+            const _Greeting(),
+            ActiveOrderBanner(
+              orders: _activeOrders,
+              onOpen: (order) => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => OrderDetailScreen(orderId: order.id),
+                ),
+              ),
+              onSeeAll: widget.onSeeOrders,
+            ),
+            const SizedBox(height: 16),
+            _SearchBar(
+              onTap: () => Navigator.of(
+                context,
+              ).push(MaterialPageRoute(builder: (_) => const SearchScreen())),
+            ),
+            const SizedBox(height: 8),
+            const _SectionHeader(title: 'Services'),
+            SizedBox(
+              height: 144,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                itemCount: _services.length,
+                separatorBuilder: (_, _) => const SizedBox(width: 12),
+                itemBuilder: (context, index) {
+                  final service = _services[index];
+                  return _ServiceCard(
+                    service: service,
+                    onTap: () => _openService(service),
+                  );
+                },
               ),
             ),
-            onSeeAll: widget.onSeeOrders,
-          ),
-          const SizedBox(height: 16),
-          _SearchBar(
-            onTap: () => Navigator.of(
-              context,
-            ).push(MaterialPageRoute(builder: (_) => const SearchScreen())),
-          ),
-          const SizedBox(height: 8),
-          const _SectionHeader(title: 'Services'),
-          SizedBox(
-            height: 144,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              itemCount: _services.length,
-              separatorBuilder: (_, _) => const SizedBox(width: 12),
-              itemBuilder: (context, index) {
-                final service = _services[index];
-                return _ServiceCard(
-                  service: service,
-                  onTap: () => _openService(service),
-                );
-              },
-            ),
-          ),
-          // Below the services, not above: the services are how the app is
-          // used, and the tall offer cards would otherwise push them below
-          // the fold on small phones. The row still shows on first screen.
-          _PromotionsSection(future: _promotionsFuture, onRetry: _refresh),
-          const SizedBox(height: 8),
-          _SectionHeader(
-            title: 'Restaurants',
-            onSeeAll: () => Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => Scaffold(
-                  appBar: AppBar(title: const Text('Restaurants')),
-                  body: const RestaurantsScreen(),
+            // Below the services, not above: the services are how the app is
+            // used, and the tall offer cards would otherwise push them below
+            // the fold on small phones. The row still shows on first screen.
+            _PromotionsSection(future: _promotionsFuture, onRetry: _refresh),
+            const SizedBox(height: 8),
+            _SectionHeader(
+              title: 'Restaurants',
+              onSeeAll: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => Scaffold(
+                    appBar: AppBar(title: const Text('Restaurants')),
+                    body: const RestaurantsScreen(),
+                  ),
                 ),
               ),
             ),
-          ),
-          _RestaurantsPreview(
-            future: _restaurantsFuture,
-            onTapRestaurant: _openRestaurant,
-          ),
-        ],
+            _RestaurantsPreview(
+              future: _restaurantsFuture,
+              onTapRestaurant: _openRestaurant,
+            ),
+          ],
+        ),
       ),
     );
   }
