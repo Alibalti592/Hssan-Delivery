@@ -100,9 +100,12 @@ class _HomeScreenState extends State<HomeScreen> {
   late Future<List<Restaurant>> _restaurantsFuture;
   List<ClientOrder> _activeOrders = const [];
 
-  /// The row under the search bar; empty (and left out) until loaded, and
-  /// when no restaurant has a category yet.
+  /// "Que souhaitez-vous manger ?", above the restaurants; empty (and left
+  /// out) until loaded, and when no restaurant has a category yet.
   List<RestaurantCategory> _categories = const [];
+
+  /// The category the restaurants below are filtered by; null is "Tout".
+  int? _categoryId;
   Timer? _activePoll;
   StreamSubscription<int>? _orderChanges;
 
@@ -162,7 +165,12 @@ class _HomeScreenState extends State<HomeScreen> {
       final categories = await context
           .read<CatalogueRepository>()
           .listRestaurantCategories();
-      if (mounted) setState(() => _categories = categories);
+      if (!mounted) return;
+      setState(() {
+        _categories = categories;
+        // A filter with no tile to undo it would hide restaurants for good.
+        if (!categories.any((c) => c.id == _categoryId)) _categoryId = null;
+      });
     } catch (_) {
       // Best effort: the restaurants are all still one tap away.
     }
@@ -184,13 +192,13 @@ class _HomeScreenState extends State<HomeScreen> {
     ]);
   }
 
-  /// The full restaurant list, opened on a category when one was tapped.
-  void _openRestaurants({int? categoryId}) {
+  /// The full restaurant list, on the category picked here if any.
+  void _openRestaurants() {
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => Scaffold(
           appBar: AppBar(title: const Text('Restaurants')),
-          body: RestaurantsScreen(initialCategoryId: categoryId),
+          body: RestaurantsScreen(initialCategoryId: _categoryId),
         ),
       ),
     );
@@ -264,15 +272,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 context,
               ).push(MaterialPageRoute(builder: (_) => const SearchScreen())),
             ),
-            if (_categories.isNotEmpty) ...[
-              const SizedBox(height: 16),
-              CategorySelector(
-                categories: _categories,
-                showAll: false,
-                onSelected: (id) => _openRestaurants(categoryId: id),
-              ),
-            ] else
-              const SizedBox(height: 8),
+            const SizedBox(height: 8),
             const _SectionHeader(title: 'Services'),
             SizedBox(
               height: 144,
@@ -295,9 +295,19 @@ class _HomeScreenState extends State<HomeScreen> {
             // the fold on small phones. The row still shows on first screen.
             _PromotionsSection(future: _promotionsFuture, onRetry: _refresh),
             const SizedBox(height: 8),
+            // Right above the restaurants it filters.
+            if (_categories.isNotEmpty) ...[
+              const _SectionHeader(title: 'Que souhaitez-vous manger ?'),
+              CategorySelector(
+                categories: _categories,
+                selectedId: _categoryId,
+                onSelected: (id) => setState(() => _categoryId = id),
+              ),
+            ],
             _SectionHeader(title: 'Restaurants', onSeeAll: _openRestaurants),
             _RestaurantsPreview(
               future: _restaurantsFuture,
+              categoryId: _categoryId,
               onTapRestaurant: _openRestaurant,
             ),
           ],
@@ -619,9 +629,13 @@ class _RestaurantsPreview extends StatelessWidget {
   const _RestaurantsPreview({
     required this.future,
     required this.onTapRestaurant,
+    this.categoryId,
   });
 
   final Future<List<Restaurant>> future;
+
+  /// Only the restaurants with this category; null shows them all.
+  final int? categoryId;
   final void Function(Restaurant) onTapRestaurant;
 
   @override
@@ -646,12 +660,20 @@ class _RestaurantsPreview extends StatelessWidget {
         // The home feed only ever teases restaurants — "Voir tout" is where
         // the full, searchable list lives — so cap it well short of a full
         // page's worth even when the catalogue is large.
-        final restaurants = (snapshot.data ?? const []).take(4).toList();
+        final categoryId = this.categoryId;
+        final restaurants = (snapshot.data ?? const <Restaurant>[])
+            .where((r) => categoryId == null || r.hasCategory(categoryId))
+            .take(4)
+            .toList();
 
         if (restaurants.isEmpty) {
-          return const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-            child: Text('Aucun restaurant disponible pour le moment.'),
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            child: Text(
+              categoryId == null
+                  ? 'Aucun restaurant disponible pour le moment.'
+                  : 'Aucun restaurant dans cette catégorie pour le moment.',
+            ),
           );
         }
 

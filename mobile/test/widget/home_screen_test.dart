@@ -403,77 +403,93 @@ void main() {
     );
   });
 
-  testWidgets(
-    'the category row under the search bar opens the restaurants of a category',
-    (tester) async {
-      tester.view.physicalSize = const Size(800, 2400);
-      tester.view.devicePixelRatio = 1.0;
-      addTearDown(tester.view.reset);
+  testWidgets('"Que souhaitez-vous manger ?" filters the restaurants below', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(800, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
 
-      Map<String, dynamic> category(int id, String name, String icon) => {
-        'id': id,
-        'name': name,
-        'icon': icon,
-        'imageUrl': null,
-        'position': id,
-      };
-      final pizza = category(1, 'Pizza', 'pizza');
-      final sweet = category(2, 'Sucré', 'cake');
+    Map<String, dynamic> category(int id, String name, String icon) => {
+      'id': id,
+      'name': name,
+      'icon': icon,
+      'imageUrl': null,
+      'position': id,
+    };
+    final pizza = category(1, 'Pizza', 'pizza');
+    final sweet = category(2, 'Sucré', 'cake');
+    Map<String, dynamic> restaurant(int id, String name, List<dynamic> c) => {
+      'id': id,
+      'name': name,
+      'description': null,
+      'isAvailable': true,
+      'photoUrl': null,
+      'categories': c,
+    };
 
-      await tester.pumpWidget(
-        _wrap(
-          categories: [pizza, sweet],
-          restaurants: [
-            {
-              'id': 1,
-              'name': 'Napoli Express',
-              'description': null,
-              'isAvailable': true,
-              'photoUrl': null,
-              'categories': [pizza],
-            },
-            {
-              'id': 2,
-              'name': 'Douceurs du Lac',
-              'description': null,
-              'isAvailable': true,
-              'photoUrl': null,
-              'categories': [sweet],
-            },
-          ],
-        ),
-      );
-      await tester.pumpAndSettle();
+    await tester.pumpWidget(
+      _wrap(
+        categories: [pizza, sweet],
+        restaurants: [
+          restaurant(1, 'Napoli Express', [pizza]),
+          restaurant(2, 'Douceurs du Lac', [sweet]),
+        ],
+      ),
+    );
+    await tester.pumpAndSettle();
 
-      // Shortcuts on the home screen: no "Tout", nothing selected.
-      expect(find.byType(CategorySelector), findsOneWidget);
-      expect(find.text('Tout'), findsNothing);
-      // Each restaurant card says what it serves.
-      expect(find.text('Pizza'), findsNWidgets(2));
-      expect(find.text('Sucré'), findsNWidgets(2));
+    Finder tile(String name) => find.descendant(
+      of: find.byType(CategorySelector),
+      matching: find.text(name),
+    );
 
-      await tester.tap(
-        find.descendant(
-          of: find.byType(CategorySelector),
-          matching: find.text('Sucré'),
-        ),
-      );
-      await tester.pumpAndSettle();
+    // Right above the restaurants, "Tout" first.
+    final title = find.text('Que souhaitez-vous manger ?');
+    expect(title, findsOneWidget);
+    expect(
+      tester.getTopLeft(title).dy,
+      greaterThan(tester.getTopLeft(find.text('Services')).dy),
+    );
+    expect(
+      tester.getTopLeft(title).dy,
+      lessThan(tester.getTopLeft(find.text('Restaurants').last).dy),
+    );
+    expect(tile('Tout'), findsOneWidget);
+    expect(find.text('Napoli Express'), findsOneWidget);
+    expect(find.text('Douceurs du Lac'), findsOneWidget);
 
-      // The full list, already filtered; "Tout" there undoes it.
-      expect(find.byType(RestaurantsScreen), findsOneWidget);
-      expect(find.text('Tout'), findsOneWidget);
-      final list = find.byType(RestaurantsScreen);
-      expect(
-        find.descendant(of: list, matching: find.text('Douceurs du Lac')),
-        findsOneWidget,
-      );
-      expect(
-        find.descendant(of: list, matching: find.text('Napoli Express')),
-        findsNothing,
-      );
-    },
-  );
+    await tester.tap(tile('Sucré'));
+    await tester.pumpAndSettle();
+
+    // Filtered in place: still on the home screen.
+    expect(find.byType(RestaurantsScreen), findsNothing);
+    expect(find.text('Douceurs du Lac'), findsOneWidget);
+    expect(find.text('Napoli Express'), findsNothing);
+
+    await tester.tap(tile('Tout'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Napoli Express'), findsOneWidget);
+    expect(find.text('Douceurs du Lac'), findsOneWidget);
+
+    // "Voir tout" keeps the category picked here.
+    await tester.tap(tile('Pizza'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Voir tout'));
+    await tester.pumpAndSettle();
+
+    final list = find.byType(RestaurantsScreen);
+    expect(list, findsOneWidget);
+    expect(
+      find.descendant(of: list, matching: find.text('Napoli Express')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: list, matching: find.text('Douceurs du Lac')),
+      findsNothing,
+    );
+  });
 
   testWidgets('no category row while no restaurant has a category', (
     tester,
@@ -482,6 +498,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(CategorySelector), findsNothing);
+    expect(find.text('Que souhaitez-vous manger ?'), findsNothing);
     expect(find.text('Services'), findsOneWidget);
   });
 }

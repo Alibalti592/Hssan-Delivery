@@ -29,26 +29,23 @@ IconData categoryIconData(String key) => switch (key) {
   _ => Icons.restaurant_outlined,
 };
 
-/// The row of restaurant categories under a search bar: a round tile and a
-/// name each, scrolling sideways.
+/// The row of restaurant categories that filters a restaurant list: a
+/// round tile and a name each, scrolling sideways, "Tout" first.
 ///
-/// With [showAll], a "Tout" tile comes first and the row is a filter: the
-/// tile of [selectedId] (or "Tout" when null) is highlighted, and [onSelected]
-/// gets the tapped category's id, or null for "Tout" and for a second tap on
-/// the selected one. Without it, the tiles are plain shortcuts.
+/// The tile of [selectedId] (or "Tout" when null) is highlighted, and
+/// [onSelected] gets the tapped category's id, or null for "Tout" and for a
+/// second tap on the selected one.
 class CategorySelector extends StatefulWidget {
   const CategorySelector({
     required this.categories,
     required this.onSelected,
     this.selectedId,
-    this.showAll = true,
     super.key,
   });
 
   final List<RestaurantCategory> categories;
   final int? selectedId;
   final ValueChanged<int?> onSelected;
-  final bool showAll;
 
   static const double _tileWidth = 76;
   static const double _gap = 4;
@@ -77,7 +74,7 @@ class _CategorySelectorState extends State<CategorySelector> {
       final position = _scroll.position;
       final tileEnd =
           CategorySelector._padding +
-          (index + (widget.showAll ? 1 : 0)) * extent +
+          (index + 1) * extent +
           CategorySelector._tileWidth;
       final overflow =
           tileEnd + CategorySelector._padding - position.viewportDimension;
@@ -96,7 +93,6 @@ class _CategorySelectorState extends State<CategorySelector> {
   @override
   Widget build(BuildContext context) {
     final categories = widget.categories;
-    final leading = widget.showAll ? 1 : 0;
 
     return SizedBox(
       // Room for a name on two lines ("Cuisine Tunisienne").
@@ -107,11 +103,11 @@ class _CategorySelectorState extends State<CategorySelector> {
         padding: const EdgeInsets.symmetric(
           horizontal: CategorySelector._padding,
         ),
-        itemCount: categories.length + leading,
+        itemCount: categories.length + 1,
         separatorBuilder: (_, _) =>
             const SizedBox(width: CategorySelector._gap),
         itemBuilder: (context, index) {
-          if (index < leading) {
+          if (index == 0) {
             return _CategoryTile(
               name: 'Tout',
               icon: Icons.grid_view_rounded,
@@ -119,8 +115,8 @@ class _CategorySelectorState extends State<CategorySelector> {
               onTap: () => widget.onSelected(null),
             );
           }
-          final category = categories[index - leading];
-          final selected = widget.showAll && category.id == widget.selectedId;
+          final category = categories[index - 1];
+          final selected = category.id == widget.selectedId;
           return _CategoryTile(
             name: category.name,
             icon: categoryIconData(category.icon),

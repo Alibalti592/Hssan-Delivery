@@ -20,8 +20,8 @@ class RestaurantsScreen extends StatefulWidget {
   /// screen; only the copy and the backend filter differ.
   final RestaurantType type;
 
-  /// The restaurant category to open on (a tap on the home screen's
-  /// category row); the client can change it or go back to "Tout".
+  /// The restaurant category to open on (the one picked on the home
+  /// screen); the client can change it or go back to "Tout".
   final int? initialCategoryId;
 
   @override
