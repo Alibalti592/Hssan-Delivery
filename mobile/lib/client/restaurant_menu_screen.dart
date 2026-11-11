@@ -363,6 +363,16 @@ class _ProductRow extends StatelessWidget {
                       color: navy,
                     ),
                   ),
+                  // What can be added, so "CHOISIR" isn't a surprise.
+                  if (product.hasExtras) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      '${product.extraGroups.map((g) => g.name).join(' · ')} au choix',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 12, color: mutedText),
+                    ),
+                  ],
                 ],
               ),
             ),

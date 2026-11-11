@@ -177,32 +177,43 @@ void main() {
     expect(find.text('Sauces'), findsOneWidget);
     expect(find.text('Gratuit'), findsNWidgets(2));
     expect(find.text('+1.500 DT'), findsOneWidget);
-    expect(find.text('Un seul choix'), findsOneWidget);
+    expect(find.text('Choisissez-en 1'), findsOneWidget);
     expect(find.text('Obligatoire'), findsOneWidget);
-    expect(find.text('8.000 DT'), findsOneWidget);
+    expect(find.text('Facultatif'), findsNWidgets(2));
 
-    // The drink is required: nothing can be added without it.
-    final addButton = find.widgetWithText(FilledButton, 'CHOISISSEZ : BOISSON');
-    expect(addButton, findsOneWidget);
-    expect(tester.widget<FilledButton>(addButton).onPressed, isNull);
+    // The drink is required: the button says so, and takes the customer to
+    // it instead of adding.
+    await tester.tap(find.text('Choisir : Boisson'));
+    await tester.pumpAndSettle();
+    expect(find.text('Faites un choix pour continuer'), findsOneWidget);
+    expect(cart.lines, isEmpty);
 
     await tester.tap(find.text('Harissa'));
     await tester.tap(find.text('Mayonnaise'));
     await tester.tap(find.text('Fromage'));
     await tester.tap(find.text('Eau'));
     await tester.pump();
-    expect(find.text('10.500 DT'), findsOneWidget);
-    expect(find.text('Choisi'), findsOneWidget);
+    expect(find.text('Ajouter · 10.500 DT'), findsOneWidget);
+    expect(find.text('Faites un choix pour continuer'), findsNothing);
+    expect(find.text('2 choisis'), findsOneWidget);
 
     // One drink only: Coca-Cola replaces the water.
     await tester.tap(find.text('Coca-Cola'));
     // A second tap on a sauce removes it.
     await tester.tap(find.text('Mayonnaise'));
     await tester.pump();
-    expect(find.text('12.000 DT'), findsOneWidget);
+    expect(find.text('Ajouter · 12.000 DT'), findsOneWidget);
 
-    await tester.tap(find.text('AJOUTER AU PANIER'));
+    // Two of them: the total follows.
+    await tester.tap(find.byTooltip('Plus'));
+    await tester.pump();
+    expect(find.text('Ajouter · 24.000 DT'), findsOneWidget);
+
+    await tester.tap(find.text('Ajouter · 24.000 DT'));
     await tester.pumpAndSettle();
+
+    // A shortcut to the cart in the confirmation.
+    expect(find.text('VOIR LE PANIER'), findsOneWidget);
 
     final line = cart.lines.single;
     expect(line.extras.map((e) => '${e.group}/${e.name}'), [
@@ -211,5 +222,6 @@ void main() {
       'Boisson/Coca-Cola',
     ]);
     expect(line.unitPrice, '12.000');
+    expect(line.quantity, 2);
   });
 }

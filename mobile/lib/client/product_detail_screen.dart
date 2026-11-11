@@ -6,6 +6,7 @@ import '../catalogue/catalogue_models.dart';
 import '../theme.dart';
 import '../widgets/app_photo.dart';
 import '../widgets/quantity_stepper.dart';
+import 'cart_screen.dart';
 
 class ProductDetailScreen extends StatefulWidget {
   const ProductDetailScreen({
@@ -32,6 +33,13 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
   /// The extras ticked, by group name.
   final Map<String, Set<String>> _picked = {};
+
+  /// Each group's section, to bring a required one left empty into view.
+  final Map<String, GlobalKey> _groupKeys = {};
+
+  /// The required group the customer was just sent back to, outlined until
+  /// something is picked in it.
+  String? _flagged;
 
   /// What was ticked, in the product's own order — the order's too.
   List<PickedExtra> get _extras => [
@@ -60,7 +68,23 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         if (!group.multiple) picked.clear();
         picked.add(choice.name);
       }
+      if (_flagged == group.name && picked.isNotEmpty) _flagged = null;
     });
+  }
+
+  /// "Ajouter" with a required group still empty: scroll to it and outline
+  /// it, rather than a button that silently does nothing.
+  void _showMissing(ProductExtraGroup group) {
+    setState(() => _flagged = group.name);
+    final target = _groupKeys[group.name]?.currentContext;
+    if (target != null) {
+      Scrollable.ensureVisible(
+        target,
+        duration: const Duration(milliseconds: 350),
+        curve: Curves.easeOutCubic,
+        alignment: 0.1,
+      );
+    }
   }
 
   Future<void> _addToCart() async {
@@ -104,275 +128,394 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     final label = _option == null
         ? widget.product.name
         : '${widget.product.name} (${_option!.name})';
-    messenger.showSnackBar(SnackBar(content: Text('$label ajouté au panier')));
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text('$label ajouté au panier'),
+        action: SnackBarAction(
+          label: 'VOIR LE PANIER',
+          onPressed: () => navigator.push(
+            MaterialPageRoute(builder: (_) => const CartScreen()),
+          ),
+        ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final product = widget.product;
+    final textTheme = Theme.of(context).textTheme;
     final extras = _extras;
     final unitPrice =
         (double.tryParse(_option?.price ?? product.price) ?? 0) +
         extras.fold(0.0, (sum, e) => sum + (double.tryParse(e.price) ?? 0));
     final total = unitPrice * _quantity;
     final missing = _missing;
+    final hasPhoto = product.photoUrl != null && product.photoUrl!.isNotEmpty;
 
     return Scaffold(
-      body: SafeArea(
-        bottom: false,
-        child: Column(
-          children: [
-            Stack(
+      body: CustomScrollView(
+        slivers: [
+          SliverAppBar(
+            pinned: true,
+            stretch: true,
+            expandedHeight: hasPhoto ? 260 : 150,
+            backgroundColor: Colors.white,
+            surfaceTintColor: Colors.white,
+            leading: Padding(
+              padding: const EdgeInsets.all(8),
+              child: Material(
+                color: Colors.white,
+                shape: const CircleBorder(),
+                elevation: 1,
+                child: IconButton(
+                  icon: const Icon(Icons.arrow_back, color: navy, size: 20),
+                  tooltip: 'Retour',
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+              ),
+            ),
+            flexibleSpace: FlexibleSpaceBar(
+              background: AppPhoto(
+                product.photoUrl,
+                icon: Icons.restaurant_outlined,
+                iconSize: 48,
+              ),
+            ),
+          ),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    product.name,
+                    style: textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    product.hasOptions
+                        ? 'À partir de ${product.price} DT'
+                        : '${product.price} DT',
+                    style: textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: navy,
+                    ),
+                  ),
+                  if (product.description != null &&
+                      product.description!.isNotEmpty) ...[
+                    const SizedBox(height: 10),
+                    Text(
+                      product.description!,
+                      style: textTheme.bodyMedium?.copyWith(
+                        color: const Color(0xFF5B6472),
+                        height: 1.4,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+          if (product.hasOptions)
+            SliverToBoxAdapter(
+              child: _ChoiceSection(
+                title: 'Taille',
+                subtitle: 'Choisissez-en 1',
+                badge: _Badge.done,
+                children: [
+                  for (final option in product.options)
+                    _ChoiceRow(
+                      label: option.name,
+                      price: '${option.price} DT',
+                      multiple: false,
+                      selected: option.name == _option?.name,
+                      onTap: () => setState(() => _option = option),
+                    ),
+                ],
+              ),
+            ),
+          for (final group in product.extraGroups)
+            SliverToBoxAdapter(
+              child: _ChoiceSection(
+                key: _groupKeys.putIfAbsent(group.name, GlobalKey.new),
+                title: group.name,
+                subtitle: _subtitle(group, _picked[group.name]?.length ?? 0),
+                badge: !group.required
+                    ? _Badge.optional
+                    : (_picked[group.name]?.isEmpty ?? true)
+                    ? _Badge.required
+                    : _Badge.done,
+                flagged: _flagged == group.name,
+                children: [
+                  for (final choice in group.choices)
+                    _ChoiceRow(
+                      label: choice.name,
+                      price: choice.isFree ? 'Gratuit' : '+${choice.price} DT',
+                      free: choice.isFree,
+                      multiple: group.multiple,
+                      selected:
+                          _picked[group.name]?.contains(choice.name) ?? false,
+                      onTap: () => _toggle(group, choice),
+                    ),
+                ],
+              ),
+            ),
+          const SliverToBoxAdapter(child: SizedBox(height: 24)),
+        ],
+      ),
+      bottomNavigationBar: _AddBar(
+        quantity: _quantity,
+        onDecrement: _quantity > 1 ? () => setState(() => _quantity--) : null,
+        onIncrement: _quantity < CartController.maxQuantityPerProduct
+            ? () => setState(() => _quantity++)
+            : null,
+        label: missing == null
+            ? 'Ajouter · ${total.toStringAsFixed(3)} DT'
+            : 'Choisir : ${missing.name}',
+        onPressed: missing == null ? _addToCart : () => _showMissing(missing),
+      ),
+    );
+  }
+
+  /// "Choisissez-en 1", "2 choisis", "Plusieurs choix possibles"...
+  static String _subtitle(ProductExtraGroup group, int picked) {
+    if (!group.multiple) return 'Choisissez-en 1';
+    if (picked > 0) return picked == 1 ? '1 choisi' : '$picked choisis';
+    return group.required
+        ? 'Au moins 1, plusieurs possibles'
+        : 'Plusieurs choix possibles';
+  }
+}
+
+enum _Badge { optional, required, done }
+
+/// A group of choices: a tinted header (its name, how many to pick, and
+/// whether it's required) over a row per choice. [flagged] outlines it when
+/// the customer is sent back to it.
+class _ChoiceSection extends StatelessWidget {
+  const _ChoiceSection({
+    required this.title,
+    required this.subtitle,
+    required this.badge,
+    required this.children,
+    this.flagged = false,
+    super.key,
+  });
+
+  final String title;
+  final String subtitle;
+  final _Badge badge;
+  final List<Widget> children;
+  final bool flagged;
+
+  @override
+  Widget build(BuildContext context) {
+    final (badgeText, badgeColor, badgeBg) = switch (badge) {
+      _Badge.optional => ('Facultatif', mutedText, Colors.white),
+      _Badge.required => ('Obligatoire', warnText, warnBg),
+      _Badge.done => ('✓', successText, successBg),
+    };
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 250),
+      margin: const EdgeInsets.only(top: 14),
+      decoration: BoxDecoration(
+        border: Border.symmetric(
+          horizontal: BorderSide(
+            color: flagged ? warnText : Colors.transparent,
+            width: 1.5,
+          ),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Container(
+            color: flagged ? warnBg : const Color(0xFFF4F6F9),
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
+            child: Row(
               children: [
-                SizedBox(
-                  height: 200,
-                  width: double.infinity,
-                  child: AppPhoto(
-                    product.photoUrl,
-                    icon: Icons.restaurant_outlined,
-                    iconSize: 48,
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        flagged ? 'Faites un choix pour continuer' : subtitle,
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          color: flagged ? warnText : mutedText,
+                          fontWeight: flagged ? FontWeight.w700 : null,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                Positioned(
-                  top: 8,
-                  left: 8,
-                  child: CircleAvatar(
-                    backgroundColor: Colors.white,
-                    child: IconButton(
-                      icon: const Icon(Icons.arrow_back, color: navy),
-                      onPressed: () => Navigator.of(context).pop(),
+                Container(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: badge == _Badge.done ? 9 : 10,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: badgeBg,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    badgeText,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      color: badgeColor,
                     ),
                   ),
                 ),
               ],
             ),
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      product.name,
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    if (product.description != null &&
-                        product.description!.isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      Text(
-                        product.description!,
-                        style: Theme.of(context).textTheme.bodyMedium,
-                      ),
-                    ],
-                    if (product.hasOptions) ...[
-                      const SizedBox(height: 20),
-                      Text(
-                        'Taille',
-                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [
-                          for (final option in product.options)
-                            ChoiceChip(
-                              label: Text(
-                                '${option.name} · ${option.price} DT',
-                              ),
-                              selected: option.name == _option?.name,
-                              onSelected: (_) =>
-                                  setState(() => _option = option),
-                            ),
-                        ],
-                      ),
-                    ],
-                    for (final group in product.extraGroups)
-                      _ExtraGroupSection(
-                        group: group,
-                        picked: _picked[group.name] ?? const {},
-                        onToggle: (choice) => _toggle(group, choice),
-                      ),
-                    const SizedBox(height: 24),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        QuantityStepper(
-                          large: true,
-                          quantity: _quantity,
-                          onDecrement: _quantity > 1
-                              ? () => setState(() => _quantity--)
-                              : null,
-                          onIncrement:
-                              _quantity < CartController.maxQuantityPerProduct
-                              ? () => setState(() => _quantity++)
-                              : null,
-                        ),
-                        Text(
-                          '${total.toStringAsFixed(3)} DT',
-                          style: Theme.of(context).textTheme.headlineSmall
-                              ?.copyWith(fontWeight: FontWeight.w800),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            SafeArea(
-              top: false,
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: FilledButton(
-                  // A required group left empty: say which, rather than
-                  // letting the order fail later.
-                  onPressed: missing == null ? _addToCart : null,
-                  child: Text(
-                    missing == null
-                        ? 'AJOUTER AU PANIER'
-                        : 'CHOISISSEZ : ${missing.name.toUpperCase()}',
-                  ),
-                ),
-              ),
-            ),
+          ),
+          for (var i = 0; i < children.length; i++) ...[
+            if (i > 0) const Divider(height: 1, indent: 20, endIndent: 20),
+            children[i],
           ],
-        ),
-      ),
-    );
-  }
-}
-
-/// One group of extras ("Sauces", "Boisson"...): its name, whether it's
-/// required, how many can be picked, and a row per choice with its price.
-class _ExtraGroupSection extends StatelessWidget {
-  const _ExtraGroupSection({
-    required this.group,
-    required this.picked,
-    required this.onToggle,
-  });
-
-  final ProductExtraGroup group;
-  final Set<String> picked;
-  final ValueChanged<ProductExtraChoice> onToggle;
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    final missing = group.required && picked.isEmpty;
-
-    return Padding(
-      padding: const EdgeInsets.only(top: 22),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  group.name,
-                  style: textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: !group.required
-                      ? fieldFill
-                      : missing
-                      ? warnBg
-                      : successBg,
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Text(
-                  !group.required
-                      ? 'Facultatif'
-                      : missing
-                      ? 'Obligatoire'
-                      : 'Choisi',
-                  style: TextStyle(
-                    fontSize: 10.5,
-                    fontWeight: FontWeight.w700,
-                    color: !group.required
-                        ? mutedText
-                        : missing
-                        ? warnText
-                        : successText,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 2),
-          Text(
-            group.multiple ? 'Plusieurs choix possibles' : 'Un seul choix',
-            style: textTheme.bodySmall?.copyWith(color: mutedText),
-          ),
-          const SizedBox(height: 6),
-          for (final choice in group.choices)
-            _ExtraChoiceRow(
-              choice: choice,
-              multiple: group.multiple,
-              selected: picked.contains(choice.name),
-              onTap: () => onToggle(choice),
-            ),
         ],
       ),
     );
   }
 }
 
-class _ExtraChoiceRow extends StatelessWidget {
-  const _ExtraChoiceRow({
-    required this.choice,
+/// One choice: a checkbox (several) or a round button (one), its name and
+/// its price, with the whole row as the tap target.
+class _ChoiceRow extends StatelessWidget {
+  const _ChoiceRow({
+    required this.label,
+    required this.price,
     required this.multiple,
     required this.selected,
     required this.onTap,
+    this.free = false,
   });
 
-  final ProductExtraChoice choice;
+  final String label;
+  final String price;
   final bool multiple;
   final bool selected;
+  final bool free;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final accent = accentOf(context);
     final icon = multiple
-        ? (selected ? Icons.check_box : Icons.check_box_outline_blank)
+        ? (selected ? Icons.check_box_rounded : Icons.check_box_outline_blank)
         : (selected ? Icons.radio_button_checked : Icons.radio_button_off);
 
     return Semantics(
       checked: selected,
+      button: true,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(10),
         child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 9),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
           child: Row(
             children: [
-              Icon(icon, size: 22, color: selected ? accent : mutedText),
-              const SizedBox(width: 12),
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 150),
+                child: Icon(
+                  icon,
+                  key: ValueKey(selected),
+                  size: 24,
+                  color: selected ? accent : const Color(0xFFB5BCC7),
+                ),
+              ),
+              const SizedBox(width: 14),
               Expanded(
                 child: Text(
-                  choice.name,
+                  label,
                   style: TextStyle(
-                    fontSize: 14.5,
+                    fontSize: 15,
                     fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
                   ),
                 ),
               ),
               Text(
-                choice.isFree ? 'Gratuit' : '+${choice.price} DT',
+                price,
                 style: TextStyle(
-                  fontSize: 13,
+                  fontSize: 13.5,
                   fontWeight: FontWeight.w600,
-                  color: choice.isFree ? mutedText : accent,
+                  color: free ? mutedText : const Color(0xFF3A4250),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Always in view at the bottom: how many, and the button with the total
+/// on it — or, while a required group is empty, which one to fill.
+class _AddBar extends StatelessWidget {
+  const _AddBar({
+    required this.quantity,
+    required this.onDecrement,
+    required this.onIncrement,
+    required this.label,
+    required this.onPressed,
+  });
+
+  final int quantity;
+  final VoidCallback? onDecrement;
+  final VoidCallback? onIncrement;
+  final String label;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Color(0x14000000),
+            blurRadius: 16,
+            offset: Offset(0, -4),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+          child: Row(
+            children: [
+              QuantityStepper(
+                quantity: quantity,
+                onDecrement: onDecrement,
+                onIncrement: onIncrement,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: FilledButton(
+                  onPressed: onPressed,
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size(0, 52),
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                  ),
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(label, maxLines: 1),
+                  ),
                 ),
               ),
             ],
