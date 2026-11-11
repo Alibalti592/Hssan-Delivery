@@ -34,6 +34,17 @@ class Product
     #[ORM\Column(type: 'json')]
     private array $options = [];
 
+    /**
+     * What the customer can add to it when ordering: sauces, extras, a
+     * drink... Each group is either a single pick or several, optional or
+     * required, and each choice adds its price (0 for a free sauce) to the
+     * product's. Empty for most products.
+     *
+     * @var list<array{name: string, required: bool, multiple: bool, choices: list<array{name: string, price: string}>}>
+     */
+    #[ORM\Column(type: 'json', options: ['default' => '[]'])]
+    private array $extraGroups = [];
+
     #[ORM\Column]
     private bool $isAvailable = true;
 
@@ -136,6 +147,38 @@ class Product
         foreach ($this->options as $option) {
             if ($option['name'] === $name) {
                 return $option;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @return list<array{name: string, required: bool, multiple: bool, choices: list<array{name: string, price: string}>}>
+     */
+    public function getExtraGroups(): array
+    {
+        return $this->extraGroups;
+    }
+
+    /**
+     * @param list<array{name: string, required: bool, multiple: bool, choices: list<array{name: string, price: string}>}> $extraGroups
+     */
+    public function setExtraGroups(array $extraGroups): static
+    {
+        $this->extraGroups = $extraGroups;
+
+        return $this;
+    }
+
+    /**
+     * @return array{name: string, required: bool, multiple: bool, choices: list<array{name: string, price: string}>}|null
+     */
+    public function findExtraGroup(string $name): ?array
+    {
+        foreach ($this->extraGroups as $group) {
+            if ($group['name'] === $name) {
+                return $group;
             }
         }
 

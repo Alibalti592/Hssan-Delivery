@@ -5,6 +5,7 @@ namespace App\Tests\Integration;
 use App\Entity\Category;
 use App\Entity\Delivery;
 use App\Entity\DeliveryZone;
+use App\Entity\Order;
 use App\Entity\Product;
 use App\Entity\Restaurant;
 use App\Entity\User;
@@ -707,6 +708,165 @@ final class OrderApiTest extends WebTestCase
         yield 'no option chosen' => [true, null, 'Choisissez une taille pour « %s ».'];
         yield 'unknown option' => [true, 'XXL', 'La taille « XXL » n\'est plus proposée pour « %s ».'];
         yield 'option on a single-price product' => [false, 'M', '« %s » n\'a pas de taille à choisir.'];
+    }
+
+    public function testOrderingSaucesExtrasAndADrinkChargesAndRecordsThem(): void
+    {
+        $client = static::createClient();
+
+        $this->entityManager = self::getContainer()
+            ->get(EntityManagerInterface::class);
+
+        $user = $this->createTestUser();
+        $restaurant = $this->createTestRestaurant();
+        $category = $this->createTestCategory($restaurant);
+        $sandwich = $this->createTestProductWithExtras($restaurant, $category);
+        $zone = $this->createTestDeliveryZone('4.000');
+        $token = $this->authenticateClient($client, $user);
+
+        $response = $this->postOrder($client, $token, $restaurant, $zone, [
+            [
+                'productId' => $sandwich->getId(),
+                'quantity' => 2,
+                // Not in the product's order: recorded in it.
+                'extras' => [
+                    ['group' => 'Boisson', 'choice' => 'Coca-Cola'],
+                    ['group' => 'Sauces', 'choice' => 'Mayonnaise'],
+                    ['group' => 'Suppléments', 'choice' => 'Fromage'],
+                    ['group' => 'Sauces', 'choice' => 'Harissa'],
+                ],
+            ],
+            // The same sandwich with just its drink: its own line and price.
+            [
+                'productId' => $sandwich->getId(),
+                'quantity' => 1,
+                'extras' => [['group' => 'Boisson', 'choice' => 'Eau']],
+            ],
+        ]);
+
+        self::assertResponseStatusCodeSame(201);
+
+        // (12.500 + 1.500 cheese + 2.000 coca) x 2 + (12.500 + 1.000 water) + 4.000
+        self::assertSame('49.500', $response['totalAmount']);
+        self::assertSame('16.000', $response['items'][0]['unitPrice']);
+        self::assertSame(
+            [
+                ['group' => 'Sauces', 'name' => 'Harissa', 'price' => '0.000'],
+                ['group' => 'Sauces', 'name' => 'Mayonnaise', 'price' => '0.000'],
+                ['group' => 'Suppléments', 'name' => 'Fromage', 'price' => '1.500'],
+                ['group' => 'Boisson', 'name' => 'Coca-Cola', 'price' => '2.000'],
+            ],
+            $response['items'][0]['extras']
+        );
+        self::assertSame('13.500', $response['items'][1]['unitPrice']);
+
+        // The courier sees them too.
+        $orderId = $response['id'];
+        $this->entityManager->clear();
+        $order = $this->entityManager->getRepository(Order::class)->find($orderId);
+        self::assertCount(4, $order->getItems()->first()->getExtras());
+    }
+
+    #[DataProvider('invalidExtraChoices')]
+    public function testOrderItemExtrasMustMatchTheProduct(array $extras, string $expectedMessage): void
+    {
+        $client = static::createClient();
+
+        $this->entityManager = self::getContainer()
+            ->get(EntityManagerInterface::class);
+
+        $user = $this->createTestUser();
+        $restaurant = $this->createTestRestaurant();
+        $category = $this->createTestCategory($restaurant);
+        $product = $this->createTestProductWithExtras($restaurant, $category);
+        $zone = $this->createTestDeliveryZone('4.000');
+        $token = $this->authenticateClient($client, $user);
+
+        $response = $this->postOrder($client, $token, $restaurant, $zone, [
+            ['productId' => $product->getId(), 'quantity' => 1, 'extras' => $extras],
+        ]);
+
+        self::assertResponseStatusCodeSame(400);
+        self::assertSame(
+            sprintf($expectedMessage, $product->getName()),
+            $response['message']
+        );
+    }
+
+    public static function invalidExtraChoices(): iterable
+    {
+        $water = ['group' => 'Boisson', 'choice' => 'Eau'];
+
+        yield 'required drink left out' => [
+            [['group' => 'Sauces', 'choice' => 'Harissa']],
+            'Choisissez « Boisson » pour « %s ».',
+        ];
+        yield 'two drinks' => [
+            [$water, ['group' => 'Boisson', 'choice' => 'Coca-Cola']],
+            'Un seul choix pour « Boisson » de « %s ».',
+        ];
+        yield 'unknown choice' => [
+            [$water, ['group' => 'Sauces', 'choice' => 'Ketchup']],
+            '« Ketchup » n\'est plus proposé pour « %s ». Mettez votre panier à jour.',
+        ];
+        yield 'unknown group' => [
+            [$water, ['group' => 'Desserts', 'choice' => 'Harissa']],
+            '« Harissa » n\'est plus proposé pour « %s ». Mettez votre panier à jour.',
+        ];
+    }
+
+    public function testExtrasOnAProductWithoutAnyAreRejected(): void
+    {
+        $client = static::createClient();
+
+        $this->entityManager = self::getContainer()
+            ->get(EntityManagerInterface::class);
+
+        $user = $this->createTestUser();
+        $restaurant = $this->createTestRestaurant();
+        $category = $this->createTestCategory($restaurant);
+        $product = $this->createTestProduct($restaurant, $category);
+        $zone = $this->createTestDeliveryZone('4.000');
+        $token = $this->authenticateClient($client, $user);
+
+        $this->postOrder($client, $token, $restaurant, $zone, [
+            ['productId' => $product->getId(), 'quantity' => 1, 'extras' => [['group' => 'Sauces', 'choice' => 'Harissa']]],
+        ]);
+        self::assertResponseStatusCodeSame(400);
+
+        // Without extras, as before.
+        $response = $this->postOrder($client, $token, $restaurant, $zone, [
+            ['productId' => $product->getId(), 'quantity' => 1],
+        ]);
+        self::assertResponseStatusCodeSame(201);
+        self::assertSame([], $response['items'][0]['extras']);
+    }
+
+    /**
+     * A sandwich at 12.500: free sauces (several, optional), paid extras
+     * (several, optional) and a required single drink.
+     */
+    private function createTestProductWithExtras(Restaurant $restaurant, Category $category): Product
+    {
+        $product = $this->createTestProduct($restaurant, $category);
+        $product->setExtraGroups([
+            ['name' => 'Sauces', 'required' => false, 'multiple' => true, 'choices' => [
+                ['name' => 'Harissa', 'price' => '0.000'],
+                ['name' => 'Mayonnaise', 'price' => '0.000'],
+            ]],
+            ['name' => 'Suppléments', 'required' => false, 'multiple' => true, 'choices' => [
+                ['name' => 'Fromage', 'price' => '1.500'],
+                ['name' => 'Oeuf', 'price' => '1.000'],
+            ]],
+            ['name' => 'Boisson', 'required' => true, 'multiple' => false, 'choices' => [
+                ['name' => 'Eau', 'price' => '1.000'],
+                ['name' => 'Coca-Cola', 'price' => '2.000'],
+            ]],
+        ]);
+
+        $this->entityManager->flush();
+
+        return $product;
     }
 
     private function createTestProductWithOptions(Restaurant $restaurant, Category $category): Product

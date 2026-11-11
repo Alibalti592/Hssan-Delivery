@@ -220,6 +220,126 @@ final class AdminProductApiTest extends WebTestCase
         self::assertSame([], $updated['options']);
     }
 
+    public function testAdminCanSetAProductsExtrasAndLeaveThemOnUpdate(): void
+    {
+        $client = static::createClient();
+
+        $this->entityManager = self::getContainer()
+            ->get(EntityManagerInterface::class);
+
+        $admin = $this->createTestUser('ROLE_ADMIN', 'Test Admin');
+        $restaurant = $this->createRestaurant('Snack');
+        $category = $this->createCategory($restaurant, 'Sandwichs');
+        $token = $this->authenticateClient($client, $admin);
+        $headers = [
+            'CONTENT_TYPE' => 'application/json',
+            'HTTP_AUTHORIZATION' => 'Bearer '.$token,
+        ];
+
+        $client->request(
+            'POST',
+            '/api/admin/restaurants/'.$restaurant->getId().'/products',
+            server: $headers,
+            content: json_encode([
+                'name' => 'Chapati',
+                'price' => '6.500',
+                'categoryId' => $category->getId(),
+                'extraGroups' => [
+                    ['name' => ' Sauces ', 'required' => false, 'multiple' => true, 'choices' => [
+                        ['name' => ' Harissa ', 'price' => '0'],
+                        ['name' => 'Mayonnaise'],
+                    ]],
+                    ['name' => 'Boisson', 'required' => true, 'multiple' => false, 'choices' => [
+                        ['name' => 'Coca-Cola', 'price' => '2.5'],
+                    ]],
+                ],
+            ])
+        );
+
+        self::assertResponseStatusCodeSame(Response::HTTP_CREATED);
+
+        $created = json_decode($client->getResponse()->getContent(), true);
+
+        $expected = [
+            ['name' => 'Sauces', 'required' => false, 'multiple' => true, 'choices' => [
+                ['name' => 'Harissa', 'price' => '0.000'],
+                ['name' => 'Mayonnaise', 'price' => '0.000'],
+            ]],
+            ['name' => 'Boisson', 'required' => true, 'multiple' => false, 'choices' => [
+                ['name' => 'Coca-Cola', 'price' => '2.500'],
+            ]],
+        ];
+        self::assertSame($expected, $created['extraGroups']);
+        // The product's own price is untouched by its extras.
+        self::assertSame('6.500', $created['price']);
+
+        // An edit that doesn't send them leaves them as they are.
+        $client->request('PUT', '/api/admin/products/'.$created['id'], server: $headers, content: json_encode([
+            'name' => 'Chapati thon',
+            'price' => '7.000',
+            'categoryId' => $category->getId(),
+        ]));
+
+        self::assertResponseIsSuccessful();
+        self::assertSame($expected, json_decode($client->getResponse()->getContent(), true)['extraGroups']);
+
+        // Sent empty: removed.
+        $client->request('PUT', '/api/admin/products/'.$created['id'], server: $headers, content: json_encode([
+            'name' => 'Chapati thon',
+            'price' => '7.000',
+            'categoryId' => $category->getId(),
+            'extraGroups' => [],
+        ]));
+
+        self::assertSame([], json_decode($client->getResponse()->getContent(), true)['extraGroups']);
+    }
+
+    #[DataProvider('invalidExtraPayloads')]
+    public function testInvalidProductExtrasAreRejected(array $extraGroups): void
+    {
+        $client = static::createClient();
+
+        $this->entityManager = self::getContainer()
+            ->get(EntityManagerInterface::class);
+
+        $admin = $this->createTestUser('ROLE_ADMIN', 'Test Admin');
+        $restaurant = $this->createRestaurant('Snack');
+        $category = $this->createCategory($restaurant, 'Sandwichs');
+        $token = $this->authenticateClient($client, $admin);
+
+        $client->request(
+            'POST',
+            '/api/admin/restaurants/'.$restaurant->getId().'/products',
+            server: [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_AUTHORIZATION' => 'Bearer '.$token,
+            ],
+            content: json_encode([
+                'name' => 'Chapati',
+                'price' => '6.500',
+                'categoryId' => $category->getId(),
+                'extraGroups' => $extraGroups,
+            ])
+        );
+
+        self::assertResponseStatusCodeSame(Response::HTTP_UNPROCESSABLE_ENTITY);
+    }
+
+    public static function invalidExtraPayloads(): iterable
+    {
+        $harissa = ['name' => 'Harissa', 'price' => '0'];
+
+        yield 'group without choices' => [[['name' => 'Sauces', 'choices' => []]]];
+        yield 'group without a name' => [[['name' => ' ', 'choices' => [$harissa]]]];
+        yield 'duplicate group names' => [[
+            ['name' => 'Sauces', 'choices' => [$harissa]],
+            ['name' => 'sauces', 'choices' => [$harissa]],
+        ]];
+        yield 'duplicate choice names' => [[['name' => 'Sauces', 'choices' => [$harissa, ['name' => 'HARISSA', 'price' => '1']]]]];
+        yield 'negative price' => [[['name' => 'Sauces', 'choices' => [['name' => 'Harissa', 'price' => '-1']]]]];
+        yield 'choice without a name' => [[['name' => 'Sauces', 'choices' => [['name' => '', 'price' => '0']]]]];
+    }
+
     #[DataProvider('invalidOptionPayloads')]
     public function testInvalidProductOptionsAreRejected(array $payload): void
     {

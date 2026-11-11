@@ -3,6 +3,7 @@
 namespace App\Service;
 
 use App\Dto\Admin\CreateProductRequest;
+use App\Dto\Admin\ProductExtraGroupRequest;
 use App\Dto\Admin\ProductOptionRequest;
 use App\Dto\Admin\UpdateProductRequest;
 use App\Entity\Category;
@@ -56,6 +57,7 @@ final class ProductService
             ->setCategory($category);
 
         $this->applyPricing($product, $dto->price, $dto->options);
+        $product->setExtraGroups($this->normalizeExtraGroups($dto->extraGroups));
 
         $this->entityManager->persist($product);
         $this->entityManager->flush();
@@ -173,6 +175,11 @@ final class ProductService
             ->setCategory($category);
 
         $this->applyPricing($product, $dto->price, $dto->options);
+
+        // Left out by a form that doesn't know about them: unchanged.
+        if (null !== $dto->extraGroups) {
+            $product->setExtraGroups($this->normalizeExtraGroups($dto->extraGroups));
+        }
 
         $this->entityManager->flush();
 
@@ -296,5 +303,32 @@ final class ProductService
 
         $product->setOptions($normalized);
         $product->setPrice((string) $price);
+    }
+
+    /**
+     * Names trimmed and prices normalized to 3 decimals, as the order will
+     * copy them.
+     *
+     * @param ProductExtraGroupRequest[] $groups
+     *
+     * @return list<array{name: string, required: bool, multiple: bool, choices: list<array{name: string, price: string}>}>
+     */
+    private function normalizeExtraGroups(array $groups): array
+    {
+        return array_map(
+            static fn (ProductExtraGroupRequest $group) => [
+                'name' => trim((string) $group->name),
+                'required' => $group->required,
+                'multiple' => $group->multiple,
+                'choices' => array_map(
+                    static fn ($choice) => [
+                        'name' => trim((string) $choice->name),
+                        'price' => Money::fromMillimes(Money::toMillimes((string) ($choice->price ?? '0'))),
+                    ],
+                    array_values($group->choices)
+                ),
+            ],
+            array_values($groups)
+        );
     }
 }
