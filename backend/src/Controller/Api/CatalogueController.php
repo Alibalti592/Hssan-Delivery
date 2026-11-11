@@ -47,7 +47,9 @@ final class CatalogueController extends AbstractController
         $result = $this->restaurantService->listAvailable(
             $this->paginationPage($request),
             $this->paginationLimit($request),
-            $type
+            $type,
+            // ?category=<id>: only those with this restaurant category.
+            $this->categoryFilter($request)
         );
 
         return $this->paginatedJson($result, static fn ($restaurant) => RestaurantResponse::fromEntity($restaurant));
@@ -108,6 +110,17 @@ final class CatalogueController extends AbstractController
         );
 
         return $this->paginatedJson($result, static fn ($product) => ProductResponse::fromEntity($product));
+    }
+
+    /**
+     * The `?category=` filter: a restaurant category's id, or null when
+     * there is none (or it isn't a number).
+     */
+    private function categoryFilter(Request $request): ?int
+    {
+        $category = $request->query->get('category');
+
+        return is_string($category) && ctype_digit($category) ? (int) $category : null;
     }
 
     private function getAvailableRestaurant(int $id): ?Restaurant

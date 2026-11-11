@@ -54,7 +54,8 @@ final class AdminRestaurantController extends AbstractApiController
         $result = $this->restaurantService->list(
             $this->paginationPage($request),
             $this->paginationLimit($request),
-            $type
+            $type,
+            $this->categoryFilter($request)
         );
 
         return $this->paginatedJson($result, static fn ($restaurant) => RestaurantResponse::fromEntity($restaurant));
@@ -194,5 +195,16 @@ final class AdminRestaurantController extends AbstractApiController
         $restaurant = $this->restaurantService->removePhoto($restaurant);
 
         return $this->json(RestaurantResponse::fromEntity($restaurant));
+    }
+
+    /**
+     * The `?category=` filter: a restaurant category's id, or null when
+     * there is none (or it isn't a number).
+     */
+    private function categoryFilter(Request $request): ?int
+    {
+        $category = $request->query->get('category');
+
+        return is_string($category) && ctype_digit($category) ? (int) $category : null;
     }
 }

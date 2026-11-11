@@ -39,6 +39,13 @@ final class SearchController extends AbstractController
 
         $term = mb_substr($term, 0, 100);
 
+        $products = $this->productService->searchAvailable($term, self::MAX_PRODUCTS);
+
+        $this->restaurantService->preloadCategories(array_map(
+            static fn ($product) => $product->getRestaurant(),
+            $products
+        ));
+
         return $this->json([
             'restaurants' => array_map(
                 static fn ($restaurant) => RestaurantResponse::fromEntity($restaurant),
@@ -48,7 +55,7 @@ final class SearchController extends AbstractController
                 static fn ($product) => ProductResponse::fromEntity($product) + [
                     'restaurant' => RestaurantResponse::fromEntity($product->getRestaurant()),
                 ],
-                $this->productService->searchAvailable($term, self::MAX_PRODUCTS)
+                $products
             ),
         ]);
     }

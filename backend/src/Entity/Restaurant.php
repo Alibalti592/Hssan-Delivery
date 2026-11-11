@@ -44,6 +44,19 @@ class Restaurant
     )]
     private Collection $products;
 
+    /**
+     * What it serves, for browsing ("Pizza", "Sucré"...): not its menu
+     * sections, which are $categories above.
+     *
+     * @var Collection<int, RestaurantCategory>
+     */
+    #[ORM\ManyToMany(targetEntity: RestaurantCategory::class, inversedBy: 'restaurants')]
+    #[ORM\JoinTable(name: 'restaurant_restaurant_category')]
+    #[ORM\JoinColumn(onDelete: 'CASCADE')]
+    #[ORM\InverseJoinColumn(onDelete: 'CASCADE')]
+    #[ORM\OrderBy(['position' => 'ASC', 'id' => 'ASC'])]
+    private Collection $restaurantCategories;
+
     #[ORM\Column]
     private ?\DateTimeImmutable $createdAt = null;
 
@@ -54,6 +67,7 @@ class Restaurant
     {
         $this->categories = new ArrayCollection();
         $this->products = new ArrayCollection();
+        $this->restaurantCategories = new ArrayCollection();
     }
 
     #[ORM\PrePersist]
@@ -188,6 +202,36 @@ class Restaurant
         if ($this->products->removeElement($product)) {
             if ($product->getRestaurant() === $this) {
                 $product->setRestaurant(null);
+            }
+        }
+
+        return $this;
+    }
+
+    /**
+     * @return Collection<int, RestaurantCategory>
+     */
+    public function getRestaurantCategories(): Collection
+    {
+        return $this->restaurantCategories;
+    }
+
+    /**
+     * Replaces the whole set.
+     *
+     * @param RestaurantCategory[] $restaurantCategories
+     */
+    public function setRestaurantCategories(array $restaurantCategories): static
+    {
+        foreach ($this->restaurantCategories as $current) {
+            if (!in_array($current, $restaurantCategories, true)) {
+                $this->restaurantCategories->removeElement($current);
+            }
+        }
+
+        foreach ($restaurantCategories as $restaurantCategory) {
+            if (!$this->restaurantCategories->contains($restaurantCategory)) {
+                $this->restaurantCategories->add($restaurantCategory);
             }
         }
 
