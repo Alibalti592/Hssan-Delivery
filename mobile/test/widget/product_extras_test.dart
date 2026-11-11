@@ -224,4 +224,52 @@ void main() {
     expect(line.unitPrice, '12.000');
     expect(line.quantity, 2);
   });
+
+  testWidgets('an optional drink: nothing to pick to add the dish', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(800, 2000);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    final product = Product.fromJson({
+      'id': 6,
+      'name': 'Makloub',
+      'description': null,
+      'price': '9.000',
+      'isAvailable': true,
+      'photoUrl': null,
+      'restaurantId': 7,
+      'categoryId': 3,
+      'extraGroups': [
+        {
+          'name': 'Boisson',
+          'required': false,
+          'multiple': false,
+          'choices': [
+            {'name': 'Coca-Cola', 'price': '2.500'},
+          ],
+        },
+      ],
+    });
+    final cart = CartController();
+    await tester.pumpWidget(
+      ChangeNotifierProvider<CartController>.value(
+        value: cart,
+        child: MaterialApp(
+          home: ProductDetailScreen(product: product, restaurantName: 'Snack'),
+        ),
+      ),
+    );
+
+    expect(find.text('Facultatif'), findsOneWidget);
+    expect(find.text('Un seul choix possible'), findsOneWidget);
+    expect(find.text('Obligatoire'), findsNothing);
+
+    await tester.tap(find.text('Ajouter · 9.000 DT'));
+    await tester.pump();
+
+    expect(cart.lines.single.extras, isEmpty);
+    expect(cart.lines.single.unitPrice, '9.000');
+  });
 }

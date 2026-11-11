@@ -281,9 +281,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     );
   }
 
-  /// "Choisissez-en 1", "2 choisis", "Plusieurs choix possibles"...
+  /// "Choisissez-en 1", "Un seul choix possible", "2 choisis"...
   static String _subtitle(ProductExtraGroup group, int picked) {
-    if (!group.multiple) return 'Choisissez-en 1';
+    // Optional (a drink, most often): worded so it doesn't read as an order.
+    if (!group.multiple) {
+      return group.required ? 'Choisissez-en 1' : 'Un seul choix possible';
+    }
     if (picked > 0) return picked == 1 ? '1 choisi' : '$picked choisis';
     return group.required
         ? 'Au moins 1, plusieurs possibles'
