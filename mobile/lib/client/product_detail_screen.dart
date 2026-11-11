@@ -384,7 +384,13 @@ class _ChoiceSection extends StatelessWidget {
             ),
           ),
           for (var i = 0; i < children.length; i++) ...[
-            if (i > 0) const Divider(height: 1, indent: 20, endIndent: 20),
+            if (i > 0)
+              Divider(
+                height: 1,
+                indent: 20,
+                endIndent: 20,
+                color: cardBorderOf(context),
+              ),
             children[i],
           ],
         ],
