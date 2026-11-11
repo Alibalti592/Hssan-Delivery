@@ -193,7 +193,7 @@ void main() {
     await tester.tap(find.text('Fromage'));
     await tester.tap(find.text('Eau'));
     await tester.pump();
-    expect(find.text('Ajouter · 10.500 DT'), findsOneWidget);
+    expect(find.text('10.500 DT'), findsOneWidget);
     expect(find.text('Faites un choix pour continuer'), findsNothing);
     expect(find.text('2 choisis'), findsOneWidget);
 
@@ -202,14 +202,14 @@ void main() {
     // A second tap on a sauce removes it.
     await tester.tap(find.text('Mayonnaise'));
     await tester.pump();
-    expect(find.text('Ajouter · 12.000 DT'), findsOneWidget);
+    expect(find.text('12.000 DT'), findsOneWidget);
 
     // Two of them: the total follows.
     await tester.tap(find.byTooltip('Plus'));
     await tester.pump();
-    expect(find.text('Ajouter · 24.000 DT'), findsOneWidget);
+    expect(find.text('24.000 DT'), findsOneWidget);
 
-    await tester.tap(find.text('Ajouter · 24.000 DT'));
+    await tester.tap(find.text('Ajouter'));
     await tester.pumpAndSettle();
 
     // A shortcut to the cart in the confirmation.
@@ -266,7 +266,8 @@ void main() {
     expect(find.text('Un seul choix possible'), findsOneWidget);
     expect(find.text('Obligatoire'), findsNothing);
 
-    await tester.tap(find.text('Ajouter · 9.000 DT'));
+    expect(find.text('9.000 DT'), findsWidgets);
+    await tester.tap(find.text('Ajouter'));
     await tester.pump();
 
     expect(cart.lines.single.extras, isEmpty);

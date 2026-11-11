@@ -312,60 +312,49 @@ class _ProductRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    // A product with sizes or extras is added from its own screen, so its
+    // "+" opens it; another one goes straight to the cart, then shows − n +.
+    final showStepper = quantity > 0 && !product.needsChoosing;
+
     return InkWell(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 10),
+        padding: const EdgeInsets.symmetric(vertical: 14),
         decoration: const BoxDecoration(
           border: Border(bottom: BorderSide(color: cardBorder)),
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(6),
-              child: AppPhoto(
-                product.photoUrl,
-                icon: Icons.restaurant_outlined,
-                width: 44,
-                height: 44,
-                iconSize: 18,
-              ),
-            ),
-            const SizedBox(width: 10),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     product.name,
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w700,
+                    style: textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 15,
                     ),
                   ),
                   if (product.description != null &&
                       product.description!.isNotEmpty) ...[
-                    const SizedBox(height: 2),
+                    const SizedBox(height: 3),
                     Text(
                       product.description!,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodySmall,
+                      style: textTheme.bodySmall?.copyWith(
+                        color: const Color(0xFF5B6472),
+                        height: 1.35,
+                      ),
                     ),
                   ],
-                  const SizedBox(height: 4),
-                  Text(
-                    product.hasOptions
-                        ? 'à partir de ${product.price} DT'
-                        : '${product.price} DT',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: navy,
-                    ),
-                  ),
-                  // What can be added, so "CHOISIR" isn't a surprise.
+                  // What can be added, so the "+" opening a screen isn't a
+                  // surprise.
                   if (product.hasExtras) ...[
-                    const SizedBox(height: 2),
+                    const SizedBox(height: 4),
                     Text(
                       '${product.extraGroups.map((g) => g.name).join(' · ')} au choix',
                       maxLines: 1,
@@ -373,37 +362,109 @@ class _ProductRow extends StatelessWidget {
                       style: const TextStyle(fontSize: 12, color: mutedText),
                     ),
                   ],
+                  const SizedBox(height: 8),
+                  Text(
+                    product.hasOptions
+                        ? 'À partir de ${product.price} DT'
+                        : '${product.price} DT',
+                    style: textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      color: navy,
+                    ),
+                  ),
+                  if (showStepper) ...[
+                    const SizedBox(height: 8),
+                    QuantityStepper(
+                      quantity: quantity,
+                      removesAtOne: true,
+                      onDecrement: onDecrement,
+                      onIncrement: onIncrement,
+                    ),
+                  ],
                 ],
               ),
             ),
-            const SizedBox(width: 8),
-            quantity == 0 || product.needsChoosing
-                ? OutlinedButton(
-                    onPressed: onAdd,
-                    // The app-wide OutlinedButtonTheme sets minimumSize to
-                    // Size.fromHeight, i.e. an infinite width — fine for a
-                    // full-width Column button, but this one sits beside an
-                    // Expanded sibling in a Row, so it needs its own compact
-                    // bound or it swallows the row and starves the sibling.
-                    style: OutlinedButton.styleFrom(
-                      minimumSize: const Size(0, 34),
-                      padding: const EdgeInsets.symmetric(horizontal: 14),
+            const SizedBox(width: 14),
+            SizedBox(
+              width: 96,
+              height: 96,
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Positioned.fill(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(14),
+                      child: AppPhoto(
+                        product.photoUrl,
+                        icon: Icons.restaurant_outlined,
+                        width: 96,
+                        height: 96,
+                        iconSize: 28,
+                      ),
                     ),
-                    child: Text(
-                      !product.needsChoosing
-                          ? 'AJOUTER'
-                          : quantity == 0
-                          ? 'CHOISIR'
-                          : 'CHOISIR · $quantity',
-                    ),
-                  )
-                : QuantityStepper(
-                    quantity: quantity,
-                    removesAtOne: true,
-                    onDecrement: onDecrement,
-                    onIncrement: onIncrement,
                   ),
+                  if (!showStepper)
+                    Positioned(
+                      right: -6,
+                      bottom: -6,
+                      child: _AddButton(
+                        tooltip: product.needsChoosing ? 'Choisir' : 'Ajouter',
+                        count: quantity,
+                        onTap: onAdd,
+                      ),
+                    ),
+                ],
+              ),
+            ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// The round "+" on a dish's photo; with [count] of it already in the cart
+/// (a dish with choices, added from its own screen), that number instead.
+class _AddButton extends StatelessWidget {
+  const _AddButton({
+    required this.tooltip,
+    required this.count,
+    required this.onTap,
+  });
+
+  final String tooltip;
+  final int count;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: navy,
+        shape: const CircleBorder(
+          side: BorderSide(color: Colors.white, width: 3),
+        ),
+        elevation: 2,
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: onTap,
+          child: SizedBox(
+            width: 40,
+            height: 40,
+            child: Center(
+              child: count > 0
+                  ? Text(
+                      '$count',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 15,
+                      ),
+                    )
+                  : const Icon(Icons.add, color: Colors.white, size: 22),
+            ),
+          ),
         ),
       ),
     );
