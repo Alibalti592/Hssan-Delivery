@@ -1,4 +1,5 @@
 import '../cart/cart.dart';
+import '../catalogue/catalogue_models.dart';
 import '../catalogue/catalogue_repository.dart';
 import 'order_models.dart';
 
@@ -40,7 +41,11 @@ Future<ReorderResult> reorder(
         : product.options.where((o) => o.name == item.option).firstOrNull;
     final optionOk =
         product != null && (product.hasOptions == (option != null));
-    if (product == null || !product.isAvailable || !optionOk) {
+    final extras = product == null ? null : _sameExtras(product, item.extras);
+    if (product == null ||
+        !product.isAvailable ||
+        !optionOk ||
+        extras == null) {
       missing.add(item.displayName);
       continue;
     }
@@ -49,8 +54,31 @@ Future<ReorderResult> reorder(
       restaurantName: order.restaurantName ?? '',
       quantity: item.quantity,
       option: option,
+      extras: extras,
     );
     added++;
   }
   return ReorderResult(added: added, missing: missing);
+}
+
+/// The extras of a past order line, at the product's current prices; null
+/// when one is no longer offered or a group now required is missing, so the
+/// line goes to "missing" rather than failing at checkout.
+List<PickedExtra>? _sameExtras(Product product, List<PickedExtra> previous) {
+  final extras = <PickedExtra>[];
+  for (final old in previous) {
+    final group = product.extraGroups
+        .where((g) => g.name == old.group)
+        .firstOrNull;
+    final choice = group?.choices.where((c) => c.name == old.name).firstOrNull;
+    if (choice == null) return null;
+    extras.add(
+      PickedExtra(group: old.group, name: old.name, price: choice.price),
+    );
+  }
+  for (final group in product.extraGroups) {
+    if (!group.required) continue;
+    if (!extras.any((e) => e.group == group.name)) return null;
+  }
+  return extras;
 }

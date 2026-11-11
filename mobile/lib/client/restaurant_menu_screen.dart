@@ -216,9 +216,9 @@ class _RestaurantMenuScreenState extends State<RestaurantMenuScreen> {
                         _ProductRow(
                           product: product,
                           quantity: cart.quantityOf(product.id),
-                          // A product with sizes/portions is added from its
-                          // detail screen, where the option is chosen.
-                          onAdd: product.hasOptions
+                          // A product with sizes or extras is added from its
+                          // detail screen, where they're chosen.
+                          onAdd: product.needsChoosing
                               ? () => _openProduct(product)
                               : () => _addToCart(product),
                           onIncrement: () => cart.increment(
@@ -367,7 +367,7 @@ class _ProductRow extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 8),
-            quantity == 0 || product.hasOptions
+            quantity == 0 || product.needsChoosing
                 ? OutlinedButton(
                     onPressed: onAdd,
                     // The app-wide OutlinedButtonTheme sets minimumSize to
@@ -380,7 +380,7 @@ class _ProductRow extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(horizontal: 14),
                     ),
                     child: Text(
-                      !product.hasOptions
+                      !product.needsChoosing
                           ? 'AJOUTER'
                           : quantity == 0
                           ? 'CHOISIR'

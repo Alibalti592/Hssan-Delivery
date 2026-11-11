@@ -124,6 +124,92 @@ class ProductOption {
   }
 }
 
+/// One thing the customer can add to a product: "Harissa", "Fromage",
+/// "Coca-Cola"... and what it adds to the price ("0.000" when free).
+class ProductExtraChoice {
+  const ProductExtraChoice({required this.name, required this.price});
+
+  final String name;
+  final String price;
+
+  bool get isFree => (double.tryParse(price) ?? 0) == 0;
+
+  factory ProductExtraChoice.fromJson(Map<String, dynamic> json) {
+    return ProductExtraChoice(
+      name: json['name'] as String? ?? '',
+      price: json['price'] as String? ?? '0.000',
+    );
+  }
+}
+
+/// Things the customer can add to a product when ordering: "Sauces",
+/// "Suppléments", "Boisson"... Either one pick or several ([multiple]), and
+/// optional or not ([required]).
+class ProductExtraGroup {
+  const ProductExtraGroup({
+    required this.name,
+    required this.required,
+    required this.multiple,
+    required this.choices,
+  });
+
+  final String name;
+  final bool required;
+  final bool multiple;
+  final List<ProductExtraChoice> choices;
+
+  factory ProductExtraGroup.fromJson(Map<String, dynamic> json) {
+    return ProductExtraGroup(
+      name: json['name'] as String? ?? '',
+      required: json['required'] as bool? ?? false,
+      multiple: json['multiple'] as bool? ?? true,
+      choices: (json['choices'] as List<dynamic>? ?? const [])
+          .map((c) => ProductExtraChoice.fromJson(c as Map<String, dynamic>))
+          .toList(growable: false),
+    );
+  }
+}
+
+/// An extra the customer picked, as it goes in the cart and the order:
+/// "Harissa" from "Sauces", with its price at the time.
+class PickedExtra {
+  const PickedExtra({
+    required this.group,
+    required this.name,
+    required this.price,
+  });
+
+  final String group;
+  final String name;
+  final String price;
+
+  factory PickedExtra.fromJson(Map<String, dynamic> json) {
+    return PickedExtra(
+      group: json['group'] as String? ?? '',
+      name: json['name'] as String? ?? '',
+      price: json['price'] as String? ?? '0.000',
+    );
+  }
+
+  /// Read from an order or a delivery: an older server has no `extras`.
+  static List<PickedExtra> listFrom(Object? json) =>
+      (json as List<dynamic>? ?? const [])
+          .map((e) => PickedExtra.fromJson(e as Map<String, dynamic>))
+          .toList(growable: false);
+
+  /// "Sauces : Harissa, Mayonnaise · Boisson : Coca-Cola", group by group
+  /// in the order they come; empty for none.
+  static String describe(List<PickedExtra> extras) {
+    final groups = <String, List<String>>{};
+    for (final extra in extras) {
+      groups.putIfAbsent(extra.group, () => []).add(extra.name);
+    }
+    return groups.entries
+        .map((g) => '${g.key} : ${g.value.join(', ')}')
+        .join(' · ');
+  }
+}
+
 class Product {
   Product({
     required this.id,
@@ -135,6 +221,7 @@ class Product {
     required this.restaurantId,
     required this.categoryId,
     this.options = const [],
+    this.extraGroups = const [],
   });
 
   final int id;
@@ -152,6 +239,15 @@ class Product {
 
   bool get hasOptions => options.isNotEmpty;
 
+  /// What the customer can add when ordering (sauces, extras, a drink...).
+  final List<ProductExtraGroup> extraGroups;
+
+  bool get hasExtras => extraGroups.isNotEmpty;
+
+  /// Added from its own screen, where a size or extras are picked, rather
+  /// than straight from the menu.
+  bool get needsChoosing => hasOptions || hasExtras;
+
   factory Product.fromJson(Map<String, dynamic> json) {
     return Product(
       id: json['id'] as int,
@@ -164,6 +260,9 @@ class Product {
       categoryId: json['categoryId'] as int,
       options: (json['options'] as List<dynamic>? ?? const [])
           .map((o) => ProductOption.fromJson(o as Map<String, dynamic>))
+          .toList(growable: false),
+      extraGroups: (json['extraGroups'] as List<dynamic>? ?? const [])
+          .map((g) => ProductExtraGroup.fromJson(g as Map<String, dynamic>))
           .toList(growable: false),
     );
   }

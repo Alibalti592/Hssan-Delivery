@@ -71,6 +71,16 @@ class CartView extends StatelessWidget {
                               style: Theme.of(context).textTheme.titleSmall
                                   ?.copyWith(fontWeight: FontWeight.w700),
                             ),
+                            if (line.extras.isNotEmpty) ...[
+                              const SizedBox(height: 3),
+                              Text(
+                                line.extrasLabel,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: mutedText,
+                                ),
+                              ),
+                            ],
                             const SizedBox(height: 8),
                             QuantityStepper(
                               quantity: line.quantity,

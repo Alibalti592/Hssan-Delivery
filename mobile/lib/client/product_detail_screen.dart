@@ -30,6 +30,39 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       ? widget.product.options.first
       : null;
 
+  /// The extras ticked, by group name.
+  final Map<String, Set<String>> _picked = {};
+
+  /// What was ticked, in the product's own order — the order's too.
+  List<PickedExtra> get _extras => [
+    for (final group in widget.product.extraGroups)
+      for (final choice in group.choices)
+        if (_picked[group.name]?.contains(choice.name) ?? false)
+          PickedExtra(
+            group: group.name,
+            name: choice.name,
+            price: choice.price,
+          ),
+  ];
+
+  /// The first required group with nothing ticked yet, if any.
+  ProductExtraGroup? get _missing => widget.product.extraGroups
+      .where((g) => g.required && (_picked[g.name]?.isEmpty ?? true))
+      .firstOrNull;
+
+  void _toggle(ProductExtraGroup group, ProductExtraChoice choice) {
+    setState(() {
+      final picked = _picked.putIfAbsent(group.name, () => <String>{});
+      if (picked.contains(choice.name)) {
+        picked.remove(choice.name);
+      } else {
+        // One pick only: the new one replaces the old.
+        if (!group.multiple) picked.clear();
+        picked.add(choice.name);
+      }
+    });
+  }
+
   Future<void> _addToCart() async {
     final cart = context.read<CartController>();
     final messenger = ScaffoldMessenger.of(context);
@@ -65,6 +98,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       restaurantName: widget.restaurantName,
       quantity: _quantity,
       option: _option,
+      extras: _extras,
     );
     navigator.pop();
     final label = _option == null
@@ -76,8 +110,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final product = widget.product;
-    final unitPrice = _option?.price ?? product.price;
-    final total = (double.tryParse(unitPrice) ?? 0) * _quantity;
+    final extras = _extras;
+    final unitPrice =
+        (double.tryParse(_option?.price ?? product.price) ?? 0) +
+        extras.fold(0.0, (sum, e) => sum + (double.tryParse(e.price) ?? 0));
+    final total = unitPrice * _quantity;
+    final missing = _missing;
 
     return Scaffold(
       body: SafeArea(
@@ -153,6 +191,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                         ],
                       ),
                     ],
+                    for (final group in product.extraGroups)
+                      _ExtraGroupSection(
+                        group: group,
+                        picked: _picked[group.name] ?? const {},
+                        onToggle: (choice) => _toggle(group, choice),
+                      ),
                     const SizedBox(height: 24),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -184,12 +228,155 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: FilledButton(
-                  onPressed: _addToCart,
-                  child: const Text('AJOUTER AU PANIER'),
+                  // A required group left empty: say which, rather than
+                  // letting the order fail later.
+                  onPressed: missing == null ? _addToCart : null,
+                  child: Text(
+                    missing == null
+                        ? 'AJOUTER AU PANIER'
+                        : 'CHOISISSEZ : ${missing.name.toUpperCase()}',
+                  ),
                 ),
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// One group of extras ("Sauces", "Boisson"...): its name, whether it's
+/// required, how many can be picked, and a row per choice with its price.
+class _ExtraGroupSection extends StatelessWidget {
+  const _ExtraGroupSection({
+    required this.group,
+    required this.picked,
+    required this.onToggle,
+  });
+
+  final ProductExtraGroup group;
+  final Set<String> picked;
+  final ValueChanged<ProductExtraChoice> onToggle;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final missing = group.required && picked.isEmpty;
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 22),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  group.name,
+                  style: textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: !group.required
+                      ? fieldFill
+                      : missing
+                      ? warnBg
+                      : successBg,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  !group.required
+                      ? 'Facultatif'
+                      : missing
+                      ? 'Obligatoire'
+                      : 'Choisi',
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w700,
+                    color: !group.required
+                        ? mutedText
+                        : missing
+                        ? warnText
+                        : successText,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 2),
+          Text(
+            group.multiple ? 'Plusieurs choix possibles' : 'Un seul choix',
+            style: textTheme.bodySmall?.copyWith(color: mutedText),
+          ),
+          const SizedBox(height: 6),
+          for (final choice in group.choices)
+            _ExtraChoiceRow(
+              choice: choice,
+              multiple: group.multiple,
+              selected: picked.contains(choice.name),
+              onTap: () => onToggle(choice),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ExtraChoiceRow extends StatelessWidget {
+  const _ExtraChoiceRow({
+    required this.choice,
+    required this.multiple,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final ProductExtraChoice choice;
+  final bool multiple;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = accentOf(context);
+    final icon = multiple
+        ? (selected ? Icons.check_box : Icons.check_box_outline_blank)
+        : (selected ? Icons.radio_button_checked : Icons.radio_button_off);
+
+    return Semantics(
+      checked: selected,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 9),
+          child: Row(
+            children: [
+              Icon(icon, size: 22, color: selected ? accent : mutedText),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  choice.name,
+                  style: TextStyle(
+                    fontSize: 14.5,
+                    fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                  ),
+                ),
+              ),
+              Text(
+                choice.isFree ? 'Gratuit' : '+${choice.price} DT',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: choice.isFree ? mutedText : accent,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
