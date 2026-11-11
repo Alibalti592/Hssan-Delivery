@@ -24,6 +24,17 @@ class CatalogueRepository {
         .toList(growable: false);
   }
 
+  /// The categories to filter the restaurant (or grocery store) list by:
+  /// only those with an open restaurant behind them, in the admin's order.
+  Future<List<RestaurantCategory>> listRestaurantCategories({
+    RestaurantType type = RestaurantType.restaurant,
+  }) async {
+    final body = await _api.get('/api/restaurant-categories?type=${type.wire}');
+    return (body as List<dynamic>)
+        .map((e) => RestaurantCategory.fromJson(e as Map<String, dynamic>))
+        .toList(growable: false);
+  }
+
   Future<List<MenuCategory>> listCategories(int restaurantId) async {
     final body = await _api.get('/api/restaurants/$restaurantId/categories');
     return (body as List<dynamic>)

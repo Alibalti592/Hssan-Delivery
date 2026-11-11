@@ -3,8 +3,10 @@ import '../addresses/selected_address.dart';
 import '../auth/auth_controller.dart';
 import '../bills/bill_providers_screen.dart';
 import '../cart/cart.dart';
-import '../catalogue/catalogue_models.dart' show Restaurant, RestaurantType;
+import '../catalogue/catalogue_models.dart'
+    show Restaurant, RestaurantCategory, RestaurantType;
 import '../catalogue/catalogue_repository.dart';
+import '../catalogue/category_widgets.dart';
 import '../orders/order_models.dart';
 import '../orders/orders_repository.dart';
 import '../promotions/auto_carousel.dart';
@@ -97,6 +99,10 @@ class _HomeScreenState extends State<HomeScreen> {
   late Future<List<Promotion>> _promotionsFuture;
   late Future<List<Restaurant>> _restaurantsFuture;
   List<ClientOrder> _activeOrders = const [];
+
+  /// The row under the search bar; empty (and left out) until loaded, and
+  /// when no restaurant has a category yet.
+  List<RestaurantCategory> _categories = const [];
   Timer? _activePoll;
   StreamSubscription<int>? _orderChanges;
 
@@ -107,6 +113,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _restaurantsFuture = context.read<CatalogueRepository>().listRestaurants();
     _loadAddress();
     _loadActiveOrders();
+    _loadCategories();
     _orderChanges = context.read<OrdersRepository>().changes.listen(
       (_) => _loadActiveOrders(),
     );
@@ -149,6 +156,18 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  /// A failure only leaves the category row out.
+  Future<void> _loadCategories() async {
+    try {
+      final categories = await context
+          .read<CatalogueRepository>()
+          .listRestaurantCategories();
+      if (mounted) setState(() => _categories = categories);
+    } catch (_) {
+      // Best effort: the restaurants are all still one tap away.
+    }
+  }
+
   Future<void> _refresh() async {
     final promotions = context.read<PromotionsRepository>().listActive();
     final restaurants = context.read<CatalogueRepository>().listRestaurants();
@@ -161,7 +180,20 @@ class _HomeScreenState extends State<HomeScreen> {
       restaurants,
       _loadAddress(),
       _loadActiveOrders(),
+      _loadCategories(),
     ]);
+  }
+
+  /// The full restaurant list, opened on a category when one was tapped.
+  void _openRestaurants({int? categoryId}) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => Scaffold(
+          appBar: AppBar(title: const Text('Restaurants')),
+          body: RestaurantsScreen(initialCategoryId: categoryId),
+        ),
+      ),
+    );
   }
 
   void _openService(_Service service) {
@@ -232,7 +264,15 @@ class _HomeScreenState extends State<HomeScreen> {
                 context,
               ).push(MaterialPageRoute(builder: (_) => const SearchScreen())),
             ),
-            const SizedBox(height: 8),
+            if (_categories.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              CategorySelector(
+                categories: _categories,
+                showAll: false,
+                onSelected: (id) => _openRestaurants(categoryId: id),
+              ),
+            ] else
+              const SizedBox(height: 8),
             const _SectionHeader(title: 'Services'),
             SizedBox(
               height: 144,
@@ -255,17 +295,7 @@ class _HomeScreenState extends State<HomeScreen> {
             // the fold on small phones. The row still shows on first screen.
             _PromotionsSection(future: _promotionsFuture, onRetry: _refresh),
             const SizedBox(height: 8),
-            _SectionHeader(
-              title: 'Restaurants',
-              onSeeAll: () => Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => Scaffold(
-                    appBar: AppBar(title: const Text('Restaurants')),
-                    body: const RestaurantsScreen(),
-                  ),
-                ),
-              ),
-            ),
+            _SectionHeader(title: 'Restaurants', onSeeAll: _openRestaurants),
             _RestaurantsPreview(
               future: _restaurantsFuture,
               onTapRestaurant: _openRestaurant,
@@ -681,6 +711,10 @@ class _RestaurantPreviewCard extends StatelessWidget {
                           style: Theme.of(context).textTheme.titleSmall
                               ?.copyWith(fontWeight: FontWeight.w800),
                         ),
+                        if (restaurant.categories.isNotEmpty) ...[
+                          const SizedBox(height: 6),
+                          CategoryLabels(restaurant.categories),
+                        ],
                         if (restaurant.description != null &&
                             restaurant.description!.isNotEmpty) ...[
                           const SizedBox(height: 2),
