@@ -38,6 +38,10 @@ export async function mockLogin(page: Page, roles: string[]) {
   await page.route('**/api/admin/deliveries/waiting', (route) => json(route, []));
   await page.route('**/api/admin/deliveries/active', (route) => json(route, []));
 
+  // The restaurant pages offer the restaurant categories; none unless a
+  // test says otherwise.
+  await page.route('**/api/admin/restaurant-categories', (route) => json(route, []));
+
   // AuthContext calls this when /me comes back without ROLE_ADMIN, to clear
   // the httpOnly auth cookie the backend just set on login.
   await page.route('**/api/auth/logout', (route) =>

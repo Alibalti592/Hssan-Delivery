@@ -7,8 +7,53 @@ export interface Restaurant {
   isAvailable: boolean;
   type: RestaurantType;
   photoUrl: string | null;
+  /** What it serves, for browsing. Absent from a backend older than this admin. */
+  categories?: RestaurantCategory[];
   createdAt: string;
   updatedAt: string;
+}
+
+/**
+ * The icons the app can draw for a restaurant category. Mirrors the
+ * backend's RestaurantCategory::ICONS and the app's CategoryIcon.
+ */
+export const RESTAURANT_CATEGORY_ICONS = [
+  'restaurant',
+  'fast_food',
+  'burger',
+  'pizza',
+  'kebab',
+  'grill',
+  'bowl',
+  'soup',
+  'pasta',
+  'fish',
+  'tapas',
+  'croissant',
+  'breakfast',
+  'leaf',
+  'cake',
+  'ice_cream',
+  'coffee',
+  'drink',
+  'basket',
+] as const;
+
+export type RestaurantCategoryIcon = (typeof RESTAURANT_CATEGORY_ICONS)[number];
+
+/**
+ * What restaurants are browsed by in the app ("Pizza", "Sucré"...). Not a
+ * section of one restaurant's menu: that is Category, below.
+ */
+export interface RestaurantCategory {
+  id: number;
+  name: string;
+  icon: RestaurantCategoryIcon;
+  /** Shown instead of the icon when set. */
+  imageUrl: string | null;
+  position: number;
+  /** Only on the admin's list of categories. */
+  restaurantCount?: number;
 }
 
 export interface Category {

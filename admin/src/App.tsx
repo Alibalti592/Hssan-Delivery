@@ -22,6 +22,7 @@ import CourierMapPage from './pages/courier-map/CourierMapPage';
 import ChangePasswordPage from './pages/account/ChangePasswordPage';
 import PasswordResetPage from './pages/users/PasswordResetPage';
 import BillProvidersPage from './pages/bill-providers/BillProvidersPage';
+import RestaurantCategoriesPage from './pages/restaurant-categories/RestaurantCategoriesPage';
 
 export default function App() {
   return (
@@ -61,6 +62,8 @@ export default function App() {
         <Route path="promotions/:promotionId/edit" element={<PromotionFormPage />} />
 
         <Route path="bill-providers" element={<BillProvidersPage />} />
+
+        <Route path="restaurant-categories" element={<RestaurantCategoriesPage />} />
 
         <Route path="courier-map" element={<CourierMapPage />} />
 

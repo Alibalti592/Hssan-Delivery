@@ -16,6 +16,8 @@ import type {
   ProductOption,
   Promotion,
   Restaurant,
+  RestaurantCategory,
+  RestaurantCategoryIcon,
   RestaurantType,
   WaitingDelivery,
 } from './types';
@@ -27,6 +29,8 @@ export interface PageParams {
 
 export interface RestaurantListParams extends PageParams {
   type?: RestaurantType;
+  /** Only restaurants with this restaurant category. */
+  category?: number;
 }
 
 function toQuery(params?: PageParams | RestaurantListParams): string {
@@ -36,6 +40,7 @@ function toQuery(params?: PageParams | RestaurantListParams): string {
   if (params.page !== undefined) qs.set('page', String(params.page));
   if (params.limit !== undefined) qs.set('limit', String(params.limit));
   if ('type' in params && params.type !== undefined) qs.set('type', params.type);
+  if ('category' in params && params.category !== undefined) qs.set('category', String(params.category));
 
   const s = qs.toString();
   return s ? `?${s}` : '';
@@ -62,6 +67,8 @@ export interface RestaurantPayload {
   description: string | null;
   isAvailable: boolean;
   type: RestaurantType;
+  /** Its restaurant categories, the whole set. Left out: unchanged. */
+  categoryIds?: number[];
 }
 
 export const restaurantsApi = {
@@ -79,7 +86,29 @@ export const restaurantsApi = {
   removePhoto: (id: number) => api.delete<Restaurant>(`/api/admin/restaurants/${id}/photo`),
 };
 
-// Categories
+// Restaurant categories ("Pizza", "Sucré"...): what the app's restaurant
+// list is filtered by. A restaurant's own are set with categoryIds, above.
+export interface RestaurantCategoryPayload {
+  name: string;
+  icon: RestaurantCategoryIcon;
+  position: number;
+}
+
+export const restaurantCategoriesApi = {
+  list: () => api.get<RestaurantCategory[]>('/api/admin/restaurant-categories'),
+  create: (data: RestaurantCategoryPayload) =>
+    api.post<RestaurantCategory>('/api/admin/restaurant-categories', data),
+  update: (id: number, data: RestaurantCategoryPayload) =>
+    api.put<RestaurantCategory>(`/api/admin/restaurant-categories/${id}`, data),
+  /** Its restaurants stay; they just lose the category. */
+  delete: (id: number) => api.delete<void>(`/api/admin/restaurant-categories/${id}`),
+  uploadImage: (id: number, file: File) =>
+    api.upload<RestaurantCategory>(`/api/admin/restaurant-categories/${id}/image`, file, 'image'),
+  removeImage: (id: number) =>
+    api.delete<RestaurantCategory>(`/api/admin/restaurant-categories/${id}/image`),
+};
+
+// Menu categories (the sections of one restaurant's menu)
 export const categoriesApi = {
   listForRestaurant: (restaurantId: number) =>
     api.get<Category[]>(`/api/admin/restaurants/${restaurantId}/categories`),

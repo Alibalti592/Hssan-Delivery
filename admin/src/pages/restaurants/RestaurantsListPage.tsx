@@ -106,6 +106,9 @@ export default function RestaurantsListPage() {
                       <Link to={`/restaurants/${r.id}`} className="rname">
                         {r.name}
                       </Link>
+                      {r.categories && r.categories.length > 0 && (
+                        <div className="rmeta">{r.categories.map((c) => c.name).join(' · ')}</div>
+                      )}
                     </td>
                     <td>{TYPE_LABEL[r.type]}</td>
                     <td>

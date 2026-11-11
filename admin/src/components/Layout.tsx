@@ -7,6 +7,7 @@ import monogramUrl from '../assets/monogram.svg';
 const NAV_ITEMS = [
   { to: '/', label: 'Dashboard', end: true },
   { to: '/restaurants', label: 'Restaurants' },
+  { to: '/restaurant-categories', label: 'Categories' },
   { to: '/delivery-zones', label: 'Delivery Zones' },
   { to: '/couriers', label: 'Couriers' },
   { to: '/orders', label: 'Orders' },
