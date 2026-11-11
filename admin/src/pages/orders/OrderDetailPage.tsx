@@ -12,6 +12,7 @@ import {
   deliveryTypeLabel,
 } from '../../components/ui';
 import { BillDetails } from '../../components/BillDetails';
+import type { OrderItem } from '../../api/types';
 
 // Mirrors DeliveryDetailPage's CANCELLABLE: an order can be called off any
 // time before it's actually completed or already cancelled. Cancelling goes
@@ -167,6 +168,11 @@ export default function OrderDetailPage() {
                       <td className="rname">
                         {item.productName}
                         {item.option && <div className="rmeta">{item.option}</div>}
+                        {extrasByGroup(item.extras).map(([group, names]) => (
+                          <div key={group} className="rmeta">
+                            {group}: {names}
+                          </div>
+                        ))}
                       </td>
                       <td>{item.quantity}</td>
                       <td>{money(item.unitPrice)}</td>
@@ -214,4 +220,13 @@ export default function OrderDetailPage() {
       </div>
     </>
   );
+}
+
+/** "Sauces" → "Harissa, Mayonnaise", in the order they were added. */
+function extrasByGroup(extras: OrderItem['extras']): [string, string][] {
+  const groups = new Map<string, string[]>();
+  for (const extra of extras ?? []) {
+    groups.set(extra.group, [...(groups.get(extra.group) ?? []), extra.name]);
+  }
+  return [...groups].map(([group, names]) => [group, names.join(', ')]);
 }

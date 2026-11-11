@@ -13,6 +13,7 @@ import type {
   DiscountType,
   Paginated,
   Product,
+  ProductExtraGroup,
   ProductOption,
   Promotion,
   Restaurant,
@@ -131,6 +132,8 @@ export interface ProductPayload {
   options: ProductOption[];
   categoryId: number;
   isAvailable: boolean;
+  /** What the customer can add. Left out on an edit: unchanged. */
+  extraGroups?: ProductExtraGroup[];
 }
 
 export const productsApi = {

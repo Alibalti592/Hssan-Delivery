@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { API_URL } from '../api/client';
 import { productsApi } from '../api/resources';
-import type { Category, Product, ProductOption } from '../api/types';
+import type { Category, Product, ProductExtraGroup, ProductOption } from '../api/types';
 import { ErrorBanner, MONEY_PATTERN, MONEY_TITLE } from './ui';
+import { ExtrasEditor } from './ExtrasEditor';
+import { cleanExtraGroups } from './extraGroups';
 
 // Mirrors PhotoUploader::MAX_SIZE_BYTES on the backend.
 const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
@@ -38,6 +40,12 @@ export function ProductEditor({
   const [name, setName] = useState(product?.name ?? '');
   const [price, setPrice] = useState(product?.price ?? '');
   const [options, setOptions] = useState<ProductOption[]>(product?.options ?? []);
+  const [extraGroups, setExtraGroups] = useState<ProductExtraGroup[]>(product?.extraGroups ?? []);
+  // The restaurant's menu (shared with the menu editor): to copy choices from.
+  const menu = useQuery({
+    queryKey: ['products', restaurantId, 'all'],
+    queryFn: () => productsApi.listAll(restaurantId),
+  });
   const [categoryId, setCategoryId] = useState<number | ''>(
     product?.categoryId ?? defaultCategoryId ?? categories[0]?.id ?? '',
   );
@@ -80,6 +88,7 @@ export function ProductEditor({
         options: options.map((o) => ({ name: o.name.trim(), price: o.price })),
         categoryId: Number(categoryId),
         isAvailable,
+        extraGroups: cleanExtraGroups(extraGroups),
       };
       const saved = isEdit
         ? await productsApi.update(product.id, payload)
@@ -97,6 +106,7 @@ export function ProductEditor({
         setName('');
         setPrice('');
         setOptions([]);
+        // Kept: the next dish usually takes the same sauces and drinks.
         setPendingFile(null);
         setPreview(null);
         setPhotoUrl(null);
@@ -338,6 +348,12 @@ export function ProductEditor({
               </div>
             )}
           </div>
+
+          <ExtrasEditor
+            value={extraGroups}
+            onChange={setExtraGroups}
+            otherProducts={(menu.data ?? []).filter((p) => p.id !== product?.id)}
+          />
 
           <label className="field-checkbox">
             <input type="checkbox" checked={isAvailable} onChange={(e) => setIsAvailable(e.target.checked)} />

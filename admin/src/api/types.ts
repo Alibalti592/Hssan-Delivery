@@ -71,12 +71,32 @@ export interface ProductOption {
   price: string;
 }
 
+/** One thing the customer can add: "Harissa", "Fromage", "Coca-Cola"... */
+export interface ProductExtraChoice {
+  name: string;
+  /** Added to the product's price; "0.000" for a free one. */
+  price: string;
+}
+
+/**
+ * Things the customer can add to a product when ordering: "Sauces",
+ * "Suppléments", "Boisson"... One pick or several, optional or required.
+ */
+export interface ProductExtraGroup {
+  name: string;
+  required: boolean;
+  multiple: boolean;
+  choices: ProductExtraChoice[];
+}
+
 export interface Product {
   id: number;
   name: string;
   description: string | null;
   price: string;
   options: ProductOption[];
+  /** Absent from a backend older than this admin. */
+  extraGroups?: ProductExtraGroup[];
   isAvailable: boolean;
   photoUrl: string | null;
   restaurantId: number;
@@ -119,6 +139,8 @@ export interface OrderItem {
   productId: number;
   productName: string;
   option: string | null;
+  /** What the customer added (sauces, extras, a drink...), already in unitPrice. */
+  extras?: { group: string; name: string; price: string }[];
   quantity: number;
   unitPrice: string;
 }
