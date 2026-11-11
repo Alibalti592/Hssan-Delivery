@@ -18,4 +18,14 @@ final class UpdateRestaurantRequest
 
     #[Assert\Choice(choices: ['RESTAURANT', 'GROCERY'])]
     public string $type = 'RESTAURANT';
+
+    /**
+     * Ids of its restaurant categories ("Pizza", "Sucré"...): the whole
+     * set. Left out: unchanged.
+     *
+     * @var int[]|null
+     */
+    #[Assert\All([new Assert\Type('int'), new Assert\Positive()])]
+    #[Assert\Count(max: 20)]
+    public ?array $categoryIds = null;
 }

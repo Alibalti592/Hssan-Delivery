@@ -3,17 +3,26 @@ import 'package:provider/provider.dart';
 
 import '../catalogue/catalogue_models.dart';
 import '../catalogue/catalogue_repository.dart';
+import '../catalogue/category_widgets.dart';
 import '../theme.dart';
 import '../widgets/app_photo.dart';
 import 'restaurant_menu_screen.dart';
 
 class RestaurantsScreen extends StatefulWidget {
-  const RestaurantsScreen({this.type = RestaurantType.restaurant, super.key});
+  const RestaurantsScreen({
+    this.type = RestaurantType.restaurant,
+    this.initialCategoryId,
+    super.key,
+  });
 
   /// Which vertical to browse — restaurants or grocery stores (see mobile
   /// HomeScreen's "Restaurants"/"Courses" services). Both reuse this same
   /// screen; only the copy and the backend filter differ.
   final RestaurantType type;
+
+  /// The restaurant category to open on (the one picked on the home
+  /// screen); the client can change it or go back to "Tout".
+  final int? initialCategoryId;
 
   @override
   State<RestaurantsScreen> createState() => _RestaurantsScreenState();
@@ -24,12 +33,19 @@ class _RestaurantsScreenState extends State<RestaurantsScreen> {
   final _searchController = TextEditingController();
   String _query = '';
 
+  /// The categories to filter by; empty until loaded, and when there are
+  /// none (the row is then left out).
+  List<RestaurantCategory> _categories = const [];
+  int? _categoryId;
+
   bool get _isGrocery => widget.type == RestaurantType.grocery;
 
   @override
   void initState() {
     super.initState();
+    _categoryId = widget.initialCategoryId;
     _future = _load();
+    _loadCategories();
     _searchController.addListener(() {
       setState(() => _query = _searchController.text.trim().toLowerCase());
     });
@@ -47,16 +63,53 @@ class _RestaurantsScreenState extends State<RestaurantsScreen> {
     );
   }
 
+  /// Best effort: without the categories the list simply isn't filtered.
+  Future<void> _loadCategories() async {
+    List<RestaurantCategory> categories = const [];
+    try {
+      categories = await context
+          .read<CatalogueRepository>()
+          .listRestaurantCategories(type: widget.type);
+    } catch (_) {
+      // Offline, or a server older than this app: no category row.
+    }
+    if (!mounted) return;
+    setState(() {
+      _categories = categories;
+      // A filter with no tile to undo it would trap the client.
+      if (!categories.any((c) => c.id == _categoryId)) _categoryId = null;
+    });
+  }
+
   Future<void> _refresh() async {
     final future = _load();
     setState(() => _future = future);
-    await future;
+    await Future.wait([future, _loadCategories()]);
   }
 
+  /// The search and the category work together: a restaurant shows when it
+  /// has the selected category (if any) and matches what was typed (if
+  /// anything) — by its name, its description or one of its categories.
   bool _matches(Restaurant restaurant) {
+    final categoryId = _categoryId;
+    if (categoryId != null && !restaurant.hasCategory(categoryId)) {
+      return false;
+    }
     if (_query.isEmpty) return true;
     return restaurant.name.toLowerCase().contains(_query) ||
-        (restaurant.description?.toLowerCase().contains(_query) ?? false);
+        (restaurant.description?.toLowerCase().contains(_query) ?? false) ||
+        restaurant.categories.any((c) => c.name.toLowerCase().contains(_query));
+  }
+
+  String _nothingMatches() {
+    if (_query.isNotEmpty) {
+      return _isGrocery
+          ? 'Aucun magasin ne correspond à votre recherche.'
+          : 'Aucun restaurant ne correspond à votre recherche.';
+    }
+    return _isGrocery
+        ? 'Aucun magasin dans cette catégorie pour le moment.'
+        : 'Aucun restaurant dans cette catégorie pour le moment.';
   }
 
   @override
@@ -81,6 +134,15 @@ class _RestaurantsScreenState extends State<RestaurantsScreen> {
             ),
           ),
         ),
+        if (_categories.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 10),
+            child: CategorySelector(
+              categories: _categories,
+              selectedId: _categoryId,
+              onSelected: (id) => setState(() => _categoryId = id),
+            ),
+          ),
         Expanded(
           child: RefreshIndicator(
             onRefresh: _refresh,
@@ -140,13 +202,7 @@ class _RestaurantsScreenState extends State<RestaurantsScreen> {
                   return ListView(
                     children: [
                       const SizedBox(height: 100),
-                      Center(
-                        child: Text(
-                          _isGrocery
-                              ? 'Aucun magasin ne correspond à votre recherche.'
-                              : 'Aucun restaurant ne correspond à votre recherche.',
-                        ),
-                      ),
+                      Center(child: Text(_nothingMatches())),
                     ],
                   );
                 }
@@ -237,6 +293,10 @@ class _RestaurantCard extends StatelessWidget {
                       ),
                     ],
                   ),
+                  if (restaurant.categories.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    CategoryLabels(restaurant.categories),
+                  ],
                   if (restaurant.description != null &&
                       restaurant.description!.isNotEmpty) ...[
                     const SizedBox(height: 4),

@@ -139,6 +139,15 @@ tr.row-link:hover td { background: #fafbfc; }
 .badge.warn { background: #fdf1e4; color: #9c4221; }
 .badge.muted { background: #f0f2f5; color: #8b93a0; }
 
+/* ---- toggle chips (a restaurant's categories) ---- */
+.chip-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip {
+  font: inherit; font-size: 11px; font-weight: 600; padding: 5px 11px; border-radius: 999px;
+  background: #fff; color: #3a4250; border: 1.2px solid #d5dae1; cursor: pointer;
+}
+.chip:hover { border-color: #1b2437; }
+.chip.on { background: #1b2437; color: #fff; border-color: #1b2437; }
+
 /* ---- misc ---- */
 .discount { color: #276749; }
 .stats { display: flex; gap: 14px; margin-bottom: 22px; }

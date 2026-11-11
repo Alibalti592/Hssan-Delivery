@@ -10,8 +10,10 @@ import 'package:mobile/bills/bills_repository.dart';
 import 'package:mobile/cart/cart.dart';
 import 'package:mobile/catalogue/catalogue_models.dart';
 import 'package:mobile/catalogue/catalogue_repository.dart';
+import 'package:mobile/catalogue/category_widgets.dart';
 import 'package:mobile/client/home_screen.dart';
 import 'package:mobile/client/parcel_form_screen.dart';
+import 'package:mobile/client/restaurants_screen.dart';
 import 'package:mobile/core/api_client.dart';
 import 'package:mobile/core/token_storage.dart';
 import 'package:mobile/orders/orders_repository.dart';
@@ -71,6 +73,7 @@ Map<String, dynamic> _offer() => {
 Widget _wrap({
   List<dynamic> promotions = const [],
   List<dynamic> restaurants = const [],
+  List<dynamic> categories = const [],
   List<dynamic> orders = const [],
   CartController? cart,
   VoidCallback? onSeeOrders,
@@ -87,6 +90,9 @@ Widget _wrap({
       }
       if (request.url.path == '/api/restaurants') {
         return jsonResponse(pagedBody(restaurants));
+      }
+      if (request.url.path == '/api/restaurant-categories') {
+        return jsonResponse(categories);
       }
       if (request.url.path == '/api/bill-providers') {
         return jsonResponse([
@@ -395,5 +401,104 @@ void main() {
       find.text('Aucun magasin disponible pour le moment.'),
       findsOneWidget,
     );
+  });
+
+  testWidgets('"Que souhaitez-vous manger ?" filters the restaurants below', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(800, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    Map<String, dynamic> category(int id, String name, String icon) => {
+      'id': id,
+      'name': name,
+      'icon': icon,
+      'imageUrl': null,
+      'position': id,
+    };
+    final pizza = category(1, 'Pizza', 'pizza');
+    final sweet = category(2, 'Sucré', 'cake');
+    Map<String, dynamic> restaurant(int id, String name, List<dynamic> c) => {
+      'id': id,
+      'name': name,
+      'description': null,
+      'isAvailable': true,
+      'photoUrl': null,
+      'categories': c,
+    };
+
+    await tester.pumpWidget(
+      _wrap(
+        categories: [pizza, sweet],
+        restaurants: [
+          restaurant(1, 'Napoli Express', [pizza]),
+          restaurant(2, 'Douceurs du Lac', [sweet]),
+        ],
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    Finder tile(String name) => find.descendant(
+      of: find.byType(CategorySelector),
+      matching: find.text(name),
+    );
+
+    // Right above the restaurants, "Tout" first.
+    final title = find.text('Que souhaitez-vous manger ?');
+    expect(title, findsOneWidget);
+    expect(
+      tester.getTopLeft(title).dy,
+      greaterThan(tester.getTopLeft(find.text('Services')).dy),
+    );
+    expect(
+      tester.getTopLeft(title).dy,
+      lessThan(tester.getTopLeft(find.text('Restaurants').last).dy),
+    );
+    expect(tile('Tout'), findsOneWidget);
+    expect(find.text('Napoli Express'), findsOneWidget);
+    expect(find.text('Douceurs du Lac'), findsOneWidget);
+
+    await tester.tap(tile('Sucré'));
+    await tester.pumpAndSettle();
+
+    // Filtered in place: still on the home screen.
+    expect(find.byType(RestaurantsScreen), findsNothing);
+    expect(find.text('Douceurs du Lac'), findsOneWidget);
+    expect(find.text('Napoli Express'), findsNothing);
+
+    await tester.tap(tile('Tout'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Napoli Express'), findsOneWidget);
+    expect(find.text('Douceurs du Lac'), findsOneWidget);
+
+    // "Voir tout" keeps the category picked here.
+    await tester.tap(tile('Pizza'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Voir tout'));
+    await tester.pumpAndSettle();
+
+    final list = find.byType(RestaurantsScreen);
+    expect(list, findsOneWidget);
+    expect(
+      find.descendant(of: list, matching: find.text('Napoli Express')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: list, matching: find.text('Douceurs du Lac')),
+      findsNothing,
+    );
+  });
+
+  testWidgets('no category row while no restaurant has a category', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_wrap());
+    await tester.pumpAndSettle();
+
+    expect(find.byType(CategorySelector), findsNothing);
+    expect(find.text('Que souhaitez-vous manger ?'), findsNothing);
+    expect(find.text('Services'), findsOneWidget);
   });
 }

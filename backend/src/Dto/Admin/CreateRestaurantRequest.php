@@ -17,4 +17,14 @@ final class CreateRestaurantRequest
 
     #[Assert\Choice(choices: ['RESTAURANT', 'GROCERY'])]
     public string $type = 'RESTAURANT';
+
+    /**
+     * Ids of its restaurant categories ("Pizza", "Sucré"...). Left out:
+     * none.
+     *
+     * @var int[]
+     */
+    #[Assert\All([new Assert\Type('int'), new Assert\Positive()])]
+    #[Assert\Count(max: 20)]
+    public array $categoryIds = [];
 }

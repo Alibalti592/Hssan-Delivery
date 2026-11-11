@@ -23,6 +23,7 @@ final class RestaurantService
         private readonly PromotionRepository $promotionRepository,
         private readonly DeliveryRepository $deliveryRepository,
         private readonly PhotoUploader $photoUploader,
+        private readonly RestaurantCategoryService $restaurantCategoryService,
     ) {
     }
 
@@ -34,7 +35,8 @@ final class RestaurantService
             ->setName($dto->name)
             ->setDescription($dto->description)
             ->setIsAvailable($dto->isAvailable)
-            ->setType(RestaurantType::from($dto->type));
+            ->setType(RestaurantType::from($dto->type))
+            ->setRestaurantCategories($this->restaurantCategoryService->resolve($dto->categoryIds));
 
         $this->entityManager->persist($restaurant);
         $this->entityManager->flush();
@@ -43,9 +45,11 @@ final class RestaurantService
     }
 
     /**
+     * @param int|null $categoryId only restaurants with this restaurant category
+     *
      * @return PaginatedResult<Restaurant>
      */
-    public function list(int $page, int $limit, ?RestaurantType $type = null): PaginatedResult
+    public function list(int $page, int $limit, ?RestaurantType $type = null, ?int $categoryId = null): PaginatedResult
     {
         $qb = $this->entityManager
             ->getRepository(Restaurant::class)
@@ -59,16 +63,22 @@ final class RestaurantService
             $qb->andWhere('r.type = :type')->setParameter('type', $type);
         }
 
-        return Paginator::paginate($qb, $page, $limit);
+        if (null !== $categoryId) {
+            $qb->andWhere(':category MEMBER OF r.restaurantCategories')->setParameter('category', $categoryId);
+        }
+
+        return $this->withCategories(Paginator::paginate($qb, $page, $limit));
     }
 
     /**
      * The public catalogue: open restaurants (or grocery stores, depending
      * on $type) only, alphabetical for browsing.
      *
+     * @param int|null $categoryId only those with this restaurant category
+     *
      * @return PaginatedResult<Restaurant>
      */
-    public function listAvailable(int $page, int $limit, RestaurantType $type = RestaurantType::RESTAURANT): PaginatedResult
+    public function listAvailable(int $page, int $limit, RestaurantType $type = RestaurantType::RESTAURANT, ?int $categoryId = null): PaginatedResult
     {
         $qb = $this->entityManager
             ->getRepository(Restaurant::class)
@@ -82,7 +92,11 @@ final class RestaurantService
             // why a tiebreaker is required for stable pagination.
             ->addOrderBy('r.id', 'ASC');
 
-        return Paginator::paginate($qb, $page, $limit);
+        if (null !== $categoryId) {
+            $qb->andWhere(':category MEMBER OF r.restaurantCategories')->setParameter('category', $categoryId);
+        }
+
+        return $this->withCategories(Paginator::paginate($qb, $page, $limit));
     }
 
     /**
@@ -92,7 +106,7 @@ final class RestaurantService
      */
     public function searchAvailable(string $term, int $limit): array
     {
-        return $this->entityManager
+        $restaurants = $this->entityManager
             ->getRepository(Restaurant::class)
             ->createQueryBuilder('r')
             ->andWhere('LOWER(r.name) LIKE :term')
@@ -104,6 +118,40 @@ final class RestaurantService
             ->setMaxResults($limit)
             ->getQuery()
             ->getResult();
+
+        $this->preloadCategories($restaurants);
+
+        return $restaurants;
+    }
+
+    /**
+     * Loads the restaurant categories of all these restaurants in one query,
+     * rather than one query each when a list is turned into JSON.
+     *
+     * @param Restaurant[] $restaurants
+     */
+    public function preloadCategories(array $restaurants): void
+    {
+        if ([] === $restaurants) {
+            return;
+        }
+
+        $this->entityManager
+            ->createQuery('SELECT r, rc FROM App\Entity\Restaurant r LEFT JOIN r.restaurantCategories rc WHERE r IN (:restaurants)')
+            ->setParameter('restaurants', $restaurants)
+            ->getResult();
+    }
+
+    /**
+     * @param PaginatedResult<Restaurant> $result
+     *
+     * @return PaginatedResult<Restaurant>
+     */
+    private function withCategories(PaginatedResult $result): PaginatedResult
+    {
+        $this->preloadCategories($result->items);
+
+        return $result;
     }
 
     public function get(int $id): ?Restaurant
@@ -122,6 +170,11 @@ final class RestaurantService
             ->setDescription($dto->description)
             ->setIsAvailable($dto->isAvailable)
             ->setType(RestaurantType::from($dto->type));
+
+        // Left out by a form that doesn't know about them: unchanged.
+        if (null !== $dto->categoryIds) {
+            $restaurant->setRestaurantCategories($this->restaurantCategoryService->resolve($dto->categoryIds));
+        }
 
         $this->entityManager->flush();
 

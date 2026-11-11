@@ -18,6 +18,37 @@ enum RestaurantType {
   }
 }
 
+/// What a restaurant serves, for browsing: "Pizza", "Sucré", "Cuisine
+/// Tunisienne"... The client filters the restaurant list by one, and a
+/// restaurant can have several. Managed from the admin dashboard — not to
+/// be confused with [MenuCategory], a section of one restaurant's menu.
+class RestaurantCategory {
+  const RestaurantCategory({
+    required this.id,
+    required this.name,
+    required this.icon,
+    required this.imageUrl,
+  });
+
+  final int id;
+  final String name;
+
+  /// Which icon to draw for it (see CategoryIcon), when it has no image.
+  final String icon;
+
+  /// The admin's own image for it, shown instead of the icon.
+  final String? imageUrl;
+
+  factory RestaurantCategory.fromJson(Map<String, dynamic> json) {
+    return RestaurantCategory(
+      id: json['id'] as int,
+      name: json['name'] as String? ?? '',
+      icon: json['icon'] as String? ?? '',
+      imageUrl: json['imageUrl'] as String?,
+    );
+  }
+}
+
 class Restaurant {
   Restaurant({
     required this.id,
@@ -26,6 +57,7 @@ class Restaurant {
     required this.isAvailable,
     required this.type,
     required this.photoUrl,
+    this.categories = const [],
   });
 
   final int id;
@@ -35,6 +67,12 @@ class Restaurant {
   final RestaurantType type;
   final String? photoUrl;
 
+  /// What it serves, in the admin's order; empty when it has none (or the
+  /// server is older than this app).
+  final List<RestaurantCategory> categories;
+
+  bool hasCategory(int categoryId) => categories.any((c) => c.id == categoryId);
+
   factory Restaurant.fromJson(Map<String, dynamic> json) {
     return Restaurant(
       id: json['id'] as int,
@@ -43,6 +81,9 @@ class Restaurant {
       isAvailable: json['isAvailable'] as bool? ?? false,
       type: RestaurantType.fromWire(json['type'] as String? ?? 'RESTAURANT'),
       photoUrl: json['photoUrl'] as String?,
+      categories: (json['categories'] as List<dynamic>? ?? const [])
+          .map((e) => RestaurantCategory.fromJson(e as Map<String, dynamic>))
+          .toList(growable: false),
     );
   }
 }

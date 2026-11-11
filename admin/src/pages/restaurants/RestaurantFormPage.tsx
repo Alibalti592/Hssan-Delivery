@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { restaurantsApi } from '../../api/resources';
 import type { RestaurantType } from '../../api/types';
 import { PageHeader, ErrorBanner, Breadcrumb } from '../../components/ui';
+import { CategoryPicker } from '../../components/CategoryPicker';
 
 // Mirrors PhotoUploader::MAX_SIZE_BYTES on the backend.
 const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
@@ -19,6 +20,7 @@ export default function RestaurantFormPage() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [name, setName] = useState('');
   const [type, setType] = useState<RestaurantType>('RESTAURANT');
+  const [categoryIds, setCategoryIds] = useState<number[]>([]);
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
@@ -36,6 +38,7 @@ export default function RestaurantFormPage() {
         description: null,
         isAvailable: false,
         type,
+        categoryIds,
       });
       return file ? restaurantsApi.uploadPhoto(restaurant.id, file) : restaurant;
     },
@@ -124,6 +127,7 @@ export default function RestaurantFormPage() {
                 <option value="GROCERY">Grocery store</option>
               </select>
             </div>
+            <CategoryPicker value={categoryIds} onChange={setCategoryIds} />
             <p className="rmeta" style={{ margin: '0 0 14px' }}>
               It stays closed to clients until you open it, once its menu is in.
             </p>

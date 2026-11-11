@@ -255,7 +255,14 @@ class _RestaurantTile extends StatelessWidget {
         restaurant.name,
         style: const TextStyle(fontWeight: FontWeight.w800),
       ),
-      subtitle: Text(isGrocery ? 'Magasin' : 'Restaurant'),
+      // What it serves when it says so: "Pizza · Fast Food".
+      subtitle: Text(
+        restaurant.categories.isEmpty
+            ? (isGrocery ? 'Magasin' : 'Restaurant')
+            : restaurant.categories.map((c) => c.name).join(' · '),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
       trailing: const Icon(Icons.chevron_right, color: mutedText),
     );
   }

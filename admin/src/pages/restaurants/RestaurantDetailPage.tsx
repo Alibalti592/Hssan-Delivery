@@ -2,9 +2,10 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { categoriesApi, productsApi, restaurantsApi } from '../../api/resources';
-import type { RestaurantType } from '../../api/types';
+import type { Restaurant, RestaurantType } from '../../api/types';
 import { PageHeader, Loading, ErrorBanner, Breadcrumb } from '../../components/ui';
 import { PhotoUploader } from '../../components/PhotoUploader';
+import { CategoryPicker } from '../../components/CategoryPicker';
 import { MenuEditor, type MenuEditorHandle } from './MenuEditor';
 
 const TYPE_LABEL: Record<RestaurantType, string> = {
@@ -41,12 +42,14 @@ export default function RestaurantDetailPage() {
 
   const [name, setName] = useState('');
   const [type, setType] = useState<RestaurantType>('RESTAURANT');
+  const [categoryIds, setCategoryIds] = useState<number[]>([]);
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
     if (data) {
       setName(data.name);
       setType(data.type);
+      setCategoryIds(idsOf(data));
     }
   }, [data]);
 
@@ -64,6 +67,7 @@ export default function RestaurantDetailPage() {
         description: null,
         isAvailable: data!.isAvailable,
         type,
+        categoryIds,
       }),
     onSuccess: () => {
       setSaved(true);
@@ -156,7 +160,8 @@ export default function RestaurantDetailPage() {
     { label: 'Open it to clients', done: data.isAvailable },
   ];
   const remaining = steps.filter((s) => !s.done).length;
-  const dirty = name !== data.name || type !== data.type;
+  const dirty =
+    name !== data.name || type !== data.type || !sameIds(categoryIds, idsOf(data));
 
   return (
     <>
@@ -234,6 +239,7 @@ export default function RestaurantDetailPage() {
                   <option value="GROCERY">Grocery store</option>
                 </select>
               </div>
+              <CategoryPicker value={categoryIds} onChange={setCategoryIds} />
               <div className="details-actions">
                 <button type="submit" className="btn" disabled={update.isPending || !dirty}>
                   {update.isPending ? 'Saving…' : saved ? '✓ Saved' : 'Save changes'}
@@ -255,4 +261,13 @@ export default function RestaurantDetailPage() {
       </div>
     </>
   );
+}
+
+/** The ids of a restaurant's categories. */
+function idsOf(restaurant: Restaurant): number[] {
+  return (restaurant.categories ?? []).map((c) => c.id);
+}
+
+function sameIds(a: number[], b: number[]): boolean {
+  return a.length === b.length && a.every((id) => b.includes(id));
 }
