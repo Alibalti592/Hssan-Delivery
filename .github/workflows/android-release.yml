@@ -2,10 +2,12 @@ name: Android release APK
 
 # Builds a sideloadable release APK against the production API and publishes
 # it as the "android-latest" pre-release, so there's always one direct .apk
-# link to open on a phone. Signed with the runner's throwaway debug key (see
-# android/app/build.gradle.kts): fine for testing, not for the Play Store --
-# and since that key changes every run, uninstall the previous build before
-# installing a new one.
+# link to open on a phone. With the ANDROID_UPLOAD_* secrets set (see "Install
+# the upload key" below), it's signed with the app's permanent upload key, so
+# each build installs over the last, and a Google Play bundle (.aab) is built
+# too, kept as this run's "hssan-delivery-aab" artifact. Without them it's
+# signed with the runner's throwaway debug key, which changes every run:
+# uninstall the previous build before installing a new one.
 
 on:
   push:
@@ -69,6 +71,33 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
+      # The permanent upload key for Google Play, from four repo secrets
+      # (Settings > Secrets and variables > Actions): ANDROID_UPLOAD_KEYSTORE
+      # (the .jks file, base64), ANDROID_UPLOAD_STORE_PASSWORD,
+      # ANDROID_UPLOAD_KEY_ALIAS, ANDROID_UPLOAD_KEY_PASSWORD. Without them
+      # the build is signed with this runner's throwaway debug key, as before.
+      - name: Install the upload key
+        id: signing
+        env:
+          KEYSTORE: ${{ secrets.ANDROID_UPLOAD_KEYSTORE }}
+          STORE_PASSWORD: ${{ secrets.ANDROID_UPLOAD_STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_UPLOAD_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEY_PASSWORD }}
+        run: |
+          if [ -z "$KEYSTORE" ] || [ -z "$STORE_PASSWORD" ] || [ -z "$KEY_ALIAS" ]; then
+            echo "No upload key secrets: signing with the debug key."
+            echo "signed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          printf '%s' "$KEYSTORE" | base64 -d > android/app/upload-keystore.jks
+          {
+            echo "storeFile=upload-keystore.jks"
+            echo "storePassword=$STORE_PASSWORD"
+            echo "keyAlias=$KEY_ALIAS"
+            echo "keyPassword=${KEY_PASSWORD:-$STORE_PASSWORD}"
+          } > android/key.properties
+          echo "signed=true" >> "$GITHUB_OUTPUT"
+
       - name: Build release APK
         run: |
           flutter build apk --release \
@@ -81,6 +110,32 @@ jobs:
           cp build/app/outputs/flutter-apk/app-release.apk hssan-delivery.apk
           ls -l hssan-delivery.apk
 
+      # What Google Play takes: an app bundle, signed with the upload key.
+      # Only then; a debug-signed one would be refused anyway.
+      - name: Build the Google Play bundle
+        if: steps.signing.outputs.signed == 'true'
+        run: |
+          flutter build appbundle --release \
+            --dart-define=API_BASE_URL="$API_BASE_URL" \
+            --dart-define=FIREBASE_API_KEY="$FIREBASE_API_KEY" \
+            --dart-define=FIREBASE_APP_ID="$FIREBASE_APP_ID" \
+            --dart-define=FIREBASE_MESSAGING_SENDER_ID="$FIREBASE_MESSAGING_SENDER_ID" \
+            --dart-define=FIREBASE_PROJECT_ID="$FIREBASE_PROJECT_ID" \
+            --build-number="${{ github.run_number }}"
+          cp build/app/outputs/bundle/release/app-release.aab hssan-delivery.aab
+          ls -l hssan-delivery.aab
+
+      - name: Upload the Google Play bundle
+        if: steps.signing.outputs.signed == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: hssan-delivery-aab
+          path: mobile/hssan-delivery.aab
+
+      - name: Forget the upload key
+        if: always()
+        run: rm -f android/app/upload-keystore.jks android/key.properties
+
       - name: Upload workflow artifact
         uses: actions/upload-artifact@v7
         with:
@@ -90,10 +145,16 @@ jobs:
       - name: Publish the android-latest pre-release
         env:
           GH_TOKEN: ${{ github.token }}
+          SIGNED: ${{ steps.signing.outputs.signed }}
         run: |
+          if [ "$SIGNED" = "true" ]; then
+            key_note="Signed with the app's upload key: installs over the previous build."
+          else
+            key_note="Test build signed with a throwaway key: uninstall any previous Hssan Delivery build before installing this one."
+          fi
           gh release delete android-latest --yes --cleanup-tag || true
           gh release create android-latest hssan-delivery.apk \
             --target "$GITHUB_SHA" \
             --prerelease \
             --title "Android test build (${GITHUB_REF_NAME} #${{ github.run_number }})" \
-            --notes "Release APK built from ${GITHUB_REF_NAME} @ ${GITHUB_SHA::7}, pointing at ${API_BASE_URL}. Test build signed with a throwaway key: uninstall any previous Hssan Delivery build before installing this one."
+            --notes "Release APK built from ${GITHUB_REF_NAME} @ ${GITHUB_SHA::7}, pointing at ${API_BASE_URL}. ${key_note}"
