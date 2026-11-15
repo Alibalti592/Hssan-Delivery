@@ -24,3 +24,15 @@
 		reverse_proxy admin:80
 	}
 }
+
+# The brand's public pages (home, privacy policy, account deletion): static
+# files from ./site, required by the app stores. www goes to the bare domain.
+{$SITE_DOMAIN} {
+	encode zstd gzip
+	root * /srv/site
+	file_server
+}
+
+www.{$SITE_DOMAIN} {
+	redir https://{$SITE_DOMAIN}{uri} permanent
+}
