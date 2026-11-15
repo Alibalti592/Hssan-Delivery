@@ -5,7 +5,7 @@
 		<key>CFBundleDevelopmentRegion</key>
 		<string>$(DEVELOPMENT_LANGUAGE)</string>
 		<key>CFBundleDisplayName</key>
-		<string>Hssan Delivery</string>
+		<string>Delivery Hassen</string>
 		<key>CFBundleExecutable</key>
 		<string>$(EXECUTABLE_NAME)</string>
 		<key>CFBundleIdentifier</key>
@@ -13,7 +13,7 @@
 		<key>CFBundleInfoDictionaryVersion</key>
 		<string>6.0</string>
 		<key>CFBundleName</key>
-		<string>Hssan Delivery</string>
+		<string>Delivery Hassen</string>
 		<key>CFBundlePackageType</key>
 		<string>APPL</string>
 		<key>CFBundleShortVersionString</key>
@@ -64,10 +64,10 @@
 		     No NSLocationAlwaysAndWhenInUseUsageDescription — background
 		     location tracking is not implemented. -->
 		<key>NSCameraUsageDescription</key>
-		<string>Hssan Delivery utilise l'appareil photo pour photographier la facture que le livreur va payer.</string>
+		<string>Delivery Hassen utilise l'appareil photo pour photographier la facture que le livreur va payer.</string>
 		<key>NSPhotoLibraryUsageDescription</key>
-		<string>Hssan Delivery accède à vos photos pour joindre la facture que le livreur va payer.</string>
+		<string>Delivery Hassen accède à vos photos pour joindre la facture que le livreur va payer.</string>
 		<key>NSLocationWhenInUseUsageDescription</key>
-		<string>Hssan Delivery utilise votre position pour placer vos adresses de livraison sur la carte et, pour les livreurs, pour indiquer leur position pendant une course.</string>
+		<string>Delivery Hassen utilise votre position pour placer vos adresses de livraison sur la carte et, pour les livreurs, pour indiquer leur position pendant une course.</string>
 	</dict>
 </plist>

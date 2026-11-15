@@ -155,7 +155,7 @@ jobs:
           if [ "$SIGNED" = "true" ]; then
             key_note="Signed with the app's upload key: installs over the previous build."
           else
-            key_note="Test build signed with a throwaway key: uninstall any previous Hssan Delivery build before installing this one."
+            key_note="Test build signed with a throwaway key: uninstall any previous Delivery Hassen build before installing this one."
           fi
           gh release delete android-latest --yes --cleanup-tag || true
           gh release create android-latest hssan-delivery.apk \
