@@ -60,10 +60,11 @@ Une question ? contact@deliveryhassan.tn
 |---|---|
 | App icon (512 × 512, 32-bit PNG) | `icon-512.png` |
 | Feature graphic (1024 × 500) | `feature-graphic.png` |
-| Phone screenshots (2 to 8; 1080 × 1920) | `phone-1-home.png`, `phone-2-menu.png`, `phone-3-dish.png`, `phone-4-tracking.png` |
+| Phone screenshots (2 to 8; 1080 × 1920) | `phone-1-home.png`, `phone-2-list.png`, `phone-3-menu-pizza.png`, `phone-4-tracking.png` |
 
-The screenshots use the demo restaurants. Once real restaurants are in the app,
-new screenshots of them will look better (ask Claude to redo them).
+The screenshots show the real catalogue (restaurants, dishes and photos as
+they were in production on 17 November 2026). The order on the tracking
+screen is a test order, made on a local copy: no real order was placed.
 
 ## Store settings
 
