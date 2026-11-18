@@ -1051,6 +1051,24 @@ void main() {
       expect(tappedOrderId, isNull);
     });
 
+    test('handleTap routes a promotion sent to every customer', () {
+      final tapped = <int?>[];
+      final service = PushNotificationService(
+        NotificationsRepository(
+          ApiClient(tokenProvider: () => 'jwt', onUnauthorized: () {}),
+        ),
+        onPromotionTap: tapped.add,
+      );
+
+      service.handleTap(
+        const RemoteMessage(data: {'type': 'promotion', 'promotionId': '5'}),
+      );
+      // Not about one promotion: just opens the app.
+      service.handleTap(const RemoteMessage(data: {'type': 'promotion'}));
+
+      expect(tapped, [5, null]);
+    });
+
     test('handleTap is a no-op for a push with neither id', () {
       var tapped = false;
 

@@ -11,11 +11,13 @@ import type {
   DeliveryZoneAdmin,
   DeliveryZoneArea,
   DiscountType,
+  NotificationsOverview,
   Paginated,
   Product,
   ProductExtraGroup,
   ProductOption,
   Promotion,
+  PushCampaign,
   Restaurant,
   RestaurantCategory,
   RestaurantCategoryIcon,
@@ -227,6 +229,18 @@ export const promotionsApi = {
   uploadPhoto: (id: number, file: File) =>
     api.upload<Promotion>(`/api/admin/promotions/${id}/photo`, file),
   removePhoto: (id: number) => api.delete<Promotion>(`/api/admin/promotions/${id}/photo`),
+};
+
+// Notifications to every customer ("⚡ FLASH HOUR : -35% !").
+export interface PushCampaignPayload {
+  title: string;
+  body: string;
+  promotionId: number | null;
+}
+
+export const notificationsApi = {
+  overview: () => api.get<NotificationsOverview>('/api/admin/notifications'),
+  send: (data: PushCampaignPayload) => api.post<PushCampaign>('/api/admin/notifications', data),
 };
 
 // Bill providers (the app's Factures screen). No delete: past orders keep

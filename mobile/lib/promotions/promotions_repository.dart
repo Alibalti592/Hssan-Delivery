@@ -15,4 +15,10 @@ class PromotionsRepository {
         .map((e) => Promotion.fromJson(e as Map<String, dynamic>))
         .toList(growable: false);
   }
+
+  /// One promotion still running (a 404 once it's over).
+  Future<Promotion> get(int id) async {
+    final body = await _api.get('/api/promotions/$id');
+    return Promotion.fromJson(body as Map<String, dynamic>);
+  }
 }

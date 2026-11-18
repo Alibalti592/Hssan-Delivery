@@ -367,7 +367,7 @@ class PromotionBanner extends StatelessWidget {
                               ),
                             ),
                             child: Text(
-                              'Code ${promotion.promoCode}',
+                              'Code promo',
                               style: const TextStyle(
                                 color: Colors.white,
                                 fontSize: 11,

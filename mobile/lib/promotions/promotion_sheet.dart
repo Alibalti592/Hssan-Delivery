@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../catalogue/catalogue_models.dart';
 import '../client/restaurant_menu_screen.dart';
@@ -8,7 +7,8 @@ import '../theme.dart';
 import 'promotion_model.dart';
 
 /// A discount promotion's details: how much, where, and how to get it (by
-/// itself, or with its code to copy), with a way to go and order.
+/// itself, or with a code the customer received), with a way to go and
+/// order. The code itself is never shown: it's for those it was sent to.
 Future<void> showPromotionSheet(BuildContext context, Promotion promotion) {
   return showModalBottomSheet<void>(
     context: context,
@@ -110,13 +110,16 @@ class _PromotionSheet extends StatelessWidget {
                   ? Icons.keyboard_outlined
                   : Icons.auto_awesome_outlined,
               text: promotion.hasCode
-                  ? 'Saisissez le code au moment de commander'
+                  ? 'Avec un code promo, à saisir au moment de commander'
                   : 'Appliquée automatiquement au moment de commander',
             ),
-            if (promotion.hasCode) ...[
-              const SizedBox(height: 12),
-              _CodeBox(code: promotion.promoCode!),
-            ],
+            if (promotion.hasCode)
+              const _Fact(
+                icon: Icons.notifications_active_outlined,
+                text:
+                    'Le code est envoyé par notification : activez-les pour '
+                    'ne pas le manquer',
+              ),
             const SizedBox(height: 20),
             FilledButton(
               onPressed: () => _order(context),
@@ -150,51 +153,6 @@ class _Fact extends StatelessWidget {
           Icon(icon, size: 18, color: mutedText),
           const SizedBox(width: 10),
           Expanded(child: Text(text)),
-        ],
-      ),
-    );
-  }
-}
-
-/// The code in a dashed-looking box with "Copier".
-class _CodeBox extends StatelessWidget {
-  const _CodeBox({required this.code});
-
-  final String code;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(16, 6, 6, 6),
-      decoration: BoxDecoration(
-        color: fieldFill,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFBFCCDB)),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: SelectableText(
-              code,
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 2,
-              ),
-            ),
-          ),
-          TextButton.icon(
-            onPressed: () async {
-              await Clipboard.setData(ClipboardData(text: code));
-              if (context.mounted) {
-                ScaffoldMessenger.of(
-                  context,
-                ).showSnackBar(SnackBar(content: Text('Code $code copié')));
-              }
-            },
-            icon: const Icon(Icons.copy, size: 18),
-            label: const Text('Copier'),
-          ),
         ],
       ),
     );

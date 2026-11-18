@@ -8,7 +8,8 @@ class Promotion {
     required this.photoUrl,
     required this.discountType,
     required this.discountValue,
-    required this.promoCode,
+    this.promoCode,
+    this.requiresCode = false,
     required this.restaurantId,
     required this.restaurantName,
     this.items = const [],
@@ -21,7 +22,13 @@ class Promotion {
   final String? photoUrl;
   final String discountType;
   final String discountValue;
+
+  /// Only from an older server: today's never sends the code to the app,
+  /// so it reaches only the customers it's sent to (a notification...).
   final String? promoCode;
+
+  /// The customer must type a code at checkout to get it.
+  final bool requiresCode;
   final int? restaurantId;
   final String? restaurantName;
 
@@ -48,7 +55,8 @@ class Promotion {
       isDiscount &&
       (this.restaurantId == null || this.restaurantId == restaurantId);
 
-  bool get hasCode => promoCode != null && promoCode!.isNotEmpty;
+  bool get hasCode =>
+      requiresCode || (promoCode != null && promoCode!.isNotEmpty);
 
   /// "-10 % sur votre commande", "-5 DT sur votre commande".
   String get discountSentence => '$discountLabel sur votre commande';
@@ -89,6 +97,7 @@ class Promotion {
       discountType: json['discountType'] as String? ?? 'PERCENTAGE',
       discountValue: json['discountValue'] as String? ?? '0',
       promoCode: json['promoCode'] as String?,
+      requiresCode: json['requiresCode'] as bool? ?? false,
       restaurantId: json['restaurantId'] as int?,
       restaurantName: json['restaurantName'] as String?,
       items: (json['items'] as List<dynamic>? ?? const [])

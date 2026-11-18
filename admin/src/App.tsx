@@ -18,6 +18,7 @@ import DeliveriesListPage from './pages/deliveries/DeliveriesListPage';
 import DeliveryDetailPage from './pages/deliveries/DeliveryDetailPage';
 import PromotionsListPage from './pages/promotions/PromotionsListPage';
 import PromotionFormPage from './pages/promotions/PromotionFormPage';
+import NotificationsPage from './pages/notifications/NotificationsPage';
 import CourierMapPage from './pages/courier-map/CourierMapPage';
 import ChangePasswordPage from './pages/account/ChangePasswordPage';
 import PasswordResetPage from './pages/users/PasswordResetPage';
@@ -60,6 +61,7 @@ export default function App() {
         <Route path="promotions" element={<PromotionsListPage />} />
         <Route path="promotions/new" element={<PromotionFormPage />} />
         <Route path="promotions/:promotionId/edit" element={<PromotionFormPage />} />
+        <Route path="notifications" element={<NotificationsPage />} />
 
         <Route path="bill-providers" element={<BillProvidersPage />} />
 

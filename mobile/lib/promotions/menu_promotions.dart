@@ -111,7 +111,7 @@ class _PromotionChip extends StatelessWidget {
                     ),
                     Text(
                       promotion.hasCode
-                          ? 'Avec le code ${promotion.promoCode}'
+                          ? 'Avec un code promo'
                           : 'Appliquée automatiquement',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,

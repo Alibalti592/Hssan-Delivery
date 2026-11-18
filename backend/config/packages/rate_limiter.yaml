@@ -29,3 +29,12 @@ framework:
             policy: sliding_window
             limit: 5
             interval: '15 minutes'
+
+        # Wrong promo codes, per account: codes are never shown in the app
+        # (they reach customers by notification), so a script trying codes
+        # at checkout is stopped after a few misses. Only misses count, so
+        # a customer who types the right code is never limited.
+        promo_code:
+            policy: sliding_window
+            limit: 8
+            interval: '15 minutes'
