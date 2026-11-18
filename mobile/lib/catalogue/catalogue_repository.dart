@@ -42,14 +42,28 @@ class CatalogueRepository {
         .toList(growable: false);
   }
 
+  /// The whole menu: every page of it, so a menu over the server's page
+  /// size (100) isn't cut short. A few pages at most.
   Future<List<Product>> listProducts(int restaurantId) async {
-    final body = await _api.get(
-      '/api/restaurants/$restaurantId/products?limit=$_catalogueLimit',
-    );
-    final items = (body as Map<String, dynamic>)['items'] as List<dynamic>;
-    return items
-        .map((e) => Product.fromJson(e as Map<String, dynamic>))
-        .toList(growable: false);
+    const maxPages = 10;
+    final products = <Product>[];
+    for (var page = 1; page <= maxPages; page++) {
+      final body =
+          await _api.get(
+                '/api/restaurants/$restaurantId/products'
+                '?limit=$_catalogueLimit&page=$page',
+              )
+              as Map<String, dynamic>;
+      products.addAll(
+        (body['items'] as List<dynamic>).map(
+          (e) => Product.fromJson(e as Map<String, dynamic>),
+        ),
+      );
+      final pages =
+          (body['meta'] as Map<String, dynamic>?)?['pages'] as int? ?? 1;
+      if (page >= pages) break;
+    }
+    return List.unmodifiable(products);
   }
 
   /// Dishes and restaurants whose name contains [query] (2 letters or more).
