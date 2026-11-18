@@ -37,4 +37,18 @@ void main() {
     expect(offer.toProduct().price, '11.000');
     expect(_promotion('FIXED_PRICE', '11.000').isOffer, isFalse);
   });
+
+  test('a coded promotion needs a code without the app knowing it', () {
+    final promotion = Promotion.fromJson({
+      'id': 9,
+      'title': 'Flash Hour',
+      'discountType': 'PERCENTAGE',
+      'discountValue': '35.000',
+      'requiresCode': true,
+    });
+
+    expect(promotion.hasCode, isTrue);
+    expect(promotion.promoCode, isNull);
+    expect(promotion.isDiscount, isTrue);
+  });
 }

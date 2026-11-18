@@ -20,6 +20,7 @@ class PushNotificationService {
     this._repository, {
     this.onOrderTap,
     this.onDeliveryTap,
+    this.onPromotionTap,
     this.onOrderUpdate,
     this.onDeliveryUpdate,
   });
@@ -34,6 +35,11 @@ class PushNotificationService {
   /// Called when the user taps a courier-facing push (a new delivery just
   /// got assigned to them — sent with `data: {deliveryId: ...}`).
   final void Function(int deliveryId)? onDeliveryTap;
+
+  /// Called when the user taps a promotion sent to every customer from the
+  /// admin's Notifications page (`data: {type: promotion, promotionId?}`);
+  /// null when it isn't about one promotion in particular.
+  final void Function(int? promotionId)? onPromotionTap;
 
   /// Called when a push about an order arrives while the app is open, so
   /// the screens showing it can reload.
@@ -215,7 +221,8 @@ class PushNotificationService {
         content: Text(text),
         action:
             (message.data['orderId'] != null ||
-                message.data['deliveryId'] != null)
+                message.data['deliveryId'] != null ||
+                message.data['promotionId'] != null)
             ? SnackBarAction(label: 'VOIR', onPressed: () => handleTap(message))
             : null,
       ),
@@ -239,6 +246,11 @@ class PushNotificationService {
     final deliveryId = int.tryParse(message.data['deliveryId'] ?? '');
     if (deliveryId != null) {
       onDeliveryTap?.call(deliveryId);
+      return;
+    }
+
+    if (message.data['type'] == 'promotion') {
+      onPromotionTap?.call(int.tryParse(message.data['promotionId'] ?? ''));
     }
   }
 }

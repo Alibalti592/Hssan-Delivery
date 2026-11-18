@@ -334,3 +334,24 @@ export interface Paginated<T> {
   items: T[];
   meta: PaginationMeta;
 }
+
+/** A notification the admin sent to every customer's phone. */
+export interface PushCampaign {
+  id: number;
+  title: string;
+  body: string;
+  promotionId: number | null;
+  promotionTitle: string | null;
+  /** Customer phones it was sent to. */
+  recipients: number;
+  /** Phones Firebase accepted it for; null when push is off on the server. */
+  delivered: number | null;
+  sentBy: string | null;
+  sentAt: string;
+}
+
+export interface NotificationsOverview {
+  /** Customer phones with notifications on: who a send reaches. */
+  reachableDevices: number;
+  campaigns: PushCampaign[];
+}

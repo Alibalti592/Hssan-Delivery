@@ -16,7 +16,7 @@ Map<String, dynamic> _promotion(
   String title, {
   String type = 'PERCENTAGE',
   String value = '10.000',
-  String? code,
+  bool requiresCode = false,
   int? restaurantId,
 }) => {
   'id': id,
@@ -25,7 +25,8 @@ Map<String, dynamic> _promotion(
   'photoUrl': null,
   'discountType': type,
   'discountValue': value,
-  'promoCode': code,
+  // Today's server says a code is needed, never which one.
+  'requiresCode': requiresCode,
   'restaurantId': restaurantId,
   'restaurantName': restaurantId == null ? null : 'Restaurant $restaurantId',
   'items': const [],
@@ -33,7 +34,7 @@ Map<String, dynamic> _promotion(
 };
 
 void main() {
-  testWidgets('a menu shows the promotions that apply there, with their code', (
+  testWidgets('a menu shows the promotions that apply there, never the code', (
     tester,
   ) async {
     final api = ApiClient(
@@ -49,7 +50,7 @@ void main() {
                 'Bienvenue',
                 type: 'FIXED_AMOUNT',
                 value: '5.000',
-                code: 'BIENVENUE',
+                requiresCode: true,
               ),
               _promotion(3, 'Ailleurs', restaurantId: 2),
               _promotion(
@@ -112,19 +113,19 @@ void main() {
     expect(find.text('-10% sur votre commande'), findsOneWidget);
     expect(find.text('Appliquée automatiquement'), findsOneWidget);
     expect(find.text('-5.000 DT sur votre commande'), findsOneWidget);
-    expect(find.text('Avec le code BIENVENUE'), findsOneWidget);
+    expect(find.text('Avec un code promo'), findsOneWidget);
     // Another restaurant's promotion, and offers (on the menu as dishes).
     expect(find.textContaining('Ailleurs'), findsNothing);
     expect(find.textContaining('Menu duo'), findsNothing);
 
-    await tester.tap(find.text('Avec le code BIENVENUE'));
+    await tester.tap(find.text('Avec un code promo'));
     await tester.pumpAndSettle();
-    expect(find.text('BIENVENUE'), findsOneWidget);
-    expect(find.text('Copier'), findsOneWidget);
+    expect(find.text('Copier'), findsNothing);
     expect(
-      find.text('Saisissez le code au moment de commander'),
+      find.text('Avec un code promo, à saisir au moment de commander'),
       findsOneWidget,
     );
+    expect(find.textContaining('envoyé par notification'), findsOneWidget);
     expect(
       find.text('Valable dans tous les restaurants et magasins'),
       findsOneWidget,

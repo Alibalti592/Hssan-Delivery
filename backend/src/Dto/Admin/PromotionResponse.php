@@ -7,6 +7,22 @@ use App\Service\PhotoUploader;
 
 final class PromotionResponse
 {
+    /**
+     * What a customer sees: everything but the code itself. A code is meant
+     * to reach only the customers it's sent to (a notification, a flyer, an
+     * influencer), so the app is only told that one is needed, and the
+     * customer types it at checkout (OrderService checks it there).
+     */
+    public static function forClient(Promotion $promotion): array
+    {
+        $response = self::fromEntity($promotion);
+        $response['requiresCode'] = null !== $response['promoCode'];
+        unset($response['promoCode']);
+
+        return $response;
+    }
+
+    /** The admin's view, code included. */
     public static function fromEntity(Promotion $promotion): array
     {
         $restaurant = $promotion->getRestaurant();

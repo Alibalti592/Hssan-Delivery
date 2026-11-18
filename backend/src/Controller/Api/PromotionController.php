@@ -32,7 +32,7 @@ final class PromotionController extends AbstractController
 
         return $this->json(
             array_map(
-                static fn ($promotion) => PromotionResponse::fromEntity($promotion),
+                static fn ($promotion) => PromotionResponse::forClient($promotion),
                 $promotions
             )
         );
@@ -50,6 +50,6 @@ final class PromotionController extends AbstractController
             );
         }
 
-        return $this->json(PromotionResponse::fromEntity($promotion));
+        return $this->json(PromotionResponse::forClient($promotion));
     }
 }

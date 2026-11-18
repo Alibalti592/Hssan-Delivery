@@ -537,6 +537,33 @@ final class AdminPromotionApiTest extends WebTestCase
         self::assertNotContains($inactive->getId(), $ids);
     }
 
+    public function testCustomersAreNotToldTheCodeOnlyThatOneIsNeeded(): void
+    {
+        $client = static::createClient();
+        $this->entityManager = self::getContainer()->get(EntityManagerInterface::class);
+        $user = $this->createTestUser('ROLE_CLIENT', 'Code Client');
+
+        $coded = $this->createPromotion('Flash Hour', true, new \DateTimeImmutable('-1 day'), new \DateTimeImmutable('+1 week'));
+        $coded->setPromoCode('RB35');
+        $open = $this->createPromotion('Everyone', true, new \DateTimeImmutable('-1 day'), new \DateTimeImmutable('+1 week'));
+        $this->entityManager->flush();
+
+        $token = $this->authenticateClient($client, $user);
+        $client->request('GET', '/api/promotions', server: ['HTTP_AUTHORIZATION' => 'Bearer '.$token]);
+        self::assertResponseIsSuccessful();
+        $body = (string) $client->getResponse()->getContent();
+        $byId = array_column(json_decode($body, true), null, 'id');
+
+        self::assertStringNotContainsString('RB35', $body);
+        self::assertArrayNotHasKey('promoCode', $byId[$coded->getId()]);
+        self::assertTrue($byId[$coded->getId()]['requiresCode']);
+        self::assertFalse($byId[$open->getId()]['requiresCode']);
+
+        $client->request('GET', '/api/promotions/'.$coded->getId(), server: ['HTTP_AUTHORIZATION' => 'Bearer '.$token]);
+        self::assertResponseIsSuccessful();
+        self::assertStringNotContainsString('RB35', (string) $client->getResponse()->getContent());
+    }
+
     public function testPublicShowReturns404ForExpiredPromotion(): void
     {
         $client = static::createClient();

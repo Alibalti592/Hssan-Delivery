@@ -28,6 +28,8 @@ import 'notifications/push_notification_service.dart';
 import 'onboarding/onboarding_screen.dart';
 import 'onboarding/splash_screen.dart';
 import 'orders/orders_repository.dart';
+import 'promotions/offer_screen.dart';
+import 'promotions/promotion_sheet.dart';
 import 'promotions/promotions_repository.dart';
 import 'theme.dart';
 import 'widgets/status_bar.dart';
@@ -97,6 +99,27 @@ class _HssanDeliveryAppState extends State<HssanDeliveryApp> {
             builder: (_) => OrderDetailScreen(orderId: orderId),
           ),
         );
+      },
+      // A promotion sent to every customer: back to the home screen, with
+      // the promotion open on top if it's still running.
+      onPromotionTap: (promotionId) async {
+        _navigatorKey.currentState?.popUntil((route) => route.isFirst);
+        if (promotionId == null) return;
+        try {
+          final promotion = await PromotionsRepository(_api).get(promotionId);
+          final navigator = _navigatorKey.currentState;
+          final context = _navigatorKey.currentContext;
+          if (navigator == null || context == null || !context.mounted) return;
+          if (promotion.isOffer) {
+            navigator.push(
+              MaterialPageRoute(builder: (_) => OfferScreen(offer: promotion)),
+            );
+          } else {
+            showPromotionSheet(context, promotion);
+          }
+        } catch (_) {
+          // Over, or offline: the home screen is a fine place to land.
+        }
       },
       onOrderUpdate: (orderId) => _orders.notifyChanged(orderId),
       onDeliveryUpdate: (_) => _deliveries.refresh(silent: true),
