@@ -6,6 +6,7 @@ use App\Entity\User;
 use App\Repository\DeviceTokenRepository;
 use Kreait\Firebase\Contract\Messaging;
 use Kreait\Firebase\Factory;
+use Kreait\Firebase\Messaging\AndroidConfig;
 use Kreait\Firebase\Messaging\ApnsConfig;
 use Kreait\Firebase\Messaging\CloudMessage;
 use Kreait\Firebase\Messaging\Notification;
@@ -54,12 +55,7 @@ class PushNotificationService
             return;
         }
 
-        $message = CloudMessage::new()
-            ->withNotification(Notification::create($title, $body))
-            ->withData($data)
-            // iOS shows a notification silently unless the APNs payload
-            // asks for a sound; Android already plays its channel's sound.
-            ->withApnsConfig(ApnsConfig::new()->withDefaultSound());
+        $message = $this->message($title, $body, $data);
 
         try {
             $report = $messaging->sendMulticast($message, $tokens);
@@ -117,10 +113,7 @@ class PushNotificationService
             return null;
         }
 
-        $message = CloudMessage::new()
-            ->withNotification(Notification::create($title, $body))
-            ->withData($data)
-            ->withApnsConfig(ApnsConfig::new()->withDefaultSound());
+        $message = $this->message($title, $body, $data);
 
         $delivered = 0;
         $failed = 0;
@@ -141,6 +134,23 @@ class PushNotificationService
         }
 
         return ['delivered' => $delivered, 'batches' => count($batches), 'failedBatches' => $failed];
+    }
+
+    /**
+     * @param array<string, string> $data
+     */
+    private function message(string $title, string $body, array $data): CloudMessage
+    {
+        return CloudMessage::new()
+            ->withNotification(Notification::create($title, $body))
+            ->withData($data)
+            // High priority wakes a phone that's asleep with the app closed
+            // to show the notification now, not at its next maintenance
+            // window; the app's channel (MainActivity) makes it pop up.
+            ->withAndroidConfig(AndroidConfig::new()->withHighMessagePriority())
+            // iOS shows a notification silently unless the APNs payload
+            // asks for a sound; Android plays its channel's sound.
+            ->withApnsConfig(ApnsConfig::new()->withDefaultSound());
     }
 
     private function messaging(): ?Messaging

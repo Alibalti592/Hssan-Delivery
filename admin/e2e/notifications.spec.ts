@@ -46,7 +46,7 @@ test('sends a Flash notification with the promotion code, after confirming', asy
   await loginAsAdmin(page);
   await page.goto('/notifications');
 
-  await expect(page.getByText('120 customer phones with notifications on')).toBeVisible();
+  await expect(page.getByText('120 customer phones signed in to the app')).toBeVisible();
   await page.getByLabel('Promotion (optional)').selectOption('9');
   await page.getByRole('button', { name: 'Flash' }).click();
 

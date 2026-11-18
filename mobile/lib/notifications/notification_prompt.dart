@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:provider/provider.dart';
 
 import '../theme.dart';
@@ -21,16 +22,61 @@ Future<void> askCourierForNotifications(BuildContext context) async {
     return;
   }
 
-  final accepted = await showDialog<bool>(
+  final accepted = await _explain(
+    context,
+    title: 'Ne ratez aucune course',
+    body:
+        'Activez les notifications pour être prévenu dès qu\'une course '
+        'vous est confiée, même quand l\'application est fermée.',
+  );
+  if (accepted == true) await push.requestPermission();
+}
+
+const _clientAskedKey = 'client_notifications_asked';
+
+/// Client: once, on the home screen. Codes promo only reach customers by
+/// notification, and Android 13+ shows none while the app is closed until
+/// they're allowed. "Plus tard" isn't asked again here (the order screen
+/// still offers it, see OrderNotificationsCard).
+Future<void> askClientForNotifications(
+  BuildContext context, {
+  FlutterSecureStorage storage = const FlutterSecureStorage(),
+}) async {
+  final push = pushServiceOf(context);
+  if (push == null || !await push.needsPermission()) return;
+  try {
+    if (await storage.read(key: _clientAskedKey) == 'true') return;
+  } catch (_) {
+    // Unreadable storage: asking once more is harmless.
+  }
+  if (!context.mounted) return;
+
+  final accepted = await _explain(
+    context,
+    title: 'Ne ratez aucune offre',
+    body:
+        'Activez les notifications pour recevoir les codes promo et suivre '
+        'vos commandes, même quand l\'application est fermée.',
+  );
+  try {
+    await storage.write(key: _clientAskedKey, value: 'true');
+  } catch (_) {}
+  if (accepted == true) await push.requestPermission();
+}
+
+/// Why notifications matter, before the system prompt, which can only be
+/// shown once or twice. True when the user chose "Activer".
+Future<bool?> _explain(
+  BuildContext context, {
+  required String title,
+  required String body,
+}) {
+  return showDialog<bool>(
     context: context,
     builder: (context) => AlertDialog(
       icon: const Icon(Icons.notifications_active_outlined, size: 36),
-      title: const Text('Ne ratez aucune course'),
-      content: const Text(
-        'Activez les notifications pour être prévenu dès qu\'une course '
-        'vous est confiée, même quand l\'application est fermée.',
-        textAlign: TextAlign.center,
-      ),
+      title: Text(title),
+      content: Text(body, textAlign: TextAlign.center),
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context, false),
@@ -43,7 +89,6 @@ Future<void> askCourierForNotifications(BuildContext context) async {
       ],
     ),
   );
-  if (accepted == true) await push.requestPermission();
 }
 
 /// Client: offered once they've placed an order, when being told it's on

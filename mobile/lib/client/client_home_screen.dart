@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../cart/cart.dart';
+import '../notifications/notification_prompt.dart';
 import '../widgets/dark_header.dart';
 import 'cart_screen.dart';
 import 'home_screen.dart';
@@ -32,6 +33,14 @@ class ClientHomeScreen extends StatefulWidget {
 
 class _ClientHomeScreenState extends State<ClientHomeScreen> {
   int _index = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) askClientForNotifications(context);
+    });
+  }
 
   late final List<Widget> _tabs = [
     HomeScreen(onSeeOrders: () => setState(() => _index = 1)),
