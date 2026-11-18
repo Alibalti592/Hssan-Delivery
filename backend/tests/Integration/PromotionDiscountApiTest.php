@@ -128,6 +128,29 @@ final class PromotionDiscountApiTest extends WebTestCase
         self::assertStringContainsString('valable seulement chez Snack Ailleurs', $this->message());
     }
 
+    public function testTryingCodesOneAfterAnotherIsStopped(): void
+    {
+        $code = $this->uniqueCode();
+        $this->createPromotion('-5 DT', DiscountType::FIXED_AMOUNT, '5', code: $code, restaurant: $this->restaurant);
+
+        // The right code costs no tries.
+        $this->client->request('POST', '/api/orders/quote', server: $this->headers(), content: $this->orderBody(1, null, $code));
+        self::assertResponseIsSuccessful();
+
+        for ($i = 0; $i < 8; ++$i) {
+            $this->client->request('POST', '/api/orders/quote', server: $this->headers(), content: $this->orderBody(1, null, 'NOPE'.$i.random_int(1000, 9999)));
+            self::assertResponseStatusCodeSame(Response::HTTP_BAD_REQUEST);
+        }
+
+        // Even the right one waits now: otherwise trying goes on.
+        $this->placeOrder(quantity: 1, code: $code);
+        self::assertResponseStatusCodeSame(Response::HTTP_TOO_MANY_REQUESTS);
+
+        // Ordering without a code still works.
+        $this->placeOrder(quantity: 1);
+        self::assertResponseStatusCodeSame(Response::HTTP_CREATED);
+    }
+
     public function testOnlyTheBestPromotionApplies(): void
     {
         $this->createPromotion('-10 %', DiscountType::PERCENTAGE, '10', restaurant: $this->restaurant);

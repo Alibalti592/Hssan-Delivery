@@ -8,6 +8,13 @@ use App\Service\PhotoUploader;
 final class PromotionResponse
 {
     /**
+     * What apps built before requiresCode existed get instead of the code:
+     * they read "a code is needed" from a non-empty promoCode, so this keeps
+     * them saying "Avec le code ••••" rather than "applied automatically".
+     */
+    public const HIDDEN_CODE = '••••';
+
+    /**
      * What a customer sees: everything but the code itself. A code is meant
      * to reach only the customers it's sent to (a notification, a flyer, an
      * influencer), so the app is only told that one is needed, and the
@@ -17,7 +24,7 @@ final class PromotionResponse
     {
         $response = self::fromEntity($promotion);
         $response['requiresCode'] = null !== $response['promoCode'];
-        unset($response['promoCode']);
+        $response['promoCode'] = $response['requiresCode'] ? self::HIDDEN_CODE : null;
 
         return $response;
     }

@@ -6,8 +6,10 @@ use App\Dto\Order\CreateBillOrderRequest;
 use App\Dto\Order\CreateOrderRequest;
 use App\Dto\Order\CreateParcelOrderRequest;
 use App\Dto\Order\OrderResponse;
+use App\Entity\User;
 use App\Enum\DeliveryStatus;
 use App\Exception\InvalidOperationException;
+use App\Exception\InvalidPromoCodeException;
 use App\Repository\CourierLocationRepository;
 use App\Repository\OrderRepository;
 use App\Service\BillOrderService;
@@ -31,6 +33,7 @@ final class OrderController extends AbstractApiController
     public function __construct(
         private readonly OrderService $orderService,
         private readonly RateLimiterFactory $orderCreateLimiter,
+        private readonly RateLimiterFactory $promoCodeLimiter,
         private readonly BillOrderService $billOrderService,
         private readonly OrderRepository $orderRepository,
         private readonly CourierLocationRepository $courierLocationRepository,
@@ -111,7 +114,13 @@ final class OrderController extends AbstractApiController
         /** @var CreateOrderRequest $dto */
         $dto = $this->deserializeAndValidate($request, CreateOrderRequest::class);
 
-        $order = $this->orderService->createOrder($dto, $user);
+        if (null !== $blocked = $this->promoCodeBlocked($user, $dto)) {
+            return $blocked;
+        }
+        $order = $this->countingPromoCodeMisses(
+            $user,
+            fn () => $this->orderService->createOrder($dto, $user),
+        );
 
         return $this->json(
             OrderResponse::fromEntity($order),
@@ -139,7 +148,13 @@ final class OrderController extends AbstractApiController
         /** @var CreateOrderRequest $dto */
         $dto = $this->deserializeAndValidate($request, CreateOrderRequest::class);
 
-        $order = $this->orderService->quoteOrder($dto, $user);
+        if (null !== $blocked = $this->promoCodeBlocked($user, $dto)) {
+            return $blocked;
+        }
+        $order = $this->countingPromoCodeMisses(
+            $user,
+            fn () => $this->orderService->quoteOrder($dto, $user),
+        );
 
         $total = Money::toMillimes($order->getTotalAmount());
         $fee = Money::toMillimes($order->getDeliveryFee());
@@ -363,5 +378,43 @@ final class OrderController extends AbstractApiController
         return $this->json(
             OrderResponse::fromEntity($order)
         );
+    }
+
+    /**
+     * Too many wrong promo codes lately: refused before the code is even
+     * looked at, so guessing stops for a while (see rate_limiter.yaml).
+     */
+    private function promoCodeBlocked(User $user, CreateOrderRequest $dto): ?JsonResponse
+    {
+        if (null === $dto->promoCode || '' === trim($dto->promoCode)) {
+            return null;
+        }
+        if ($this->promoCodeLimiter->create((string) $user->getId())->consume(0)->getRemainingTokens() > 0) {
+            return null;
+        }
+
+        return $this->json(
+            ['message' => 'Trop de codes essayés. Réessayez dans quelques minutes.'],
+            Response::HTTP_TOO_MANY_REQUESTS
+        );
+    }
+
+    /**
+     * Runs [work]; a wrong promo code counts against the account's tries.
+     *
+     * @template T
+     *
+     * @param callable(): T $work
+     *
+     * @return T
+     */
+    private function countingPromoCodeMisses(User $user, callable $work): mixed
+    {
+        try {
+            return $work();
+        } catch (InvalidPromoCodeException $e) {
+            $this->promoCodeLimiter->create((string) $user->getId())->consume();
+            throw $e;
+        }
     }
 }

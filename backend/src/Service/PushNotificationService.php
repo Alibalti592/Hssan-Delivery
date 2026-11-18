@@ -100,13 +100,16 @@ class PushNotificationService
     /**
      * One notification to many phones (a promotion to every customer), in
      * batches Firebase accepts, pruning the dead tokens it reports. Returns
-     * how many phones Firebase accepted it for, or null when push is off on
-     * this server (no Firebase credentials): nothing was sent.
+     * how many phones Firebase accepted it for and how many batches failed
+     * outright (Firebase down, credentials refused...), or null when push is
+     * off on this server (no Firebase credentials): nothing was sent.
      *
      * @param string[]              $tokens
      * @param array<string, string> $data
+     *
+     * @return array{delivered: int, batches: int, failedBatches: int}|null
      */
-    public function broadcast(array $tokens, string $title, string $body, array $data = []): ?int
+    public function broadcast(array $tokens, string $title, string $body, array $data = []): ?array
     {
         $messaging = $this->messaging();
 
@@ -120,7 +123,9 @@ class PushNotificationService
             ->withApnsConfig(ApnsConfig::new()->withDefaultSound());
 
         $delivered = 0;
-        foreach (array_chunk(array_values(array_unique($tokens)), self::MULTICAST_LIMIT) as $batch) {
+        $failed = 0;
+        $batches = array_chunk(array_values(array_unique($tokens)), self::MULTICAST_LIMIT);
+        foreach ($batches as $batch) {
             try {
                 $report = $messaging->sendMulticast($message, $batch);
                 $delivered += $report->successes()->count();
@@ -130,11 +135,12 @@ class PushNotificationService
                     $this->deviceTokenRepository->deleteByTokens($stale);
                 }
             } catch (\Throwable $e) {
+                ++$failed;
                 $this->logger->warning('Broadcast push failed for a batch.', ['exception' => $e]);
             }
         }
 
-        return $delivered;
+        return ['delivered' => $delivered, 'batches' => count($batches), 'failedBatches' => $failed];
     }
 
     private function messaging(): ?Messaging

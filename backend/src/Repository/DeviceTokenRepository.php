@@ -38,10 +38,20 @@ class DeviceTokenRepository extends ServiceEntityRepository
     public function findClientTokenStrings(): array
     {
         return $this->getEntityManager()->getConnection()->fetchFirstColumn(
-            'SELECT t.token FROM device_token t JOIN "user" u ON u.id = t.user_id'
-            ." WHERE CAST(u.roles AS TEXT) LIKE '%ROLE_CLIENT%' ORDER BY t.id"
+            'SELECT t.token'.self::CLIENT_TOKENS.' ORDER BY t.id'
         );
     }
+
+    /** How many phones findClientTokenStrings() would reach. */
+    public function countClientTokens(): int
+    {
+        return (int) $this->getEntityManager()->getConnection()->fetchOne(
+            'SELECT COUNT(*)'.self::CLIENT_TOKENS
+        );
+    }
+
+    private const CLIENT_TOKENS = ' FROM device_token t JOIN "user" u ON u.id = t.user_id'
+        ." WHERE CAST(u.roles AS TEXT) LIKE '%ROLE_CLIENT%'";
 
     /**
      * Bulk-removes device tokens FCM reported as invalid/unregistered (see

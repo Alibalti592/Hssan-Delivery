@@ -2,6 +2,7 @@
 
 namespace App\Tests\Integration;
 
+use App\Dto\Admin\PromotionResponse;
 use App\Entity\Promotion;
 use App\Entity\Restaurant;
 use App\Entity\User;
@@ -555,7 +556,9 @@ final class AdminPromotionApiTest extends WebTestCase
         $byId = array_column(json_decode($body, true), null, 'id');
 
         self::assertStringNotContainsString('RB35', $body);
-        self::assertArrayNotHasKey('promoCode', $byId[$coded->getId()]);
+        // Older apps only read promoCode: they get a mask, never the code.
+        self::assertSame(PromotionResponse::HIDDEN_CODE, $byId[$coded->getId()]['promoCode']);
+        self::assertNull($byId[$open->getId()]['promoCode']);
         self::assertTrue($byId[$coded->getId()]['requiresCode']);
         self::assertFalse($byId[$open->getId()]['requiresCode']);
 

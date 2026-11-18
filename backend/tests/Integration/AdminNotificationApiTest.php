@@ -90,6 +90,18 @@ final class AdminNotificationApiTest extends WebTestCase
 
         $this->request('POST', $admin, ['title' => 'Titre', 'body' => 'Texte', 'promotionId' => 999999999]);
         self::assertResponseStatusCodeSame(Response::HTTP_UNPROCESSABLE_ENTITY);
+
+        // Switched off: a tap would open nothing in the app.
+        $off = (new Promotion())
+            ->setTitle('Off')
+            ->setDiscountType(DiscountType::PERCENTAGE)
+            ->setDiscountValue('10.000')
+            ->setStartAt(new \DateTimeImmutable('-1 hour'))
+            ->setIsActive(false);
+        $this->entityManager->persist($off);
+        $this->entityManager->flush();
+        $this->request('POST', $admin, ['title' => 'Titre', 'body' => 'Texte', 'promotionId' => $off->getId()]);
+        self::assertResponseStatusCodeSame(Response::HTTP_UNPROCESSABLE_ENTITY);
     }
 
     public function testOnlyForAdmins(): void

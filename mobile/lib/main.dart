@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
@@ -103,10 +105,13 @@ class _HssanDeliveryAppState extends State<HssanDeliveryApp> {
       // A promotion sent to every customer: back to the home screen, with
       // the promotion open on top if it's still running.
       onPromotionTap: (promotionId) async {
+        // A tap that launched the app arrives before the saved session is
+        // read: without it the request would go out signed out and fail.
+        if (!await _signedIn()) return;
         _navigatorKey.currentState?.popUntil((route) => route.isFirst);
         if (promotionId == null) return;
         try {
-          final promotion = await PromotionsRepository(_api).get(promotionId);
+          final promotion = await _promotions.get(promotionId);
           final navigator = _navigatorKey.currentState;
           final context = _navigatorKey.currentContext;
           if (navigator == null || context == null || !context.mounted) return;
@@ -173,6 +178,31 @@ class _HssanDeliveryAppState extends State<HssanDeliveryApp> {
 
     _pushNotifications.initialize();
     _auth.bootstrap();
+  }
+
+  /// Whether a customer is signed in, waiting first for the saved session
+  /// to be read when the app has only just started (a notification tap can
+  /// launch it), and for the home screen it leads to.
+  Future<bool> _signedIn() async {
+    if (_auth.status == AuthStatus.unknown) {
+      final resolved = Completer<void>();
+      void listener() {
+        if (_auth.status != AuthStatus.unknown && !resolved.isCompleted) {
+          resolved.complete();
+        }
+      }
+
+      _auth.addListener(listener);
+      try {
+        await resolved.future.timeout(const Duration(seconds: 20));
+      } on TimeoutException {
+        return false;
+      } finally {
+        _auth.removeListener(listener);
+      }
+      await WidgetsBinding.instance.endOfFrame;
+    }
+    return mounted && _auth.status == AuthStatus.signedIn;
   }
 
   @override

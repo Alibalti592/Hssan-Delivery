@@ -5,7 +5,7 @@ namespace App\Service;
 use App\Entity\Promotion;
 use App\Entity\Restaurant;
 use App\Enum\DiscountType;
-use App\Exception\InvalidOperationException;
+use App\Exception\InvalidPromoCodeException;
 use App\Repository\PromotionRepository;
 use App\Util\Money;
 
@@ -73,7 +73,7 @@ final class PromotionPricing
         );
 
         if ([] === $matches) {
-            throw new InvalidOperationException('Ce code promo n\'est pas valable.');
+            throw new InvalidPromoCodeException('Ce code promo n\'est pas valable.');
         }
 
         foreach ($matches as $promotion) {
@@ -84,7 +84,7 @@ final class PromotionPricing
 
         $elsewhere = reset($matches)->getRestaurant()?->getName();
 
-        throw new InvalidOperationException("Ce code est valable seulement chez {$elsewhere}.");
+        throw new InvalidPromoCodeException("Ce code est valable seulement chez {$elsewhere}.");
     }
 
     private static function appliesTo(Promotion $promotion, Restaurant $restaurant): bool
