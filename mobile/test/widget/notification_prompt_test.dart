@@ -1,131 +1,157 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/testing.dart';
 import 'package:mobile/core/api_client.dart';
 import 'package:mobile/notifications/notification_prompt.dart';
 import 'package:mobile/notifications/notifications_repository.dart';
 import 'package:mobile/notifications/push_notification_service.dart';
-import 'package:mobile/theme.dart';
 import 'package:provider/provider.dart';
 
-/// Notifications never asked for yet, as on a fresh Android 13+ install.
-class _FreshInstallPush extends PushNotificationService {
-  _FreshInstallPush()
+import 'test_utils.dart';
+
+/// Firebase isn't available in tests: this one says whether it would ask.
+class _FakePush extends PushNotificationService {
+  _FakePush({required this.needed})
     : super(
         NotificationsRepository(
-          ApiClient(tokenProvider: () => null, onUnauthorized: () {}),
+          ApiClient(
+            tokenProvider: () => null,
+            onUnauthorized: () {},
+            httpClient: MockClient((_) async => jsonResponse({})),
+          ),
         ),
       );
 
-  int prompts = 0;
+  final bool needed;
+  int requests = 0;
 
   @override
-  Future<bool> needsPermission() async => true;
+  Future<bool> needsPermission() async => needed;
 
   @override
   Future<bool> requestPermission() async {
-    prompts++;
+    requests++;
     return true;
   }
 }
 
-Future<void> _openHome(WidgetTester tester, PushNotificationService push) {
-  return tester.pumpWidget(
+Widget _app(_FakePush push, Widget child) =>
     Provider<PushNotificationService>.value(
       value: push,
-      child: MaterialApp(
-        // A button style without a family is drawn as boxes in tests (a
-        // phone uses its own Roboto): named here for the screenshot.
-        theme: Platform.environment['SHOT'] == null
-            ? buildTheme()
-            : buildTheme().copyWith(
-                filledButtonTheme: FilledButtonThemeData(
-                  style: buildTheme().filledButtonTheme.style?.copyWith(
-                    textStyle: const WidgetStatePropertyAll(
-                      TextStyle(
-                        fontFamily: 'Roboto',
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 1,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-        home: Builder(
-          builder: (context) {
-            WidgetsBinding.instance.addPostFrameCallback(
-              (_) => askClientForNotifications(context),
-            );
-            return const Scaffold();
-          },
-        ),
-      ),
-    ),
-  );
-}
+      child: MaterialApp(home: Scaffold(body: child)),
+    );
 
-/// Only for a screenshot (SHOT=path): tests draw text as boxes otherwise.
-Future<void> _loadRealFonts(WidgetTester tester) async {
-  tester.view.physicalSize = const Size(1080, 2340);
-  tester.view.devicePixelRatio = 3;
-  addTearDown(tester.view.reset);
-  await tester.runAsync(() async {
-    final fonts = {
-      'Roboto': ['Regular', 'Medium', 'Bold', 'ExtraBold'],
-      'Poppins': ['Medium', 'SemiBold'],
-    };
-    for (final MapEntry(key: family, value: weights) in fonts.entries) {
-      final loader = FontLoader(family);
-      for (final weight in weights) {
-        loader.addFont(rootBundle.load('assets/fonts/$family-$weight.ttf'));
-      }
-      await loader.load();
-    }
-    final icons = File(Platform.environment['ICONS']!).readAsBytesSync();
-    await (FontLoader(
-      'MaterialIcons',
-    )..addFont(Future.value(ByteData.sublistView(icons)))).load();
-  });
-}
+/// The customer's home screen, which asks once it's shown.
+Widget _home(_FakePush push) => _app(
+  push,
+  Builder(
+    builder: (context) {
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => askClientForNotifications(context),
+      );
+      return const SizedBox();
+    },
+  ),
+);
 
 void main() {
   setUp(() => FlutterSecureStorage.setMockInitialValues({}));
 
-  testWidgets('a customer is asked once, then the system prompt follows', (
+  testWidgets('a client is offered notifications after ordering', (
     tester,
   ) async {
-    if (Platform.environment['SHOT'] != null) await _loadRealFonts(tester);
-    final push = _FreshInstallPush();
-    await _openHome(tester, push);
+    final push = _FakePush(needed: true);
+    await tester.pumpWidget(_app(push, const OrderNotificationsCard()));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('Soyez prévenu quand votre commande arrive'),
+      findsOneWidget,
+    );
+    await tester.tap(find.text('Activer'));
+    await tester.pumpAndSettle();
+
+    expect(push.requests, 1);
+    expect(
+      find.text('Soyez prévenu quand votre commande arrive'),
+      findsNothing,
+    );
+  });
+
+  testWidgets('nothing is offered once notifications were decided', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _app(_FakePush(needed: false), const OrderNotificationsCard()),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('Soyez prévenu quand votre commande arrive'),
+      findsNothing,
+    );
+  });
+
+  testWidgets('a courier is told why before the system prompt', (tester) async {
+    final push = _FakePush(needed: true);
+    await tester.pumpWidget(
+      _app(
+        push,
+        Builder(
+          builder: (context) => TextButton(
+            onPressed: () => askCourierForNotifications(context),
+            child: const Text('go'),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('go'));
+    await tester.pumpAndSettle();
+    expect(find.text('Ne ratez aucune course'), findsOneWidget);
+    await tester.tap(find.text('Plus tard'));
+    await tester.pumpAndSettle();
+    expect(push.requests, 0);
+
+    await tester.tap(find.text('go'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Activer'));
+    await tester.pumpAndSettle();
+    expect(push.requests, 1);
+  });
+
+  testWidgets('a customer is asked once on the home screen', (tester) async {
+    final push = _FakePush(needed: true);
+    await tester.pumpWidget(_home(push));
     await tester.pumpAndSettle();
 
     expect(find.text('Ne ratez aucune offre'), findsOneWidget);
-    if (Platform.environment['SHOT'] case final path?) {
-      await expectLater(find.byType(MaterialApp), matchesGoldenFile(path));
-    }
-
     await tester.tap(find.text('Activer'));
     await tester.pumpAndSettle();
-    expect(push.prompts, 1);
+    expect(push.requests, 1);
 
     // Next launch: not asked again.
     await tester.pumpWidget(const SizedBox());
-    await _openHome(tester, push);
+    await tester.pumpWidget(_home(push));
     await tester.pumpAndSettle();
     expect(find.text('Ne ratez aucune offre'), findsNothing);
   });
 
-  testWidgets('"Plus tard" doesn\'t show the system prompt', (tester) async {
-    final push = _FreshInstallPush();
-    await _openHome(tester, push);
+  testWidgets('"Plus tard" on the home screen asks nothing more', (
+    tester,
+  ) async {
+    final push = _FakePush(needed: true);
+    await tester.pumpWidget(_home(push));
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('Plus tard'));
     await tester.pumpAndSettle();
-    expect(push.prompts, 0);
+    expect(push.requests, 0);
+
+    await tester.pumpWidget(const SizedBox());
+    await tester.pumpWidget(_home(push));
+    await tester.pumpAndSettle();
+    expect(find.text('Ne ratez aucune offre'), findsNothing);
   });
 }
