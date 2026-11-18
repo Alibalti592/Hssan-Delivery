@@ -351,7 +351,7 @@ export interface PushCampaign {
 }
 
 export interface NotificationsOverview {
-  /** Customer phones with notifications on: who a send reaches. */
+  /** Customer phones signed in to the app: who a send is sent to. */
   reachableDevices: number;
   campaigns: PushCampaign[];
 }

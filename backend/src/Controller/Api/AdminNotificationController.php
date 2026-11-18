@@ -87,7 +87,7 @@ final class AdminNotificationController extends AbstractApiController
             $tokens = $this->deviceTokens->findClientTokenStrings();
             if ([] === $tokens) {
                 return $this->json(
-                    ['message' => 'No customer has turned notifications on yet.'],
+                    ['message' => 'No customer has signed in to the app yet.'],
                     Response::HTTP_UNPROCESSABLE_ENTITY
                 );
             }

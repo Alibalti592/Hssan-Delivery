@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/testing.dart';
 import 'package:mobile/core/api_client.dart';
@@ -41,7 +42,22 @@ Widget _app(_FakePush push, Widget child) =>
       child: MaterialApp(home: Scaffold(body: child)),
     );
 
+/// The customer's home screen, which asks once it's shown.
+Widget _home(_FakePush push) => _app(
+  push,
+  Builder(
+    builder: (context) {
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => askClientForNotifications(context),
+      );
+      return const SizedBox();
+    },
+  ),
+);
+
 void main() {
+  setUp(() => FlutterSecureStorage.setMockInitialValues({}));
+
   testWidgets('a client is offered notifications after ordering', (
     tester,
   ) async {
@@ -103,5 +119,39 @@ void main() {
     await tester.tap(find.text('Activer'));
     await tester.pumpAndSettle();
     expect(push.requests, 1);
+  });
+
+  testWidgets('a customer is asked once on the home screen', (tester) async {
+    final push = _FakePush(needed: true);
+    await tester.pumpWidget(_home(push));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Ne ratez aucune offre'), findsOneWidget);
+    await tester.tap(find.text('Activer'));
+    await tester.pumpAndSettle();
+    expect(push.requests, 1);
+
+    // Next launch: not asked again.
+    await tester.pumpWidget(const SizedBox());
+    await tester.pumpWidget(_home(push));
+    await tester.pumpAndSettle();
+    expect(find.text('Ne ratez aucune offre'), findsNothing);
+  });
+
+  testWidgets('"Plus tard" on the home screen asks nothing more', (
+    tester,
+  ) async {
+    final push = _FakePush(needed: true);
+    await tester.pumpWidget(_home(push));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Plus tard'));
+    await tester.pumpAndSettle();
+    expect(push.requests, 0);
+
+    await tester.pumpWidget(const SizedBox());
+    await tester.pumpWidget(_home(push));
+    await tester.pumpAndSettle();
+    expect(find.text('Ne ratez aucune offre'), findsNothing);
   });
 }

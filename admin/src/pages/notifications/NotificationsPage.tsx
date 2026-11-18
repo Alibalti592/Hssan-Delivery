@@ -134,7 +134,7 @@ export default function NotificationsPage() {
         title="Notifications"
         subtitle={
           overview.data
-            ? `${reachable} customer phone${reachable === 1 ? '' : 's'} with notifications on`
+            ? `${reachable} customer phone${reachable === 1 ? '' : 's'} signed in to the app`
             : undefined
         }
       />
@@ -222,8 +222,12 @@ export default function NotificationsPage() {
               {send.isPending ? 'Sending…' : `Send to ${reachable} phone${reachable === 1 ? '' : 's'}`}
             </button>
             {overview.data && reachable === 0 && (
-              <p className="rmeta">No customer has turned notifications on yet.</p>
+              <p className="rmeta">No customer has signed in to the app yet.</p>
             )}
+            <p className="rmeta">
+              Customers who refused notifications (or switched them off in the phone's settings) only
+              see it if the app is open when it's sent.
+            </p>
           </form>
 
           <div>
