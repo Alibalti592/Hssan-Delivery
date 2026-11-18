@@ -12,4 +12,27 @@ void main() {
     expect(AppPhoto.decodeWidth(double.infinity, 2), isNull);
     expect(AppPhoto.decodeWidth(0, 2), isNull);
   });
+
+  test('photos come in the smallest copy wide enough', () {
+    // A dish in a menu: 96 wide on a 3x phone.
+    expect(
+      AppPhoto.variantPath('/uploads/products/abc.jpg', 288),
+      '/uploads/products/w480/abc.webp',
+    );
+    // A card on the home screen.
+    expect(
+      AppPhoto.variantPath('/uploads/restaurants/logo.png', 700),
+      '/uploads/restaurants/w960/logo.webp',
+    );
+    // Full width on most phones still takes the 960 copy.
+    expect(
+      AppPhoto.variantPath('/uploads/products/abc.jpeg', 1080),
+      '/uploads/products/w960/abc.webp',
+    );
+    // Wider than that, or size unknown: the original.
+    expect(AppPhoto.variantPath('/uploads/products/abc.jpg', 1300), isNull);
+    expect(AppPhoto.variantPath('/uploads/products/abc.jpg', null), isNull);
+    // Not a catalogue upload: no copies to ask for.
+    expect(AppPhoto.variantPath('/api/orders/3/bill-photo', 300), isNull);
+  });
 }

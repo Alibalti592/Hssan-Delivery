@@ -42,19 +42,51 @@ class AppPhoto extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final shown = width?.isFinite == true ? width! : constraints.maxWidth;
-        return CachedNetworkImage(
+        final pixels = decodeWidth(shown, ratio);
+        Widget photo(String path, {Widget? onError}) => CachedNetworkImage(
           imageUrl: AppConfig.resolvePhotoUrl(path),
           width: width,
           height: height,
           fit: fit,
           alignment: alignment,
-          memCacheWidth: decodeWidth(shown, ratio),
+          memCacheWidth: pixels,
           fadeInDuration: const Duration(milliseconds: 200),
           placeholder: (_, _) => _placeholder(),
-          errorWidget: (_, _, _) => _placeholder(),
+          errorWidget: (_, _, _) => onError ?? _placeholder(),
         );
+
+        // The server's smaller copy when one is wide enough (a menu photo
+        // is a tenth of the original's weight); the original if it's
+        // missing, e.g. for a photo the server hasn't made copies of yet.
+        final smaller = variantPath(path, pixels);
+        return smaller == null
+            ? photo(path)
+            : photo(smaller, onError: photo(path));
       },
     );
+  }
+
+  /// Widths of the copies the server keeps of each catalogue photo
+  /// (backend PhotoVariants), next to it: "/uploads/products/w480/abc.webp"
+  /// for "/uploads/products/abc.jpg".
+  static const variantWidths = [480, 960];
+
+  /// The path of the smallest copy of [path] good enough for [pixels], or
+  /// null when only the original will do (no copies of it, or shown wider
+  /// than the largest). A copy up to 15% narrower than the space passes:
+  /// a full-width photo on most phones (about 1080 pixels) gets the
+  /// 960-pixel copy, at a quarter of the original's weight.
+  @visibleForTesting
+  static String? variantPath(String path, int? pixels) {
+    if (pixels == null) return null;
+    final match = RegExp(
+      r'^(.*/uploads/[^/]+)/([^/]+)\.(?:jpe?g|png|webp)$',
+    ).firstMatch(path);
+    if (match == null) return null;
+    for (final width in variantWidths) {
+      if (width * 1.15 >= pixels) return '${match[1]}/w$width/${match[2]}.webp';
+    }
+    return null;
   }
 
   /// The width, in pixels, to decode a photo shown [shown] logical pixels

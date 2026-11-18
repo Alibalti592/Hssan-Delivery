@@ -25,6 +25,8 @@ final class PhotoUploader
     public function __construct(
         #[Autowire('%kernel.project_dir%/public/uploads')]
         private readonly string $uploadsDir,
+        // Null for the private bill photos, which the app never lists.
+        private readonly ?PhotoVariants $variants = null,
     ) {
     }
 
@@ -47,7 +49,8 @@ final class PhotoUploader
 
         $filename = bin2hex(random_bytes(16)).'.'.($file->guessExtension() ?? 'bin');
 
-        $file->move($this->uploadsDir.'/'.$subdirectory, $filename);
+        $stored = $file->move($this->uploadsDir.'/'.$subdirectory, $filename);
+        $this->variants?->generate($stored->getPathname());
 
         return $filename;
     }
@@ -82,6 +85,7 @@ final class PhotoUploader
         if (!copy($source, $directory.'/'.$copy)) {
             return null;
         }
+        $this->variants?->generate($directory.'/'.$copy);
 
         return $copy;
     }
@@ -97,6 +101,7 @@ final class PhotoUploader
         if (is_file($path)) {
             @unlink($path);
         }
+        $this->variants?->remove($path);
     }
 
     /**

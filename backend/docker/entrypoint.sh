@@ -81,6 +81,12 @@ fi
 find -H var config/jwt public/uploads \( ! -user www-data -o ! -group www-data \) \
     -exec chown -h www-data:www-data {} +
 
+# The smaller copies of the catalogue photos (PhotoVariants) for photos
+# uploaded before they existed: made in the background, as www-data, so
+# Apache starts at once (the first run takes about a minute; later ones
+# only check). The app uses the originals until a copy exists.
+su -s /bin/sh www-data -c "nice php bin/console app:photos:make-variants --no-interaction --quiet" &
+
 # The exact same rm -f done at build time (Dockerfile) doesn't stick on
 # Railway: diagnostic logging confirmed mpm_prefork.load gets a fresh
 # build-time timestamp there, but mpm_event.load — deleted in that same
