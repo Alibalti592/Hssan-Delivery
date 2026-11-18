@@ -11,6 +11,7 @@ use Kreait\Firebase\Messaging\ApnsConfig;
 use Kreait\Firebase\Messaging\CloudMessage;
 use Kreait\Firebase\Messaging\Notification;
 use Kreait\Firebase\Messaging\SendReport;
+use Psr\Cache\CacheItemPoolInterface;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -35,6 +36,11 @@ class PushNotificationService
         private readonly DeviceTokenRepository $deviceTokenRepository,
         private readonly string $firebaseCredentials,
         private readonly LoggerInterface $logger,
+        // Firebase's sign-in token, kept for its hour of validity. Without
+        // it every request that sends a push (a courier accepting a job,
+        // each status change) first asked Google for a new one: one more
+        // round trip before the courier's screen moved on.
+        private readonly ?CacheItemPoolInterface $authTokenCache = null,
     ) {
     }
 
@@ -168,9 +174,11 @@ class PushNotificationService
         }
 
         try {
-            $this->messaging = (new Factory())
-                ->withServiceAccount($this->firebaseCredentials)
-                ->createMessaging();
+            $factory = (new Factory())->withServiceAccount($this->firebaseCredentials);
+            if (null !== $this->authTokenCache) {
+                $factory = $factory->withAuthTokenCache($this->authTokenCache);
+            }
+            $this->messaging = $factory->createMessaging();
         } catch (\Throwable $e) {
             $this->logger->warning('Failed to initialize Firebase Messaging.', ['exception' => $e]);
             $this->messaging = null;

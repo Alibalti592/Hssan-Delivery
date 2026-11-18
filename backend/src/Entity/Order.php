@@ -13,6 +13,10 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Entity(repositoryClass: OrderRepository::class)]
 #[ORM\HasLifecycleCallbacks]
 #[ORM\Table(name: '`order`')]
+// The dashboard's day and the popularity of the last 30 days (status and
+// date), and a customer's own orders, newest first.
+#[ORM\Index(name: 'idx_order_status_created', columns: ['status', 'created_at'])]
+#[ORM\Index(name: 'idx_order_user_created', columns: ['user_id', 'created_at'])]
 class Order
 {
     #[ORM\Id]

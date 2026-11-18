@@ -39,7 +39,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         libwebp-dev \
     && docker-php-ext-configure intl \
     && docker-php-ext-configure gd --with-jpeg --with-webp \
-    && docker-php-ext-install -j"$(nproc)" pdo pdo_pgsql intl opcache gd \
+    && docker-php-ext-install -j"$(nproc)" pdo pdo_pgsql intl opcache gd exif \
     && a2enmod rewrite \
     && (a2dismod mpm_event mpm_worker 2>/dev/null || true) \
     && a2enmod mpm_prefork \
@@ -112,6 +112,14 @@ RUN a2enmod headers \
 # be read." Raise PHP's caps just above the app's so PhotoUploader decides.
 RUN printf '%s\n' 'upload_max_filesize = 6M' 'post_max_size = 8M' \
         > /usr/local/etc/php/conf.d/uploads.ini
+
+# Symfony's recommended opcache sizing: with its libraries the app comes
+# close to PHP's default limit of cached files, past which files are
+# compiled again on every request. realpath_cache keeps PHP from looking every
+# included file up on disk again each request.
+RUN printf '%s\n' 'opcache.max_accelerated_files = 20000' 'opcache.memory_consumption = 192' \
+        'opcache.interned_strings_buffer = 16' 'realpath_cache_size = 4096K' 'realpath_cache_ttl = 600' \
+        > /usr/local/etc/php/conf.d/performance.ini
 
 WORKDIR /var/www/html
 COPY --from=vendor /app ./
