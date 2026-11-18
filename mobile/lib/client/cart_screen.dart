@@ -2,7 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../cart/cart.dart';
+import '../catalogue/add_ons.dart';
+import '../catalogue/catalogue_models.dart';
+import '../catalogue/catalogue_repository.dart';
 import '../theme.dart';
+import '../widgets/app_photo.dart';
 import '../widgets/dark_header.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/quantity_stepper.dart';
@@ -53,15 +57,16 @@ class CartView extends StatelessWidget {
                   ),
                   child: Row(
                     children: [
-                      Container(
-                        width: 36,
-                        height: 36,
-                        decoration: BoxDecoration(
-                          color: fieldFill,
-                          borderRadius: BorderRadius.circular(5),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: AppPhoto(
+                          line.product.photoUrl,
+                          icon: Icons.restaurant_outlined,
+                          width: 56,
+                          height: 56,
                         ),
                       ),
-                      const SizedBox(width: 10),
+                      const SizedBox(width: 12),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -101,6 +106,11 @@ class CartView extends StatelessWidget {
                     ],
                   ),
                 ),
+              if (cart.restaurantId case final restaurantId?)
+                _CompleteOrder(
+                  restaurantId: restaurantId,
+                  restaurantName: cart.restaurantName ?? '',
+                ),
             ],
           ),
         ),
@@ -124,6 +134,210 @@ class CartView extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// "Complétez votre commande": the restaurant's drinks, sauces and
+/// supplements not in the cart yet, one tap to add. Left out when it has
+/// none (or they can't be loaded).
+class _CompleteOrder extends StatefulWidget {
+  const _CompleteOrder({
+    required this.restaurantId,
+    required this.restaurantName,
+  });
+
+  final int restaurantId;
+  final String restaurantName;
+
+  @override
+  State<_CompleteOrder> createState() => _CompleteOrderState();
+}
+
+class _CompleteOrderState extends State<_CompleteOrder> {
+  List<(AddOnKind, Product)> _addOns = const [];
+
+  static const _max = 12;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void didUpdateWidget(_CompleteOrder old) {
+    super.didUpdateWidget(old);
+    if (old.restaurantId != widget.restaurantId) _load();
+  }
+
+  Future<void> _load() async {
+    final restaurantId = widget.restaurantId;
+    try {
+      final catalogue = context.read<CatalogueRepository>();
+      final (categories, products) = await (
+        catalogue.listCategories(restaurantId),
+        catalogue.listProducts(restaurantId),
+      ).wait;
+      if (!mounted || restaurantId != widget.restaurantId) return;
+      final groups = menuAddOns(categories: categories, products: products);
+      // Drinks first: the extra most often forgotten.
+      const order = [AddOnKind.drink, AddOnKind.sauce, AddOnKind.supplement];
+      setState(() {
+        _addOns = [
+          for (final kind in order)
+            for (final group in groups.where((g) => g.kind == kind))
+              for (final product in group.products) (kind, product),
+        ];
+      });
+    } catch (_) {
+      // Best effort: the cart orders just as well without it.
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cart = context.watch<CartController>();
+    final shown = _addOns
+        .where((a) => cart.quantityOf(a.$2.id) == 0)
+        .take(_max)
+        .toList();
+    if (shown.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Complétez votre commande',
+            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 2),
+          const Text(
+            'Boissons, sauces et suppléments du restaurant',
+            style: TextStyle(fontSize: 12.5, color: mutedText),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            height: 196,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              clipBehavior: Clip.none,
+              itemCount: shown.length,
+              separatorBuilder: (_, _) => const SizedBox(width: 10),
+              itemBuilder: (context, index) {
+                final (kind, product) = shown[index];
+                return _AddOnCard(
+                  product: product,
+                  kind: kind,
+                  onAdd: () => cart.add(
+                    product,
+                    restaurantName: widget.restaurantName,
+                    option: product.options.firstOrNull,
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AddOnCard extends StatelessWidget {
+  const _AddOnCard({
+    required this.product,
+    required this.kind,
+    required this.onAdd,
+  });
+
+  final Product product;
+  final AddOnKind kind;
+  final VoidCallback onAdd;
+
+  IconData get _icon => switch (kind) {
+    AddOnKind.drink => Icons.local_drink_outlined,
+    AddOnKind.sauce => Icons.water_drop_outlined,
+    AddOnKind.supplement => Icons.add_circle_outline,
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 132,
+      child: Material(
+        color: Theme.of(context).colorScheme.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(color: cardBorderOf(context)),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onAdd,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              SizedBox(
+                height: 92,
+                child: AppPhoto(product.photoUrl, icon: _icon, iconSize: 28),
+              ),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(10, 8, 8, 8),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        product.name,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w700,
+                          height: 1.2,
+                        ),
+                      ),
+                      const Spacer(),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              '${addOnPrice(product)} DT',
+                              style: const TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                          Semantics(
+                            button: true,
+                            label: 'Ajouter ${product.name}',
+                            child: Container(
+                              width: 28,
+                              height: 28,
+                              decoration: const BoxDecoration(
+                                color: navy,
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.add,
+                                size: 18,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

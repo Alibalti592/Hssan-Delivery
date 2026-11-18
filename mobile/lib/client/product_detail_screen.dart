@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../cart/cart.dart';
+import '../catalogue/add_ons.dart';
 import '../catalogue/catalogue_models.dart';
+import '../catalogue/catalogue_repository.dart';
 import '../theme.dart';
 import '../widgets/app_photo.dart';
 import '../widgets/quantity_stepper.dart';
@@ -45,6 +47,20 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   final _scroll = ScrollController();
   bool _titleInBar = false;
 
+  /// The restaurant's own sauces, supplements and drinks (menu items of
+  /// their own), offered under the dish; empty until loaded, or when the
+  /// restaurant has none.
+  List<AddOnGroup> _addOnGroups = const [];
+
+  /// The ones ticked, by product id: one of each goes in the cart with
+  /// the dish.
+  final Set<int> _addOns = {};
+
+  /// The kinds opened past their first few items.
+  final Set<AddOnKind> _expanded = {};
+
+  static const _addOnsShown = 5;
+
   bool get _hasPhoto =>
       widget.product.photoUrl != null && widget.product.photoUrl!.isNotEmpty;
 
@@ -56,7 +72,41 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       final show = _scroll.offset > threshold - kToolbarHeight;
       if (show != _titleInBar) setState(() => _titleInBar = show);
     });
+    _loadAddOns();
   }
+
+  /// Best effort: without them the dish orders just as well.
+  Future<void> _loadAddOns() async {
+    try {
+      final catalogue = context.read<CatalogueRepository>();
+      final restaurantId = widget.product.restaurantId;
+      final (categories, products) = await (
+        catalogue.listCategories(restaurantId),
+        catalogue.listProducts(restaurantId),
+      ).wait;
+      if (!mounted) return;
+      setState(() {
+        _addOnGroups = menuAddOns(
+          categories: categories,
+          products: products,
+          forProduct: widget.product,
+        );
+      });
+    } catch (_) {
+      // Offline, an older server, or no catalogue here (tests): no extras.
+    }
+  }
+
+  /// The extras ticked, in the order they're shown.
+  List<Product> get _pickedAddOns => [
+    for (final group in _addOnGroups)
+      for (final product in group.products)
+        if (_addOns.contains(product.id)) product,
+  ];
+
+  void _toggleAddOn(Product product) => setState(() {
+    if (!_addOns.remove(product.id)) _addOns.add(product.id);
+  });
 
   @override
   void dispose() {
@@ -147,13 +197,27 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       option: _option,
       extras: _extras,
     );
+    final addOns = _pickedAddOns;
+    for (final addOn in addOns) {
+      cart.add(
+        addOn,
+        restaurantName: widget.restaurantName,
+        option: addOn.options.firstOrNull,
+      );
+    }
     navigator.pop();
     final label = _option == null
         ? widget.product.name
         : '${widget.product.name} (${_option!.name})';
     messenger.showSnackBar(
       SnackBar(
-        content: Text('$label ajouté au panier'),
+        content: Text(
+          addOns.isEmpty
+              ? '$label ajouté au panier'
+              : '$label et ${addOns.length} '
+                    '${addOns.length == 1 ? 'extra ajoutés' : 'extras ajoutés'}'
+                    ' au panier',
+        ),
         action: SnackBarAction(
           label: 'VOIR LE PANIER',
           onPressed: () => navigator.push(
@@ -172,7 +236,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     final unitPrice =
         (double.tryParse(_option?.price ?? product.price) ?? 0) +
         extras.fold(0.0, (sum, e) => sum + (double.tryParse(e.price) ?? 0));
-    final total = unitPrice * _quantity;
+    final addOnsTotal = _pickedAddOns.fold(
+      0.0,
+      (sum, p) => sum + (double.tryParse(addOnPrice(p)) ?? 0),
+    );
+    final total = unitPrice * _quantity + addOnsTotal;
     final missing = _missing;
     final hasPhoto = _hasPhoto;
 
@@ -305,6 +373,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 ],
               ),
             ),
+          if (_addOnGroups.isNotEmpty)
+            const SliverToBoxAdapter(child: _AddOnsHeading()),
+          for (final group in _addOnGroups)
+            SliverToBoxAdapter(child: _addOnSection(group)),
           const SliverToBoxAdapter(child: SizedBox(height: 24)),
         ],
       ),
@@ -318,6 +390,56 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         price: missing == null ? '${total.toStringAsFixed(3)} DT' : null,
         onPressed: missing == null ? _addToCart : () => _showMissing(missing),
       ),
+    );
+  }
+
+  /// One kind of the restaurant's extras: its first few, and the rest a
+  /// tap away.
+  Widget _addOnSection(AddOnGroup group) {
+    final expanded = _expanded.contains(group.kind);
+    final shown = expanded
+        ? group.products
+        : group.products.take(_addOnsShown).toList();
+    final hidden = group.products.length - shown.length;
+    final picked = group.products.where((p) => _addOns.contains(p.id)).length;
+
+    return _ChoiceSection(
+      title: group.kind.title,
+      subtitle: picked == 0
+          ? 'Ajoutez-en à votre commande'
+          : picked == 1
+          ? '1 ajouté'
+          : '$picked ajoutés',
+      badge: _Badge.optional,
+      children: [
+        for (final product in shown)
+          _ChoiceRow(
+            label: product.name,
+            price: '+${addOnPrice(product)} DT',
+            multiple: true,
+            selected: _addOns.contains(product.id),
+            onTap: () => _toggleAddOn(product),
+          ),
+        if (hidden > 0)
+          InkWell(
+            onTap: () => setState(() => _expanded.add(group.kind)),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+              child: Row(
+                children: [
+                  Text(
+                    'Voir les $hidden autres',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14,
+                    ),
+                  ),
+                  const Icon(Icons.expand_more, size: 20),
+                ],
+              ),
+            ),
+          ),
+      ],
     );
   }
 
@@ -335,6 +457,34 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 }
 
 enum _Badge { optional, required, done }
+
+/// Above the restaurant's extras: they're items of their own, added next
+/// to the dish, not choices inside it.
+class _AddOnsHeading extends StatelessWidget {
+  const _AddOnsHeading();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Padding(
+      padding: EdgeInsets.fromLTRB(20, 26, 20, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Envie d’un petit plus ?',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+          ),
+          SizedBox(height: 2),
+          Text(
+            'Sauces, suppléments et boissons du restaurant, '
+            'ajoutés au panier avec votre plat.',
+            style: TextStyle(fontSize: 12.5, color: mutedText),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
 /// A group of choices: a tinted header (its name, how many to pick, and
 /// whether it's required) over a row per choice. [flagged] outlines it when
