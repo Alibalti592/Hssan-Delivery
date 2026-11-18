@@ -58,6 +58,7 @@ class Restaurant {
     required this.type,
     required this.photoUrl,
     this.categories = const [],
+    this.createdAt,
   });
 
   final int id;
@@ -66,6 +67,10 @@ class Restaurant {
   final bool isAvailable;
   final RestaurantType type;
   final String? photoUrl;
+
+  /// When it joined the app, for "Nouveautés"; null when the server
+  /// doesn't say.
+  final DateTime? createdAt;
 
   /// What it serves, in the admin's order; empty when it has none (or the
   /// server is older than this app).
@@ -84,6 +89,7 @@ class Restaurant {
       categories: (json['categories'] as List<dynamic>? ?? const [])
           .map((e) => RestaurantCategory.fromJson(e as Map<String, dynamic>))
           .toList(growable: false),
+      createdAt: DateTime.tryParse(json['createdAt'] as String? ?? ''),
     );
   }
 }
