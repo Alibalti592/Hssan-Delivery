@@ -22,4 +22,18 @@ final class OrderItemRequest
     // OrderService::createOrder().
     #[Assert\Length(max: 50)]
     public ?string $option = null;
+
+    /**
+     * What the customer added (sauces, extras, a drink...), each by its
+     * group and its name, as the product lists them — see
+     * OrderService::createOrder().
+     *
+     * @var OrderItemExtraRequest[]
+     */
+    #[Assert\Count(max: 50)]
+    #[Assert\All([
+        new Assert\Type(type: OrderItemExtraRequest::class),
+    ])]
+    #[Assert\Valid]
+    public array $extras = [];
 }

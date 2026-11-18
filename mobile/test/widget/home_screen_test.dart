@@ -13,6 +13,7 @@ import 'package:mobile/catalogue/catalogue_repository.dart';
 import 'package:mobile/catalogue/category_widgets.dart';
 import 'package:mobile/client/home_screen.dart';
 import 'package:mobile/client/parcel_form_screen.dart';
+import 'package:mobile/client/product_detail_screen.dart';
 import 'package:mobile/client/restaurants_screen.dart';
 import 'package:mobile/core/api_client.dart';
 import 'package:mobile/core/token_storage.dart';
@@ -75,6 +76,7 @@ Widget _wrap({
   List<dynamic> restaurants = const [],
   List<dynamic> categories = const [],
   List<dynamic> orders = const [],
+  Map<int, List<dynamic>> menus = const {},
   CartController? cart,
   VoidCallback? onSeeOrders,
 }) {
@@ -84,6 +86,14 @@ Widget _wrap({
     httpClient: MockClient((request) async {
       if (request.url.path == '/api/addresses') {
         return jsonResponse(const []);
+      }
+      final menu = RegExp(
+        r'^/api/restaurants/(\d+)/products$',
+      ).firstMatch(request.url.path);
+      if (menu != null) {
+        return jsonResponse(
+          pagedBody(menus[int.parse(menu.group(1)!)] ?? const []),
+        );
       }
       if (request.url.path == '/api/orders') {
         return jsonResponse(pagedBody(orders));
@@ -489,6 +499,174 @@ void main() {
       find.descendant(of: list, matching: find.text('Douceurs du Lac')),
       findsNothing,
     );
+  });
+
+  testWidgets('discounts and fixed-price offers get their own sections', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(800, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(
+      _wrap(promotions: [_promotion(1, 'Summer Discount'), _offer()]),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Promotions'), findsOneWidget);
+    expect(find.text('-10%'), findsWidgets);
+    expect(find.text('Combos & bons plans'), findsOneWidget);
+    expect(find.text('2 Sandwiches Chawarma'), findsOneWidget);
+  });
+
+  testWidgets('no promotion section is shown without promotions', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_wrap());
+    await tester.pumpAndSettle();
+
+    expect(find.text('Promotions'), findsNothing);
+    expect(find.text('Combos & bons plans'), findsNothing);
+    expect(find.text('Vos plus commandés'), findsNothing);
+    expect(find.text('Nouveautés'), findsNothing);
+  });
+
+  testWidgets('"Vos plus commandés" counts the customer’s own orders', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(800, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    Map<String, dynamic> item(int id, String name) => {
+      'productId': id,
+      'productName': name,
+      'quantity': 1,
+      'unitPrice': '15.000',
+    };
+    Map<String, dynamic> order(int id, String status, List<dynamic> items) => {
+      ..._order(id, status: status),
+      'items': items,
+    };
+    Map<String, dynamic> product(int id, String name) => {
+      'id': id,
+      'name': name,
+      'description': null,
+      'price': '15.000',
+      'isAvailable': true,
+      'photoUrl': null,
+      'restaurantId': 1,
+      'categoryId': 1,
+      'options': const [],
+    };
+
+    await tester.pumpWidget(
+      _wrap(
+        restaurants: [
+          {
+            'id': 1,
+            'name': 'Pizza Roma',
+            'description': null,
+            'isAvailable': true,
+            'photoUrl': null,
+          },
+        ],
+        orders: [
+          order(1, 'COMPLETED', [item(10, 'Pizza Reine')]),
+          order(2, 'COMPLETED', [
+            item(10, 'Pizza Reine'),
+            item(11, 'Tiramisu'),
+          ]),
+          order(3, 'CANCELLED', [item(12, 'Calzone')]),
+        ],
+        menus: {
+          1: [
+            product(10, 'Pizza Reine'),
+            product(11, 'Tiramisu'),
+            product(12, 'Calzone'),
+          ],
+        },
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Vos plus commandés'), findsOneWidget);
+    expect(find.text('Commandé 2 fois'), findsOneWidget);
+    expect(find.text('Déjà commandé'), findsOneWidget);
+    // Only in a cancelled order: not a favourite.
+    expect(find.text('Calzone'), findsNothing);
+
+    await tester.tap(find.text('Pizza Reine'));
+    await tester.pumpAndSettle();
+    expect(find.byType(ProductDetailScreen), findsOneWidget);
+  });
+
+  testWidgets('"Nouveautés" shows the restaurants added this month', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(800, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    final now = DateTime.now();
+    Map<String, dynamic> restaurant(int id, String name, int daysAgo) => {
+      'id': id,
+      'name': name,
+      'description': null,
+      'isAvailable': true,
+      'photoUrl': null,
+      'createdAt': now
+          .subtract(Duration(days: daysAgo))
+          .toUtc()
+          .toIso8601String(),
+    };
+
+    await tester.pumpWidget(
+      _wrap(
+        restaurants: [
+          restaurant(1, 'Le Vieux Port', 120),
+          restaurant(2, 'Burger Lab', 3),
+        ],
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Nouveautés'), findsOneWidget);
+    expect(find.text('NOUVEAU'), findsOneWidget);
+    expect(find.text('Ajouté il y a 3 jours'), findsOneWidget);
+    // Both still in the restaurant list; only the new one is "Nouveau".
+    expect(find.text('Le Vieux Port'), findsOneWidget);
+    expect(find.text('Burger Lab'), findsNWidgets(2));
+  });
+
+  testWidgets('open restaurants are listed before closed ones', (tester) async {
+    tester.view.physicalSize = const Size(800, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    Map<String, dynamic> restaurant(int id, String name, bool open) => {
+      'id': id,
+      'name': name,
+      'description': null,
+      'isAvailable': open,
+      'photoUrl': null,
+    };
+
+    await tester.pumpWidget(
+      _wrap(
+        restaurants: [
+          restaurant(1, 'Fermé Tard', false),
+          restaurant(2, 'Toujours Ouvert', true),
+        ],
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      tester.getTopLeft(find.text('Toujours Ouvert')).dy,
+      lessThan(tester.getTopLeft(find.text('Fermé Tard')).dy),
+    );
+    expect(find.text('Fermé'), findsOneWidget);
   });
 
   testWidgets('no category row while no restaurant has a category', (

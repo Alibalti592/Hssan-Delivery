@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart' show IconData, Icons;
 
 import '../bills/bill_models.dart';
+import '../catalogue/catalogue_models.dart' show PickedExtra;
 import '../orders/delivery_speed.dart';
 
 /// Delivery lifecycle, mirrors the backend `DeliveryStatus` enum.
@@ -112,6 +113,7 @@ class DeliveryItem {
     required this.quantity,
     required this.unitPrice,
     this.option,
+    this.extras = const [],
   });
 
   final String productName;
@@ -125,12 +127,20 @@ class DeliveryItem {
   String get displayName =>
       option == null ? productName : '$productName ($option)';
 
+  /// What the customer added (sauces, extras, a drink...), already in
+  /// [unitPrice].
+  final List<PickedExtra> extras;
+
+  /// "Sauces : Harissa · Boisson : Coca-Cola", or empty.
+  String get extrasLabel => PickedExtra.describe(extras);
+
   factory DeliveryItem.fromJson(Map<String, dynamic> json) {
     return DeliveryItem(
       productName: json['productName'] as String? ?? 'Item',
       quantity: json['quantity'] as int? ?? 1,
       unitPrice: json['unitPrice'] as String? ?? '0.000',
       option: json['option'] as String?,
+      extras: PickedExtra.listFrom(json['extras']),
     );
   }
 }

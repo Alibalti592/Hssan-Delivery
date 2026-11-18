@@ -83,6 +83,11 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           channel: stable
+          # Pinned: a new Flutter release can require newer build tools than
+          # the project has (3.50 wants Gradle 9.3.1; android/ is on 8.14.3)
+          # and break every build overnight. Upgrade on purpose, here and in
+          # the other mobile workflows together.
+          flutter-version: 3.47.9
           cache: true
 
       - name: Install dependencies

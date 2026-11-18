@@ -131,6 +131,10 @@ class OrdersRepository {
             'productId': l.product.id,
             'quantity': l.quantity,
             if (l.option != null) 'option': l.option!.name,
+            if (l.extras.isNotEmpty)
+              'extras': [
+                for (final e in l.extras) {'group': e.group, 'choice': e.name},
+              ],
           },
         )
         .toList(growable: false),

@@ -175,8 +175,24 @@ class DeliveryDetailScreen extends StatelessWidget {
                         for (final item in order.items)
                           Padding(
                             padding: const EdgeInsets.only(bottom: 4),
-                            child: Text(
-                              '${item.quantity}× ${item.displayName}',
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('${item.quantity}× ${item.displayName}'),
+                                // What to check at pickup: the sauces, the
+                                // extras, the drink.
+                                if (item.extras.isNotEmpty)
+                                  Padding(
+                                    padding: const EdgeInsets.only(left: 18),
+                                    child: Text(
+                                      item.extrasLabel,
+                                      style: const TextStyle(
+                                        fontSize: 12.5,
+                                        color: mutedText,
+                                      ),
+                                    ),
+                                  ),
+                              ],
                             ),
                           ),
                         if (order.bill != null)

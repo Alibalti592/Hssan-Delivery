@@ -36,6 +36,19 @@ final class UpdateProductRequest
     #[Assert\Valid]
     public array $options = [];
 
+    /**
+     * What the customer can add when ordering (sauces, extras, a drink...).
+     * Left out: unchanged.
+     *
+     * @var ProductExtraGroupRequest[]|null
+     */
+    #[Assert\Count(max: 10)]
+    #[Assert\All([
+        new Assert\Type(type: ProductExtraGroupRequest::class),
+    ])]
+    #[Assert\Valid]
+    public ?array $extraGroups = null;
+
     #[Assert\NotNull]
     #[Assert\Positive]
     public ?int $categoryId = null;
@@ -67,6 +80,24 @@ final class UpdateProductRequest
             }
 
             $seen[$key] = true;
+        }
+
+        $groups = [];
+
+        foreach ($this->extraGroups ?? [] as $index => $group) {
+            if (!$group instanceof ProductExtraGroupRequest || null === $group->name) {
+                continue;
+            }
+
+            $key = mb_strtolower(trim($group->name));
+
+            if (isset($groups[$key])) {
+                $context->buildViolation('Each group name must be unique.')
+                    ->atPath("extraGroups[$index].name")
+                    ->addViolation();
+            }
+
+            $groups[$key] = true;
         }
     }
 }

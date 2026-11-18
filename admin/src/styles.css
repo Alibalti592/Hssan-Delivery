@@ -287,6 +287,14 @@ tr.row-late td:first-child { box-shadow: inset 3px 0 0 #e53e3e; }
 .optional { text-transform: none; letter-spacing: 0; font-weight: 400; color: #9aa0a6; margin-left: 4px; }
 .field-row { display: flex; gap: 12px; flex-wrap: wrap; }
 .option-row { display: flex; gap: 8px; align-items: center; }
+.option-row + .option-row { margin-top: 6px; }
+.extra-group { border: 1px solid #e6e9ee; border-radius: 8px; padding: 10px; margin: 8px 0; background: #fbfcfd; }
+.extra-group > .btn { margin-top: 8px; }
+.extra-group-head { display: flex; gap: 8px; align-items: center; }
+.extra-group-head .field-input { flex: 1; min-width: 0; font-weight: 700; }
+.extra-group-head .field-select { width: 120px; }
+.extra-actions { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 4px; }
+.extra-copy { width: auto; padding: 5px 8px; font-size: 11px; }
 .option-row .field-input:first-child { flex: 2; min-width: 0; }
 .option-row .field-input:nth-child(2) { flex: 1; min-width: 0; }
 .btn.danger-text { color: #9b2c2c; border-color: #e6c3c3; }

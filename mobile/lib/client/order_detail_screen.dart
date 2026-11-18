@@ -425,9 +425,25 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                             vertical: 10,
                           ),
                           child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text('${item.quantity}x '),
-                              Expanded(child: Text(item.displayName)),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(item.displayName),
+                                    if (item.extras.isNotEmpty)
+                                      Text(
+                                        item.extrasLabel,
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          color: mutedText,
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
                               Text('${item.unitPrice} DT'),
                             ],
                           ),

@@ -98,6 +98,9 @@ nano .env
 In `.env`:
 
 - **`API_DOMAIN`**, **`ADMIN_DOMAIN`**: your two domains.
+- **`SITE_DOMAIN`**: the bare domain (`example.tn`), for the public pages in
+  `deploy/site`: home, privacy policy and account deletion, which the app
+  stores ask for. `www.example.tn` redirects to it.
 - **`ACME_EMAIL`**: your email, for certificate warnings.
 - **`POSTGRES_PASSWORD`**, **`APP_SECRET`**: new random values, each from `openssl rand -hex 32`.
 - **`JWT_PASSPHRASE`**:
@@ -123,8 +126,9 @@ log the server in once:
 
 ## 3. Point the domains at the server
 
-At your domain provider, create **A records** for both `api.example.tn` and
-`admin.example.tn` → the server's IP address.
+At your domain provider, create **A records** for `api.example.tn`,
+`admin.example.tn`, `example.tn` and `www.example.tn` → the server's IP
+address (replace any A record the provider put on `example.tn` and `www`).
 
 If you did step 0, `api.example.tn` is currently a CNAME to Railway: **leave
 it** until step 4 is done, then change it.

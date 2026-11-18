@@ -17,6 +17,8 @@ final class OrderResponse
                 'productId' => $item->getProduct()?->getId(),
                 'productName' => $item->getProduct()?->getName(),
                 'option' => $item->getOptionName(),
+                // Sauces, extras, a drink...: already in unitPrice.
+                'extras' => $item->getExtras(),
                 'quantity' => $item->getQuantity(),
                 'unitPrice' => $item->getUnitPrice(),
             ];

@@ -2,10 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../cart/cart.dart';
+import '../catalogue/add_ons.dart';
 import '../catalogue/catalogue_models.dart';
+import '../catalogue/catalogue_repository.dart';
 import '../theme.dart';
 import '../widgets/app_photo.dart';
 import '../widgets/quantity_stepper.dart';
+import 'cart_screen.dart';
 
 class ProductDetailScreen extends StatefulWidget {
   const ProductDetailScreen({
@@ -29,6 +32,133 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   late ProductOption? _option = widget.product.hasOptions
       ? widget.product.options.first
       : null;
+
+  /// The extras ticked, by group name.
+  final Map<String, Set<String>> _picked = {};
+
+  /// Each group's section, to bring a required one left empty into view.
+  final Map<String, GlobalKey> _groupKeys = {};
+
+  /// The required group the customer was just sent back to, outlined until
+  /// something is picked in it.
+  String? _flagged;
+
+  /// The dish's name in the top bar, once the photo has scrolled away.
+  final _scroll = ScrollController();
+  bool _titleInBar = false;
+
+  /// The restaurant's own sauces, supplements and drinks (menu items of
+  /// their own), offered under the dish; empty until loaded, or when the
+  /// restaurant has none.
+  List<AddOnGroup> _addOnGroups = const [];
+
+  /// The ones ticked, by product id: one of each goes in the cart with
+  /// the dish.
+  final Set<int> _addOns = {};
+
+  /// The kinds opened past their first few items.
+  final Set<AddOnKind> _expanded = {};
+
+  static const _addOnsShown = 5;
+
+  bool get _hasPhoto =>
+      widget.product.photoUrl != null && widget.product.photoUrl!.isNotEmpty;
+
+  @override
+  void initState() {
+    super.initState();
+    _scroll.addListener(() {
+      final threshold = (_hasPhoto ? 260.0 : 0.0) + 40;
+      final show = _scroll.offset > threshold - kToolbarHeight;
+      if (show != _titleInBar) setState(() => _titleInBar = show);
+    });
+    _loadAddOns();
+  }
+
+  /// Best effort: without them the dish orders just as well.
+  Future<void> _loadAddOns() async {
+    try {
+      final catalogue = context.read<CatalogueRepository>();
+      final restaurantId = widget.product.restaurantId;
+      final (categories, products) = await (
+        catalogue.listCategories(restaurantId),
+        catalogue.listProducts(restaurantId),
+      ).wait;
+      if (!mounted) return;
+      setState(() {
+        _addOnGroups = menuAddOns(
+          categories: categories,
+          products: products,
+          forProduct: widget.product,
+        );
+      });
+    } catch (_) {
+      // Offline, an older server, or no catalogue here (tests): no extras.
+    }
+  }
+
+  /// The extras ticked, in the order they're shown.
+  List<Product> get _pickedAddOns => [
+    for (final group in _addOnGroups)
+      for (final product in group.products)
+        if (_addOns.contains(product.id)) product,
+  ];
+
+  void _toggleAddOn(Product product) => setState(() {
+    if (!_addOns.remove(product.id)) _addOns.add(product.id);
+  });
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  /// What was ticked, in the product's own order — the order's too.
+  List<PickedExtra> get _extras => [
+    for (final group in widget.product.extraGroups)
+      for (final choice in group.choices)
+        if (_picked[group.name]?.contains(choice.name) ?? false)
+          PickedExtra(
+            group: group.name,
+            name: choice.name,
+            price: choice.price,
+          ),
+  ];
+
+  /// The first required group with nothing ticked yet, if any.
+  ProductExtraGroup? get _missing => widget.product.extraGroups
+      .where((g) => g.required && (_picked[g.name]?.isEmpty ?? true))
+      .firstOrNull;
+
+  void _toggle(ProductExtraGroup group, ProductExtraChoice choice) {
+    setState(() {
+      final picked = _picked.putIfAbsent(group.name, () => <String>{});
+      if (picked.contains(choice.name)) {
+        picked.remove(choice.name);
+      } else {
+        // One pick only: the new one replaces the old.
+        if (!group.multiple) picked.clear();
+        picked.add(choice.name);
+      }
+      if (_flagged == group.name && picked.isNotEmpty) _flagged = null;
+    });
+  }
+
+  /// "Ajouter" with a required group still empty: scroll to it and outline
+  /// it, rather than a button that silently does nothing.
+  void _showMissing(ProductExtraGroup group) {
+    setState(() => _flagged = group.name);
+    final target = _groupKeys[group.name]?.currentContext;
+    if (target != null) {
+      Scrollable.ensureVisible(
+        target,
+        duration: const Duration(milliseconds: 350),
+        curve: Curves.easeOutCubic,
+        alignment: 0.1,
+      );
+    }
+  }
 
   Future<void> _addToCart() async {
     final cart = context.read<CartController>();
@@ -65,131 +195,574 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       restaurantName: widget.restaurantName,
       quantity: _quantity,
       option: _option,
+      extras: _extras,
     );
+    final addOns = _pickedAddOns;
+    for (final addOn in addOns) {
+      cart.add(
+        addOn,
+        restaurantName: widget.restaurantName,
+        option: addOn.options.firstOrNull,
+      );
+    }
     navigator.pop();
     final label = _option == null
         ? widget.product.name
         : '${widget.product.name} (${_option!.name})';
-    messenger.showSnackBar(SnackBar(content: Text('$label ajouté au panier')));
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(
+          addOns.isEmpty
+              ? '$label ajouté au panier'
+              : '$label et ${addOns.length} '
+                    '${addOns.length == 1 ? 'extra ajoutés' : 'extras ajoutés'}'
+                    ' au panier',
+        ),
+        action: SnackBarAction(
+          label: 'VOIR LE PANIER',
+          onPressed: () => navigator.push(
+            MaterialPageRoute(builder: (_) => const CartScreen()),
+          ),
+        ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final product = widget.product;
-    final unitPrice = _option?.price ?? product.price;
-    final total = (double.tryParse(unitPrice) ?? 0) * _quantity;
+    final textTheme = Theme.of(context).textTheme;
+    final extras = _extras;
+    final unitPrice =
+        (double.tryParse(_option?.price ?? product.price) ?? 0) +
+        extras.fold(0.0, (sum, e) => sum + (double.tryParse(e.price) ?? 0));
+    final addOnsTotal = _pickedAddOns.fold(
+      0.0,
+      (sum, p) => sum + (double.tryParse(addOnPrice(p)) ?? 0),
+    );
+    final total = unitPrice * _quantity + addOnsTotal;
+    final missing = _missing;
+    final hasPhoto = _hasPhoto;
 
     return Scaffold(
-      body: SafeArea(
-        bottom: false,
-        child: Column(
-          children: [
-            Stack(
+      body: CustomScrollView(
+        controller: _scroll,
+        slivers: [
+          SliverAppBar(
+            pinned: true,
+            stretch: true,
+            // No photo: just the bar, rather than a big empty placeholder.
+            expandedHeight: hasPhoto ? 260 : null,
+            backgroundColor: Colors.white,
+            surfaceTintColor: Colors.white,
+            elevation: 0,
+            scrolledUnderElevation: 0.5,
+            shadowColor: const Color(0x22000000),
+            title: AnimatedOpacity(
+              duration: const Duration(milliseconds: 180),
+              opacity: _titleInBar ? 1 : 0,
+              child: Text(
+                product.name,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+            leading: Padding(
+              padding: const EdgeInsets.all(8),
+              child: Material(
+                color: Colors.white,
+                shape: const CircleBorder(),
+                elevation: 1,
+                child: IconButton(
+                  icon: const Icon(Icons.arrow_back, color: navy, size: 20),
+                  tooltip: 'Retour',
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+              ),
+            ),
+            flexibleSpace: hasPhoto
+                ? FlexibleSpaceBar(
+                    background: AppPhoto(
+                      product.photoUrl,
+                      icon: Icons.restaurant_outlined,
+                      iconSize: 48,
+                    ),
+                  )
+                : null,
+          ),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    product.name,
+                    style: textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    product.hasOptions
+                        ? 'À partir de ${product.price} DT'
+                        : '${product.price} DT',
+                    style: textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: navy,
+                    ),
+                  ),
+                  if (product.description != null &&
+                      product.description!.isNotEmpty) ...[
+                    const SizedBox(height: 10),
+                    Text(
+                      product.description!,
+                      style: textTheme.bodyMedium?.copyWith(
+                        color: const Color(0xFF5B6472),
+                        height: 1.4,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+          if (product.hasOptions)
+            SliverToBoxAdapter(
+              child: _ChoiceSection(
+                title: 'Taille',
+                subtitle: 'Choisissez-en 1',
+                badge: _Badge.done,
+                children: [
+                  for (final option in product.options)
+                    _ChoiceRow(
+                      label: option.name,
+                      price: '${option.price} DT',
+                      multiple: false,
+                      selected: option.name == _option?.name,
+                      onTap: () => setState(() => _option = option),
+                    ),
+                ],
+              ),
+            ),
+          for (final group in product.extraGroups)
+            SliverToBoxAdapter(
+              child: _ChoiceSection(
+                key: _groupKeys.putIfAbsent(group.name, GlobalKey.new),
+                title: group.name,
+                subtitle: _subtitle(group, _picked[group.name]?.length ?? 0),
+                badge: !group.required
+                    ? _Badge.optional
+                    : (_picked[group.name]?.isEmpty ?? true)
+                    ? _Badge.required
+                    : _Badge.done,
+                flagged: _flagged == group.name,
+                children: [
+                  for (final choice in group.choices)
+                    _ChoiceRow(
+                      label: choice.name,
+                      price: choice.isFree ? 'Gratuit' : '+${choice.price} DT',
+                      free: choice.isFree,
+                      multiple: group.multiple,
+                      selected:
+                          _picked[group.name]?.contains(choice.name) ?? false,
+                      onTap: () => _toggle(group, choice),
+                    ),
+                ],
+              ),
+            ),
+          if (_addOnGroups.isNotEmpty)
+            const SliverToBoxAdapter(child: _AddOnsHeading()),
+          for (final group in _addOnGroups)
+            SliverToBoxAdapter(child: _addOnSection(group)),
+          const SliverToBoxAdapter(child: SizedBox(height: 24)),
+        ],
+      ),
+      bottomNavigationBar: _AddBar(
+        quantity: _quantity,
+        onDecrement: _quantity > 1 ? () => setState(() => _quantity--) : null,
+        onIncrement: _quantity < CartController.maxQuantityPerProduct
+            ? () => setState(() => _quantity++)
+            : null,
+        label: missing == null ? 'Ajouter' : 'Choisir : ${missing.name}',
+        price: missing == null ? '${total.toStringAsFixed(3)} DT' : null,
+        onPressed: missing == null ? _addToCart : () => _showMissing(missing),
+      ),
+    );
+  }
+
+  /// One kind of the restaurant's extras: its first few, and the rest a
+  /// tap away.
+  Widget _addOnSection(AddOnGroup group) {
+    final expanded = _expanded.contains(group.kind);
+    final shown = expanded
+        ? group.products
+        : group.products.take(_addOnsShown).toList();
+    final hidden = group.products.length - shown.length;
+    final picked = group.products.where((p) => _addOns.contains(p.id)).length;
+
+    return _ChoiceSection(
+      title: group.kind.title,
+      subtitle: picked == 0
+          ? 'Ajoutez-en à votre commande'
+          : picked == 1
+          ? '1 ajouté'
+          : '$picked ajoutés',
+      badge: _Badge.optional,
+      children: [
+        for (final product in shown)
+          _ChoiceRow(
+            label: product.name,
+            price: '+${addOnPrice(product)} DT',
+            multiple: true,
+            selected: _addOns.contains(product.id),
+            onTap: () => _toggleAddOn(product),
+          ),
+        if (hidden > 0)
+          InkWell(
+            onTap: () => setState(() => _expanded.add(group.kind)),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+              child: Row(
+                children: [
+                  Text(
+                    'Voir les $hidden autres',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14,
+                    ),
+                  ),
+                  const Icon(Icons.expand_more, size: 20),
+                ],
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  /// "Choisissez-en 1", "Un seul choix possible", "2 choisis"...
+  static String _subtitle(ProductExtraGroup group, int picked) {
+    // Optional (a drink, most often): worded so it doesn't read as an order.
+    if (!group.multiple) {
+      return group.required ? 'Choisissez-en 1' : 'Un seul choix possible';
+    }
+    if (picked > 0) return picked == 1 ? '1 choisi' : '$picked choisis';
+    return group.required
+        ? 'Au moins 1, plusieurs possibles'
+        : 'Plusieurs choix possibles';
+  }
+}
+
+enum _Badge { optional, required, done }
+
+/// Above the restaurant's extras: they're items of their own, added next
+/// to the dish, not choices inside it.
+class _AddOnsHeading extends StatelessWidget {
+  const _AddOnsHeading();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Padding(
+      padding: EdgeInsets.fromLTRB(20, 26, 20, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Envie d’un petit plus ?',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+          ),
+          SizedBox(height: 2),
+          Text(
+            'Sauces, suppléments et boissons du restaurant, '
+            'ajoutés au panier avec votre plat.',
+            style: TextStyle(fontSize: 12.5, color: mutedText),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// A group of choices: a tinted header (its name, how many to pick, and
+/// whether it's required) over a row per choice. [flagged] outlines it when
+/// the customer is sent back to it.
+class _ChoiceSection extends StatelessWidget {
+  const _ChoiceSection({
+    required this.title,
+    required this.subtitle,
+    required this.badge,
+    required this.children,
+    this.flagged = false,
+    super.key,
+  });
+
+  final String title;
+  final String subtitle;
+  final _Badge badge;
+  final List<Widget> children;
+  final bool flagged;
+
+  @override
+  Widget build(BuildContext context) {
+    final (badgeText, badgeColor, badgeBg) = switch (badge) {
+      _Badge.optional => ('Facultatif', mutedText, Colors.white),
+      _Badge.required => ('Obligatoire', warnText, warnBg),
+      _Badge.done => ('✓', successText, successBg),
+    };
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 250),
+      margin: const EdgeInsets.only(top: 14),
+      decoration: BoxDecoration(
+        border: Border.symmetric(
+          horizontal: BorderSide(
+            color: flagged ? warnText : Colors.transparent,
+            width: 1.5,
+          ),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Container(
+            color: flagged ? warnBg : const Color(0xFFF4F6F9),
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
+            child: Row(
               children: [
-                SizedBox(
-                  height: 200,
-                  width: double.infinity,
-                  child: AppPhoto(
-                    product.photoUrl,
-                    icon: Icons.restaurant_outlined,
-                    iconSize: 48,
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        flagged ? 'Faites un choix pour continuer' : subtitle,
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          color: flagged ? warnText : mutedText,
+                          fontWeight: flagged ? FontWeight.w700 : null,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                Positioned(
-                  top: 8,
-                  left: 8,
-                  child: CircleAvatar(
-                    backgroundColor: Colors.white,
-                    child: IconButton(
-                      icon: const Icon(Icons.arrow_back, color: navy),
-                      onPressed: () => Navigator.of(context).pop(),
+                Container(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: badge == _Badge.done ? 9 : 10,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: badgeBg,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    badgeText,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      color: badgeColor,
                     ),
                   ),
                 ),
               ],
             ),
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      product.name,
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    if (product.description != null &&
-                        product.description!.isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      Text(
-                        product.description!,
-                        style: Theme.of(context).textTheme.bodyMedium,
-                      ),
-                    ],
-                    if (product.hasOptions) ...[
-                      const SizedBox(height: 20),
-                      Text(
-                        'Taille',
-                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [
-                          for (final option in product.options)
-                            ChoiceChip(
-                              label: Text(
-                                '${option.name} · ${option.price} DT',
-                              ),
-                              selected: option.name == _option?.name,
-                              onSelected: (_) =>
-                                  setState(() => _option = option),
-                            ),
-                        ],
-                      ),
-                    ],
-                    const SizedBox(height: 24),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        QuantityStepper(
-                          large: true,
-                          quantity: _quantity,
-                          onDecrement: _quantity > 1
-                              ? () => setState(() => _quantity--)
-                              : null,
-                          onIncrement:
-                              _quantity < CartController.maxQuantityPerProduct
-                              ? () => setState(() => _quantity++)
-                              : null,
-                        ),
-                        Text(
-                          '${total.toStringAsFixed(3)} DT',
-                          style: Theme.of(context).textTheme.headlineSmall
-                              ?.copyWith(fontWeight: FontWeight.w800),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
+          ),
+          for (var i = 0; i < children.length; i++) ...[
+            if (i > 0)
+              Divider(
+                height: 1,
+                indent: 20,
+                endIndent: 20,
+                color: cardBorderOf(context),
               ),
-            ),
-            SafeArea(
-              top: false,
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: FilledButton(
-                  onPressed: _addToCart,
-                  child: const Text('AJOUTER AU PANIER'),
-                ),
-              ),
-            ),
+            children[i],
           ],
+        ],
+      ),
+    );
+  }
+}
+
+/// One choice: a checkbox (several) or a round button (one), its name and
+/// its price, with the whole row as the tap target.
+class _ChoiceRow extends StatelessWidget {
+  const _ChoiceRow({
+    required this.label,
+    required this.price,
+    required this.multiple,
+    required this.selected,
+    required this.onTap,
+    this.free = false,
+  });
+
+  final String label;
+  final String price;
+  final bool multiple;
+  final bool selected;
+  final bool free;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      checked: selected,
+      button: true,
+      child: Material(
+        color: selected ? const Color(0xFFF7F8FA) : Colors.white,
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+            child: Row(
+              children: [
+                _Mark(selected: selected, round: !multiple),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                    ),
+                  ),
+                ),
+                Text(
+                  price,
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w600,
+                    color: free ? mutedText : const Color(0xFF3A4250),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The tick of a choice: a rounded square (several) or a circle (one),
+/// filled black with a white check, or a black ring, once picked.
+class _Mark extends StatelessWidget {
+  const _Mark({required this.selected, required this.round});
+
+  final bool selected;
+  final bool round;
+
+  @override
+  Widget build(BuildContext context) {
+    const size = 22.0;
+    final accent = accentOf(context);
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 160),
+      curve: Curves.easeOut,
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: selected && !round ? accent : Colors.white,
+        shape: round ? BoxShape.circle : BoxShape.rectangle,
+        borderRadius: round ? null : BorderRadius.circular(6),
+        border: Border.all(
+          color: selected ? accent : const Color(0xFFC3C9D2),
+          width: selected && round ? 6.5 : 1.8,
+        ),
+      ),
+      child: selected && !round
+          ? const Icon(Icons.check_rounded, size: 16, color: Colors.white)
+          : null,
+    );
+  }
+}
+
+/// Always in view at the bottom: how many, and the button with the total
+/// on it — or, while a required group is empty, which one to fill.
+class _AddBar extends StatelessWidget {
+  const _AddBar({
+    required this.quantity,
+    required this.onDecrement,
+    required this.onIncrement,
+    required this.label,
+    required this.onPressed,
+    this.price,
+  });
+
+  final int quantity;
+  final VoidCallback? onDecrement;
+  final VoidCallback? onIncrement;
+  final String label;
+
+  /// The total, on the button's right; none while a choice is missing.
+  final String? price;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Color(0x14000000),
+            blurRadius: 16,
+            offset: Offset(0, -4),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+          child: Row(
+            children: [
+              QuantityStepper(
+                quantity: quantity,
+                onDecrement: onDecrement,
+                onIncrement: onIncrement,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: FilledButton(
+                  onPressed: onPressed,
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size(0, 52),
+                    padding: const EdgeInsets.symmetric(horizontal: 18),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  child: price == null
+                      ? FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(label, maxLines: 1),
+                        )
+                      : Row(
+                          children: [
+                            Text(label),
+                            const Spacer(),
+                            Text(
+                              price!,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ],
+                        ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

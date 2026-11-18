@@ -4,9 +4,11 @@ namespace App\Service;
 
 use App\Dto\Order\CreateOrderRequest;
 use App\Dto\Order\CreateParcelOrderRequest;
+use App\Dto\Order\OrderItemExtraRequest;
 use App\Entity\Delivery;
 use App\Entity\Order;
 use App\Entity\OrderItem;
+use App\Entity\Product;
 use App\Entity\User;
 use App\Enum\DeliveryStatus;
 use App\Enum\DeliveryType;
@@ -149,6 +151,13 @@ final class OrderService
                 throw new InvalidOperationException("« {$product->getName()} » n'a pas encore de prix.");
             }
 
+            // Sauces, extras, a drink...: each adds its price to the line's.
+            $extras = $this->resolveExtras($product, $itemDto->extras);
+
+            foreach ($extras as $extra) {
+                $unitPrice = Money::fromMillimes(Money::toMillimes($unitPrice) + Money::toMillimes($extra['price']));
+            }
+
             $priceMillimes = Money::toMillimes($unitPrice);
 
             $itemTotalMillimes =
@@ -166,6 +175,7 @@ final class OrderService
             $orderItem->setQuantity($itemDto->quantity);
             $orderItem->setUnitPrice($unitPrice);
             $orderItem->setOptionName($optionName);
+            $orderItem->setExtras($extras);
 
             $order->addItem($orderItem);
         }
@@ -310,5 +320,53 @@ final class OrderService
         $this->deliveryService->cancelDelivery($delivery);
 
         return $order;
+    }
+
+    /**
+     * The extras picked for one line, checked against what the product
+     * offers: each must still exist, a single-pick group takes one at most,
+     * and a required group at least one. Copied with their current price, in
+     * the product's order.
+     *
+     * @param OrderItemExtraRequest[] $requested
+     *
+     * @return list<array{group: string, name: string, price: string}>
+     */
+    private function resolveExtras(Product $product, array $requested): array
+    {
+        $picked = [];
+
+        foreach ($requested as $extra) {
+            $group = $product->findExtraGroup((string) $extra->group);
+            $names = null === $group ? [] : array_column($group['choices'], 'name');
+
+            if (!in_array($extra->choice, $names, true)) {
+                throw new InvalidOperationException("« {$extra->choice} » n'est plus proposé pour « {$product->getName()} ». Mettez votre panier à jour.");
+            }
+
+            $picked[$group['name']][$extra->choice] = true;
+        }
+
+        $extras = [];
+
+        foreach ($product->getExtraGroups() as $group) {
+            $chosen = $picked[$group['name']] ?? [];
+
+            if ($group['required'] && [] === $chosen) {
+                throw new InvalidOperationException("Choisissez « {$group['name']} » pour « {$product->getName()} ».");
+            }
+
+            if (!$group['multiple'] && count($chosen) > 1) {
+                throw new InvalidOperationException("Un seul choix pour « {$group['name']} » de « {$product->getName()} ».");
+            }
+
+            foreach ($group['choices'] as $choice) {
+                if (isset($chosen[$choice['name']])) {
+                    $extras[] = ['group' => $group['name'], 'name' => $choice['name'], 'price' => $choice['price']];
+                }
+            }
+        }
+
+        return $extras;
     }
 }

@@ -14,7 +14,7 @@
          POST_NOTIFICATIONS and pushes are silently dropped by the OS. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <application
-        android:label="Hssan Delivery"
+        android:label="Delivery Hassen"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

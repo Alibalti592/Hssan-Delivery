@@ -15,6 +15,7 @@ final class ProductResponse
             'description' => $product->getDescription(),
             'price' => $product->getPrice(),
             'options' => $product->getOptions(),
+            'extraGroups' => $product->getExtraGroups(),
             'isAvailable' => $product->isAvailable(),
             'photoUrl' => PhotoUploader::url($product->getPhotoFilename(), 'products'),
             'restaurantId' => $product->getRestaurant()?->getId(),

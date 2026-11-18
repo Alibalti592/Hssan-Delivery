@@ -35,6 +35,16 @@ class OrderItem
     #[ORM\Column(length: 50, nullable: true)]
     private ?string $optionName = null;
 
+    /**
+     * What the customer added (sauces, extras, a drink...), copied with
+     * their price so the order keeps what was chosen even if the product's
+     * choices are edited later. Already included in $unitPrice.
+     *
+     * @var list<array{group: string, name: string, price: string}>
+     */
+    #[ORM\Column(type: 'json', options: ['default' => '[]'])]
+    private array $extras = [];
+
     public function getId(): ?int
     {
         return $this->id;
@@ -72,6 +82,24 @@ class OrderItem
     public function setQuantity(int $quantity): static
     {
         $this->quantity = $quantity;
+
+        return $this;
+    }
+
+    /**
+     * @return list<array{group: string, name: string, price: string}>
+     */
+    public function getExtras(): array
+    {
+        return $this->extras;
+    }
+
+    /**
+     * @param list<array{group: string, name: string, price: string}> $extras
+     */
+    public function setExtras(array $extras): static
+    {
+        $this->extras = $extras;
 
         return $this;
     }
