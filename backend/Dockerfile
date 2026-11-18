@@ -34,8 +34,12 @@ FROM php:8.2-apache AS app
 RUN apt-get update && apt-get install -y --no-install-recommends \
         libpq-dev \
         libicu-dev \
+        libjpeg62-turbo-dev \
+        libpng-dev \
+        libwebp-dev \
     && docker-php-ext-configure intl \
-    && docker-php-ext-install -j"$(nproc)" pdo pdo_pgsql intl opcache \
+    && docker-php-ext-configure gd --with-jpeg --with-webp \
+    && docker-php-ext-install -j"$(nproc)" pdo pdo_pgsql intl opcache gd \
     && a2enmod rewrite \
     && (a2dismod mpm_event mpm_worker 2>/dev/null || true) \
     && a2enmod mpm_prefork \
@@ -86,10 +90,15 @@ RUN echo 'SetEnvIf Authorization "(.*)" HTTP_AUTHORIZATION=$1' > /etc/apache2/co
 # served as a file. PhotoUploader only stores images, but if a .php file
 # ever landed there it must not execute. Location sections merge last, so
 # this beats the image's own "\.php$ -> PHP" handler.
+#
+# Cache-Control: a stored photo never changes (a new one gets a new random
+# name, see PhotoUploader), so phones may keep it for a year without asking
+# again.
 RUN a2enmod headers \
     && printf '%s\n' \
         '<LocationMatch "^/uploads/">' \
         '    Header set Access-Control-Allow-Origin "*"' \
+        '    Header set Cache-Control "public, max-age=31536000, immutable"' \
         '    SetHandler none' \
         '</LocationMatch>' \
         '<Directory /var/www/html/public/uploads>' \

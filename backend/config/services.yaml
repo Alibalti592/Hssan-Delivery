@@ -49,3 +49,4 @@ services:
         class: App\Service\PhotoUploader
         arguments:
             $uploadsDir: '%kernel.project_dir%/var/storage/private'
+            $variants: null

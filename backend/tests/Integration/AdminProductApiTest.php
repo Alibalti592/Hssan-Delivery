@@ -1532,6 +1532,11 @@ final class AdminProductApiTest extends WebTestCase
 
         self::assertIsString($response['photoUrl']);
         self::assertStringStartsWith('/uploads/products/', $response['photoUrl']);
+        if (function_exists('imagewebp')) {
+            // The smaller copies the app downloads in lists.
+            $name = pathinfo($response['photoUrl'], PATHINFO_FILENAME);
+            self::assertFileExists(self::getContainer()->getParameter('kernel.project_dir').'/public/uploads/products/w480/'.$name.'.webp');
+        }
 
         $this->entityManager->clear();
 
