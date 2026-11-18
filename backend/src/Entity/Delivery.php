@@ -7,6 +7,9 @@ use App\Repository\DeliveryRepository;
 use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity(repositoryClass: DeliveryRepository::class)]
+// Jobs waiting for a courier, asked for every few seconds by the admin and
+// the couriers' apps.
+#[ORM\Index(name: 'idx_delivery_status_created', columns: ['status', 'created_at'])]
 #[ORM\HasLifecycleCallbacks]
 class Delivery
 {

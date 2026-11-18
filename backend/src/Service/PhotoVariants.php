@@ -43,6 +43,7 @@ final class PhotoVariants
             if (false === $image) {
                 return 0;
             }
+            $image = $this->upright($image, $path);
             // Keeps PNG logos' transparency in the copies.
             imagepalettetotruecolor($image);
             imagealphablending($image, true);
@@ -73,6 +74,34 @@ final class PhotoVariants
         }
 
         return $made;
+    }
+
+    /**
+     * A phone photo is stored sideways with a note saying how to turn it
+     * (EXIF orientation), which the app follows for the original; the
+     * copies carry no such note, so they're turned here.
+     */
+    private function upright(\GdImage $image, string $path): \GdImage
+    {
+        if (!function_exists('exif_read_data')) {
+            return $image;
+        }
+        $orientation = (int) ((@exif_read_data($path) ?: [])['Orientation'] ?? 1);
+        $angle = match ($orientation) {
+            3, 4 => 180,
+            5, 6 => -90,
+            7, 8 => 90,
+            default => 0,
+        };
+        if (0 !== $angle) {
+            $image = imagerotate($image, $angle, 0) ?: $image;
+        }
+        // Mirrored ones (front camera), once turned.
+        if (in_array($orientation, [2, 4, 5, 7], true)) {
+            imageflip($image, IMG_FLIP_HORIZONTAL);
+        }
+
+        return $image;
     }
 
     public function remove(string $path): void

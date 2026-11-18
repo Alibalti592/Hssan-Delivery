@@ -56,6 +56,19 @@ final class PhotoVariantsTest extends TestCase
         self::assertSame(300, (getimagesize($this->dir.'/w960/logo.webp') ?: [0])[0]);
     }
 
+    public function testAPhonePhotoStoredSidewaysIsTurnedUpright(): void
+    {
+        if (!function_exists('exif_read_data')) {
+            self::markTestSkipped('No exif extension.');
+        }
+        // 60 by 30 as stored, with a note to turn it a quarter clockwise.
+        copy(__DIR__.'/../Fixtures/sideways-phone-photo.jpg', $this->dir.'/phone.jpg');
+
+        (new PhotoVariants(new NullLogger()))->generate($this->dir.'/phone.jpg');
+
+        self::assertSame([30, 60], array_slice(getimagesize($this->dir.'/w480/phone.webp') ?: [], 0, 2));
+    }
+
     public function testAFileThatIsNotAnImageIsSkipped(): void
     {
         file_put_contents($this->dir.'/broken.jpg', 'not an image');

@@ -10,6 +10,7 @@ use Doctrine\ORM\Mapping as ORM;
  * kept so the admin page shows what went out, when, and to how many phones.
  */
 #[ORM\Entity(repositoryClass: PushCampaignRepository::class)]
+#[ORM\Index(name: 'idx_push_campaign_sent_at', columns: ['sent_at'])]
 #[ORM\HasLifecycleCallbacks]
 class PushCampaign
 {
