@@ -110,6 +110,11 @@ class _HomeScreenState extends State<HomeScreen> {
   /// still on the menu today. Empty (and left out) for a new customer.
   List<FavouriteDish> _favourites = const [];
 
+  /// "Les plus commandés" and "Restaurants populaires": counts of every
+  /// customer's delivered orders, from the server; empty (and left out)
+  /// until there are enough orders.
+  PopularFeed _popular = PopularFeed.empty;
+
   /// What [_favourites] was worked out from, so the 20-second order check
   /// doesn't fetch the menus again when nothing changed.
   String? _favouritesKey;
@@ -125,6 +130,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _loadAddress();
     _loadActiveOrders();
     _loadCategories();
+    _loadPopular();
     _orderChanges = context.read<OrdersRepository>().changes.listen(
       (_) => _loadActiveOrders(),
     );
@@ -212,6 +218,17 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  /// A failure (or a server without it) only leaves both sections out.
+  Future<void> _loadPopular() async {
+    try {
+      final popular = await context.read<CatalogueRepository>().popular();
+      if (!mounted) return;
+      setState(() => _popular = popular);
+    } catch (_) {
+      // Best effort: the rest of the feed doesn't need it.
+    }
+  }
+
   /// A failure only leaves the category row out.
   Future<void> _loadCategories() async {
     try {
@@ -244,6 +261,7 @@ class _HomeScreenState extends State<HomeScreen> {
       _loadAddress(),
       _loadActiveOrders(),
       _loadCategories(),
+      _loadPopular(),
     ]);
   }
 
@@ -303,6 +321,66 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
     );
+  }
+
+  /// "Les plus commandés" (dishes not already in "Vos plus commandés") and
+  /// "Restaurants populaires", each left out when empty.
+  List<Widget> _popularSections() {
+    final mine = {for (final f in _favourites) f.product.id};
+    final dishes = [
+      for (final (product, restaurant, count) in _popular.dishes)
+        if (!mine.contains(product.id))
+          FavouriteDish(
+            product: product,
+            restaurant: restaurant,
+            orderCount: count,
+          ),
+    ];
+    final days = _popular.windowDays;
+    final now = DateTime.now();
+
+    return [
+      if (dishes.isNotEmpty) ...[
+        HomeSectionHeader(
+          title: 'Les plus commandés',
+          subtitle: 'Sur Delivery Hassen, ces $days derniers jours',
+        ),
+        HorizontalCards(
+          height: FavouriteDishCard.height,
+          itemCount: dishes.length,
+          itemBuilder: (context, index) {
+            final dish = dishes[index];
+            return FavouriteDishCard(
+              dish: dish,
+              badge: '${dish.orderCount} commandes',
+              badgeIcon: Icons.local_fire_department,
+              onTap: () => _openDish(dish),
+            );
+          },
+        ),
+      ],
+      if (_popular.restaurants.isNotEmpty) ...[
+        HomeSectionHeader(
+          title: 'Restaurants populaires',
+          subtitle: 'Les plus commandés ces $days derniers jours',
+        ),
+        HorizontalCards(
+          height: NewRestaurantCard.height,
+          itemCount: _popular.restaurants.length,
+          itemBuilder: (context, index) {
+            final (restaurant, count) = _popular.restaurants[index];
+            return NewRestaurantCard(
+              restaurant: restaurant,
+              now: now,
+              badge: 'POPULAIRE',
+              badgeIcon: Icons.local_fire_department,
+              caption: '$count commandes',
+              onTap: () => _openRestaurant(restaurant),
+            );
+          },
+        ),
+      ],
+    ];
   }
 
   @override
@@ -376,6 +454,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 },
               ),
             ],
+            ..._popularSections(),
             // Right above the restaurants it filters.
             if (_categories.isNotEmpty) ...[
               const HomeSectionHeader(title: 'Que souhaitez-vous manger ?'),

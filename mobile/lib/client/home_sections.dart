@@ -524,10 +524,20 @@ class ComboCard extends StatelessWidget {
 /// A dish the customer keeps coming back to, with how often (from their
 /// own orders); a tap opens it, ready to add again.
 class FavouriteDishCard extends StatelessWidget {
-  const FavouriteDishCard({required this.dish, required this.onTap, super.key});
+  const FavouriteDishCard({
+    required this.dish,
+    required this.onTap,
+    this.badge,
+    this.badgeIcon = Icons.replay,
+    super.key,
+  });
 
   final FavouriteDish dish;
   final VoidCallback onTap;
+
+  /// The label on the photo; by default how often this customer ordered it.
+  final String? badge;
+  final IconData badgeIcon;
 
   static const double width = 160;
   static const double height = 232;
@@ -558,8 +568,11 @@ class FavouriteDishCard extends StatelessWidget {
                     top: 8,
                     left: 8,
                     child: PhotoBadge(
-                      count > 1 ? 'Commandé $count fois' : 'Déjà commandé',
-                      icon: Icons.replay,
+                      badge ??
+                          (count > 1
+                              ? 'Commandé $count fois'
+                              : 'Déjà commandé'),
+                      icon: badgeIcon,
                     ),
                   ),
                 ],
@@ -767,12 +780,21 @@ class NewRestaurantCard extends StatelessWidget {
     required this.restaurant,
     required this.now,
     required this.onTap,
+    this.badge = 'NOUVEAU',
+    this.badgeIcon = Icons.auto_awesome,
+    this.caption,
     super.key,
   });
 
   final Restaurant restaurant;
   final DateTime now;
   final VoidCallback onTap;
+
+  /// The label on the photo, and the line under the name instead of
+  /// "Ajouté il y a…" ("Restaurants populaires" uses the same card).
+  final String badge;
+  final IconData badgeIcon;
+  final String? caption;
 
   static const double width = 236;
   static const double height = 200;
@@ -801,14 +823,14 @@ class NewRestaurantCard extends StatelessWidget {
                     icon: Icons.storefront_outlined,
                     iconSize: 32,
                   ),
-                  const Positioned(
+                  Positioned(
                     top: 10,
                     left: 10,
                     child: PhotoBadge(
-                      'NOUVEAU',
+                      badge,
                       background: navy,
                       foreground: Colors.white,
-                      icon: Icons.auto_awesome,
+                      icon: badgeIcon,
                     ),
                   ),
                   if (!restaurant.isAvailable)
@@ -840,7 +862,10 @@ class NewRestaurantCard extends StatelessWidget {
                     Text(
                       [
                         if (serves.isNotEmpty) serves,
-                        if (createdAt != null) addedLabel(createdAt, now),
+                        if (caption case final caption?)
+                          caption
+                        else if (createdAt != null)
+                          addedLabel(createdAt, now),
                       ].join(' · '),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,

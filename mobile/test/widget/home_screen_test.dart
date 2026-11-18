@@ -77,6 +77,7 @@ Widget _wrap({
   List<dynamic> categories = const [],
   List<dynamic> orders = const [],
   Map<int, List<dynamic>> menus = const {},
+  Map<String, dynamic>? popular,
   CartController? cart,
   VoidCallback? onSeeOrders,
 }) {
@@ -86,6 +87,11 @@ Widget _wrap({
     httpClient: MockClient((request) async {
       if (request.url.path == '/api/addresses') {
         return jsonResponse(const []);
+      }
+      if (request.url.path == '/api/popular') {
+        return popular == null
+            ? jsonResponse({'message': 'Not found'}, 404)
+            : jsonResponse(popular);
       }
       final menu = RegExp(
         r'^/api/restaurants/(\d+)/products$',
@@ -667,6 +673,72 @@ void main() {
       lessThan(tester.getTopLeft(find.text('Fermé Tard')).dy),
     );
     expect(find.text('Fermé'), findsOneWidget);
+  });
+
+  testWidgets('"Les plus commandés" and "Restaurants populaires" '
+      'show every customer\'s delivered orders', (tester) async {
+    tester.view.physicalSize = const Size(800, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    final roma = {
+      'id': 1,
+      'name': 'Pizza Roma',
+      'description': null,
+      'isAvailable': true,
+      'photoUrl': null,
+    };
+    await tester.pumpWidget(
+      _wrap(
+        popular: {
+          'restaurants': [
+            {...roma, 'orderCount': 42},
+          ],
+          'dishes': [
+            {
+              'id': 10,
+              'name': 'Pizza Reine',
+              'description': null,
+              'price': '15.000',
+              'isAvailable': true,
+              'photoUrl': null,
+              'restaurantId': 1,
+              'categoryId': 1,
+              'options': const [],
+              'restaurant': roma,
+              'orderCount': 17,
+            },
+          ],
+          'windowDays': 30,
+        },
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Les plus commandés'), findsOneWidget);
+    expect(
+      find.text('Sur Delivery Hassen, ces 30 derniers jours'),
+      findsOneWidget,
+    );
+    expect(find.text('17 commandes'), findsOneWidget);
+    expect(find.text('Restaurants populaires'), findsOneWidget);
+    expect(find.text('POPULAIRE'), findsOneWidget);
+    expect(find.text('42 commandes'), findsOneWidget);
+
+    await tester.tap(find.text('Pizza Reine'));
+    await tester.pumpAndSettle();
+    expect(find.byType(ProductDetailScreen), findsOneWidget);
+  });
+
+  testWidgets('no popularity sections on a server without them', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_wrap());
+    await tester.pumpAndSettle();
+
+    expect(find.text('Les plus commandés'), findsNothing);
+    expect(find.text('Restaurants populaires'), findsNothing);
+    expect(find.text('Services'), findsOneWidget);
   });
 
   testWidgets('no category row while no restaurant has a category', (

@@ -66,6 +66,13 @@ class CatalogueRepository {
     return List.unmodifiable(products);
   }
 
+  /// The most ordered restaurants and dishes. A server older than this
+  /// endpoint (404) just has none.
+  Future<PopularFeed> popular() async {
+    final body = await _api.get('/api/popular');
+    return PopularFeed.fromJson(body as Map<String, dynamic>);
+  }
+
   /// Dishes and restaurants whose name contains [query] (2 letters or more).
   Future<SearchResults> search(String query) async {
     final body = await _api.get(
