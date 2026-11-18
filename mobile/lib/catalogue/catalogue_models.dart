@@ -313,3 +313,43 @@ class SearchResults {
     );
   }
 }
+
+/// What customers order most (`GET /api/popular`): delivered orders of the
+/// last [windowDays] days, three at least per restaurant or dish. Both
+/// lists are empty until there are enough orders.
+class PopularFeed {
+  const PopularFeed({
+    this.restaurants = const [],
+    this.dishes = const [],
+    this.windowDays = 30,
+  });
+
+  static const empty = PopularFeed();
+
+  final List<(Restaurant, int)> restaurants;
+  final List<(Product, Restaurant, int)> dishes;
+  final int windowDays;
+
+  factory PopularFeed.fromJson(Map<String, dynamic> json) {
+    int count(Map<String, dynamic> row) => row['orderCount'] as int? ?? 0;
+    return PopularFeed(
+      restaurants: [
+        for (final row
+            in (json['restaurants'] as List<dynamic>? ?? const [])
+                .cast<Map<String, dynamic>>())
+          (Restaurant.fromJson(row), count(row)),
+      ],
+      dishes: [
+        for (final row
+            in (json['dishes'] as List<dynamic>? ?? const [])
+                .cast<Map<String, dynamic>>())
+          (
+            Product.fromJson(row),
+            Restaurant.fromJson(row['restaurant'] as Map<String, dynamic>),
+            count(row),
+          ),
+      ],
+      windowDays: json['windowDays'] as int? ?? 30,
+    );
+  }
+}
