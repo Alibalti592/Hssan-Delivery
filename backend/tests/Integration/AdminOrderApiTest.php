@@ -231,7 +231,60 @@ final class AdminOrderApiTest extends WebTestCase
         );
     }
 
-    private function createTestOrder(string $clientName): Order
+    public function testAdminDeletesAFinishedOrderWithItsDelivery(): void
+    {
+        $client = static::createClient();
+        $this->entityManager = self::getContainer()->get(EntityManagerInterface::class);
+        $token = $this->authenticateClient($client, $this->createTestUser('ROLE_ADMIN', 'Test Admin'));
+
+        $order = $this->createTestOrder('Test Client Three');
+        $order->setStatus(OrderStatus::CANCELLED);
+        $order->getDelivery()?->setStatus(DeliveryStatus::CANCELLED);
+        $this->entityManager->flush();
+        $orderId = $order->getId();
+        $deliveryId = $order->getDelivery()?->getId();
+
+        $client->request('DELETE', '/api/admin/orders/'.$orderId, server: ['HTTP_AUTHORIZATION' => 'Bearer '.$token]);
+        self::assertResponseStatusCodeSame(Response::HTTP_NO_CONTENT);
+
+        $this->entityManager->clear();
+        self::assertNull($this->entityManager->find(Order::class, $orderId));
+        self::assertNull($this->entityManager->find(Delivery::class, $deliveryId));
+        self::assertSame(0, $this->entityManager->getRepository(OrderItem::class)->count(['order' => $orderId]));
+
+        $client->request('DELETE', '/api/admin/orders/'.$orderId, server: ['HTTP_AUTHORIZATION' => 'Bearer '.$token]);
+        self::assertResponseStatusCodeSame(Response::HTTP_NOT_FOUND);
+    }
+
+    public function testAnOrderOnItsWayCannotBeDeleted(): void
+    {
+        $client = static::createClient();
+        $this->entityManager = self::getContainer()->get(EntityManagerInterface::class);
+        $token = $this->authenticateClient($client, $this->createTestUser('ROLE_ADMIN', 'Test Admin'));
+        $order = $this->createTestOrder('Test Client Four');
+
+        $client->request('DELETE', '/api/admin/orders/'.$order->getId(), server: ['HTTP_AUTHORIZATION' => 'Bearer '.$token]);
+
+        self::assertResponseStatusCodeSame(Response::HTTP_BAD_REQUEST);
+        $this->entityManager->clear();
+        self::assertNotNull($this->entityManager->find(Order::class, $order->getId()));
+    }
+
+    public function testOnlyAdminsDeleteOrders(): void
+    {
+        $client = static::createClient();
+        $this->entityManager = self::getContainer()->get(EntityManagerInterface::class);
+        $order = $this->createTestOrder('Test Client Five');
+        $order->setStatus(OrderStatus::COMPLETED);
+        $this->entityManager->flush();
+        $token = $this->authenticateClient($client, $this->createTestUser('ROLE_CLIENT', 'Test Client'));
+
+        $client->request('DELETE', '/api/admin/orders/'.$order->getId(), server: ['HTTP_AUTHORIZATION' => 'Bearer '.$token]);
+
+        self::assertResponseStatusCodeSame(Response::HTTP_FORBIDDEN);
+    }
+
+        private function createTestOrder(string $clientName): Order
     {
         $restaurant = new Restaurant();
 
