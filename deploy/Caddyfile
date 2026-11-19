@@ -18,6 +18,18 @@
 	}
 }
 
+# Browser protections for every site: HTTPS only from now on, files read
+# as what they say they are, and the pages never shown inside another
+# site's frame (which could trick an admin into clicking).
+(security) {
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+	}
+}
+
 # The backend sees the customer's address (worked out above) as the only
 # X-Forwarded-For entry: it trusts this proxy, not Cloudflare's addresses.
 (backend) {
@@ -29,6 +41,7 @@
 # The API the mobile app talks to.
 {$API_DOMAIN} {
 	encode zstd gzip
+	import security
 	import backend
 }
 
@@ -36,6 +49,7 @@
 # domain, so the login cookie is first-party (same as Vercel's rewrites).
 {$ADMIN_DOMAIN} {
 	encode zstd gzip
+	import security
 	handle /api/* {
 		import backend
 	}
@@ -51,6 +65,7 @@
 # files from ./site, required by the app stores. www goes to the bare domain.
 {$SITE_DOMAIN} {
 	encode zstd gzip
+	import security
 	root * /srv/site
 	file_server
 }

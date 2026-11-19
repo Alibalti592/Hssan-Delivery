@@ -3,6 +3,7 @@
 namespace App\Repository;
 
 use App\Entity\Order;
+use App\Entity\User;
 use App\Enum\OrderStatus;
 use App\Pagination\PaginatedResult;
 use App\Pagination\Paginator;
@@ -111,5 +112,11 @@ class OrderRepository extends ServiceEntityRepository
             'completed' => (int) ($row['completed'] ?? 0),
             'sales' => number_format((float) ($row['sales'] ?? 0), 3, '.', ''),
         ];
+    }
+
+    /** The order [user] already placed from this checkout, if any. */
+    public function findOneByClientRequest(User $user, string $clientRequestId): ?Order
+    {
+        return $this->findOneBy(['user' => $user, 'clientRequestId' => $clientRequestId]);
     }
 }
