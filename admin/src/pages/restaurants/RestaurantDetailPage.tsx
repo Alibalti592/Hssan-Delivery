@@ -1,3 +1,4 @@
+import { optimisticToggle } from '../../api/optimistic';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
@@ -78,10 +79,11 @@ export default function RestaurantDetailPage() {
 
   const setOpen = useMutation({
     mutationFn: (open: boolean) => restaurantsApi.setAvailability(restaurantId, open),
-    onSuccess: (restaurant) => {
-      queryClient.setQueryData(['restaurants', restaurantId], restaurant);
-      refresh();
-    },
+    // Shown at once, here and in the lists; put back if the server refuses.
+    ...optimisticToggle(queryClient, ['restaurants'], (open: boolean) => ({
+      id: restaurantId,
+      patch: { isAvailable: open },
+    })),
   });
 
   const uploadPhoto = useMutation({

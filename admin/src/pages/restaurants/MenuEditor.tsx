@@ -1,6 +1,7 @@
+import { optimisticToggle } from '../../api/optimistic';
+import { Thumb } from '../../components/Thumb';
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { API_URL } from '../../api/client';
 import { categoriesApi, productsApi } from '../../api/resources';
 import type { Category, Product } from '../../api/types';
 import { ErrorBanner, Loading, money } from '../../components/ui';
@@ -43,7 +44,6 @@ export const MenuEditor = forwardRef<MenuEditorHandle, { restaurantId: number }>
   });
 
   const refreshCategories = () => queryClient.invalidateQueries({ queryKey: ['categories', restaurantId] });
-  const refreshProducts = () => queryClient.invalidateQueries({ queryKey: ['products', restaurantId] });
 
   const addCategory = useMutation({
     mutationFn: (name: string) => categoriesApi.create(restaurantId, { name }),
@@ -73,13 +73,12 @@ export const MenuEditor = forwardRef<MenuEditorHandle, { restaurantId: number }>
 
   const toggleProduct = useMutation({
     mutationFn: (product: Product) => productsApi.setAvailability(product.id, !product.isAvailable),
-    // Flip it on screen at once; the refetch confirms it.
-    onMutate: (product) => {
-      queryClient.setQueryData<Product[]>(['products', restaurantId, 'all'], (list) =>
-        list?.map((p) => (p.id === product.id ? { ...p, isAvailable: !p.isAvailable } : p)),
-      );
-    },
-    onSettled: refreshProducts,
+    // Flipped on screen at once, put back if the server refuses
+    // (optimisticToggle); the refetch confirms it.
+    ...optimisticToggle(queryClient, ['products', restaurantId], (product: Product) => ({
+      id: product.id,
+      patch: { isAvailable: !product.isAvailable },
+    })),
   });
 
   function submitCategory(e: FormEvent) {
@@ -242,7 +241,7 @@ export const MenuEditor = forwardRef<MenuEditorHandle, { restaurantId: number }>
                     <li key={p.id} className={p.isAvailable ? undefined : 'off'}>
                       <button type="button" className="menu-product" onClick={() => setEditor({ product: p })}>
                         <span className="menu-thumb">
-                          {p.photoUrl ? <img src={`${API_URL}${p.photoUrl}`} alt="" /> : <span>🍽</span>}
+                          {p.photoUrl ? <Thumb path={p.photoUrl} /> : <span>🍽</span>}
                         </span>
                         <span className="menu-product-text">
                           <span className="rname">{p.name}</span>
@@ -259,6 +258,7 @@ export const MenuEditor = forwardRef<MenuEditorHandle, { restaurantId: number }>
                           type="checkbox"
                           checked={p.isAvailable}
                           aria-label={`${p.name} available`}
+                          disabled={toggleProduct.isPending}
                           onChange={() => toggleProduct.mutate(p)}
                         />
                         <span />

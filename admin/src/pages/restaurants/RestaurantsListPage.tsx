@@ -1,7 +1,8 @@
+import { optimisticToggle } from '../../api/optimistic';
+import { Thumb } from '../../components/Thumb';
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { API_URL } from '../../api/client';
 import { restaurantsApi } from '../../api/resources';
 import type { RestaurantType } from '../../api/types';
 import {
@@ -40,7 +41,11 @@ export default function RestaurantsListPage() {
   const toggleAvailability = useMutation({
     mutationFn: ({ id, isAvailable }: { id: number; isAvailable: boolean }) =>
       restaurantsApi.setAvailability(id, isAvailable),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['restaurants'] }),
+    // Shown at once; put back if the server refuses (optimisticToggle).
+    ...optimisticToggle(queryClient, ['restaurants'], ({ id, isAvailable }: { id: number; isAvailable: boolean }) => ({
+      id,
+      patch: { isAvailable },
+    })),
   });
 
   return (
@@ -94,7 +99,7 @@ export default function RestaurantsListPage() {
                     <td>
                       <div className="photo-box" style={{ width: 36, height: 36 }}>
                         {r.photoUrl ? (
-                          <img src={`${API_URL}${r.photoUrl}`} alt="" />
+                          <Thumb path={r.photoUrl} />
                         ) : (
                           <span className="placeholder" style={{ fontSize: 8 }}>
                             No photo

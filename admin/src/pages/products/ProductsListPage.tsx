@@ -1,7 +1,8 @@
+import { optimisticToggle } from '../../api/optimistic';
+import { Thumb } from '../../components/Thumb';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useParams } from 'react-router-dom';
-import { API_URL } from '../../api/client';
 import { categoriesApi, productsApi, restaurantsApi } from '../../api/resources';
 import {
   PageHeader,
@@ -38,7 +39,11 @@ export default function ProductsListPage() {
   const toggleAvailability = useMutation({
     mutationFn: ({ pid, isAvailable }: { pid: number; isAvailable: boolean }) =>
       productsApi.setAvailability(pid, isAvailable),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['products', restaurantId] }),
+    // Shown at once; put back if the server refuses (optimisticToggle).
+    ...optimisticToggle(queryClient, ['products', restaurantId], ({ pid, isAvailable }: { pid: number; isAvailable: boolean }) => ({
+      id: pid,
+      patch: { isAvailable },
+    })),
   });
 
   const categoryName = (categoryId: number) =>
@@ -91,7 +96,7 @@ export default function ProductsListPage() {
                     <td>
                       <div className="photo-box" style={{ width: 36, height: 36 }}>
                         {p.photoUrl ? (
-                          <img src={`${API_URL}${p.photoUrl}`} alt="" />
+                          <Thumb path={p.photoUrl} />
                         ) : (
                           <span className="placeholder" style={{ fontSize: 8 }}>
                             No photo
