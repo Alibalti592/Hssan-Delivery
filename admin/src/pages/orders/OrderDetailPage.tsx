@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { deliveriesApi, ordersApi } from '../../api/resources';
 import {
   PageHeader,
@@ -26,10 +26,15 @@ function mapLink(latitude: number, longitude: number): string {
 
 const ORDER_CANCELLABLE =['PENDING', 'CONFIRMED', 'PREPARING', 'READY_FOR_PICKUP'];
 
+// Deleted for good only once it's over: one on its way is cancelled first,
+// so no courier is left heading to a job that's gone (backend OrderDeletion).
+const ORDER_DELETABLE = ['COMPLETED', 'CANCELLED'];
+
 export default function OrderDetailPage() {
   const { id } = useParams();
   const orderId = Number(id);
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['orders', orderId],
@@ -47,6 +52,28 @@ export default function OrderDetailPage() {
     },
   });
 
+  const remove = useMutation({
+    mutationFn: () => ordersApi.delete(orderId),
+    onSuccess: () => {
+      queryClient.removeQueries({ queryKey: ['orders', orderId] });
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      queryClient.invalidateQueries({ queryKey: ['deliveries'] });
+      queryClient.invalidateQueries({ queryKey: ['stats'] });
+      navigate('/orders');
+    },
+  });
+
+  const handleDelete = () => {
+    if (
+      window.confirm(
+        `Delete order #${orderId} for good? It disappears from the customer's and the courier's history, ` +
+          'the sales and the stats. This cannot be undone.',
+      )
+    ) {
+      remove.mutate();
+    }
+  };
+
   const handleCancel = () => {
     if (window.confirm(`Cancel order #${orderId}? This cannot be undone.`)) {
       cancel.mutate();
@@ -58,7 +85,7 @@ export default function OrderDetailPage() {
       <PageHeader title={data ? `Order #${data.id}` : 'Order'} />
       <div className="content">
         <Breadcrumb items={[{ label: 'Orders', to: '/orders' }, { label: data ? `#${data.id}` : '…' }]} />
-        <ErrorBanner error={error || cancel.error} />
+        <ErrorBanner error={error || cancel.error || remove.error} />
         {isLoading ? (
           <Loading />
         ) : data ? (
@@ -145,6 +172,16 @@ export default function OrderDetailPage() {
                     onClick={handleCancel}
                   >
                     {cancel.isPending ? 'Cancelling…' : 'Cancel order'}
+                  </button>
+                )}
+                {ORDER_DELETABLE.includes(data.status) && (
+                  <button
+                    type="button"
+                    className="btn danger sm"
+                    disabled={remove.isPending}
+                    onClick={handleDelete}
+                  >
+                    {remove.isPending ? 'Deleting…' : 'Delete order'}
                   </button>
                 )}
               </div>

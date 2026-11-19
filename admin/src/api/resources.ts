@@ -291,6 +291,8 @@ export const statsApi = {
 export const ordersApi = {
   list: (params?: PageParams) => api.get<Paginated<AdminOrder>>(`/api/admin/orders${toQuery(params)}`),
   get: (id: number) => api.get<AdminOrder>(`/api/admin/orders/${id}`),
+  /** Only a delivered or cancelled order (backend OrderDeletion). */
+  delete: (id: number) => api.delete<void>(`/api/admin/orders/${id}`),
 };
 
 // Deliveries (admin visibility + actions)
