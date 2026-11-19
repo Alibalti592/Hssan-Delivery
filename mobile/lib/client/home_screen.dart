@@ -219,9 +219,11 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   /// A failure (or a server without it) only leaves both sections out.
-  Future<void> _loadPopular() async {
+  Future<void> _loadPopular({bool refresh = false}) async {
     try {
-      final popular = await context.read<CatalogueRepository>().popular();
+      final popular = await context.read<CatalogueRepository>().popular(
+        refresh: refresh,
+      );
       if (!mounted) return;
       setState(() => _popular = popular);
     } catch (_) {
@@ -230,11 +232,11 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   /// A failure only leaves the category row out.
-  Future<void> _loadCategories() async {
+  Future<void> _loadCategories({bool refresh = false}) async {
     try {
       final categories = await context
           .read<CatalogueRepository>()
-          .listRestaurantCategories();
+          .listRestaurantCategories(refresh: refresh);
       if (!mounted) return;
       setState(() {
         _categories = categories;
@@ -246,9 +248,14 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  /// Pulled down: everything asked again, past the kept answers (TtlCache).
   Future<void> _refresh() async {
-    final promotions = context.read<PromotionsRepository>().listActive();
-    final restaurants = context.read<CatalogueRepository>().listRestaurants();
+    final promotions = context.read<PromotionsRepository>().listActive(
+      refresh: true,
+    );
+    final restaurants = context.read<CatalogueRepository>().listRestaurants(
+      refresh: true,
+    );
     setState(() {
       _promotionsFuture = promotions;
       _restaurantsFuture = restaurants;
@@ -260,8 +267,8 @@ class _HomeScreenState extends State<HomeScreen> {
       restaurants,
       _loadAddress(),
       _loadActiveOrders(),
-      _loadCategories(),
-      _loadPopular(),
+      _loadCategories(refresh: true),
+      _loadPopular(refresh: true),
     ]);
   }
 
@@ -385,19 +392,18 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // One scroll view built whole, not a lazy ListView: a lazy list drops
-    // the sections that scroll out of sight and rebuilds them on the way
-    // back, so each one flashed its loading state and reloaded its photos
-    // -- the feed jumped under the finger. Every section is capped (a few
-    // cards each), so building it all is cheap.
+    // Built lazily: what's below the fold, its photos included, waits until
+    // scrolled near, so the first screen's photos load first. Each section,
+    // once built, is kept (_KeptSection): a plain lazy list dropped those
+    // scrolled out of sight and rebuilt them on the way back, each one
+    // flashing its loading state and reloading its photos.
     return RefreshIndicator(
       onRefresh: _refresh,
-      child: SingleChildScrollView(
+      child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.only(bottom: 32),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
+        children: [
+          for (final section in <Widget>[
             const _TopBar(),
             const SizedBox(height: 18),
             const _Greeting(),
@@ -478,10 +484,33 @@ class _HomeScreenState extends State<HomeScreen> {
               future: _restaurantsFuture,
               onTapRestaurant: _openRestaurant,
             ),
-          ],
-        ),
+          ])
+            _KeptSection(child: section),
+        ],
       ),
     );
+  }
+}
+
+/// A home section kept alive once built, though scrolled out of sight.
+class _KeptSection extends StatefulWidget {
+  const _KeptSection({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_KeptSection> createState() => _KeptSectionState();
+}
+
+class _KeptSectionState extends State<_KeptSection>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    return widget.child;
   }
 }
 

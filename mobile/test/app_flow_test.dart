@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'dart:convert';
 
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -608,6 +610,44 @@ void main() {
       );
       expect(auth.status, AuthStatus.signedIn);
       expect(await storage.readRefreshToken(), 'refresh-1');
+    });
+
+    test('availability flips at once, and back when refused', () async {
+      var refuse = false;
+      final answer = Completer<void>();
+      final auth = wired(
+        MockClient((request) async {
+          switch (request.url.path) {
+            case '/api/auth/login':
+              return _json({'token': 'jwt-1', 'refreshToken': 'refresh-1'});
+            case '/api/auth/me':
+              return _json(me());
+            case '/api/auth/availability':
+              await answer.future;
+              return refuse
+                  ? _json({'message': 'Une course est en cours.'}, 400)
+                  : _json({...me(), 'isAvailable': false});
+          }
+          return _json({'message': 'unexpected'}, 404);
+        }),
+        _MemoryTokenStorage(),
+      );
+      await auth.signIn('22000001', 'client1234');
+      expect(auth.account!.isAvailable, isTrue);
+
+      // Accepted: off before the server answers, and stays off.
+      final accepted = auth.setAvailability(false);
+      expect(auth.account!.isAvailable, isFalse);
+      answer.complete();
+      expect(await accepted, isNull);
+      expect(auth.account!.isAvailable, isFalse);
+
+      // Refused: on at once, then back off with the reason.
+      refuse = true;
+      final refused = auth.setAvailability(true);
+      expect(auth.account!.isAvailable, isTrue);
+      expect(await refused, 'Une course est en cours.');
+      expect(auth.account!.isAvailable, isFalse);
     });
 
     test('signing out ends the session on the server too', () async {

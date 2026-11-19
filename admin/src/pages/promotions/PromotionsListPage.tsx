@@ -1,7 +1,8 @@
+import { optimisticToggle } from '../../api/optimistic';
+import { Thumb } from '../../components/Thumb';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { API_URL } from '../../api/client';
 import { promotionsApi } from '../../api/resources';
 import {
   PageHeader,
@@ -35,7 +36,11 @@ export default function PromotionsListPage() {
   const toggleActive = useMutation({
     mutationFn: ({ id, isActive }: { id: number; isActive: boolean }) =>
       promotionsApi.setActive(id, isActive),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['promotions'] }),
+    // Shown at once; put back if the server refuses (optimisticToggle).
+    ...optimisticToggle(queryClient, ['promotions'], ({ id, isActive }: { id: number; isActive: boolean }) => ({
+      id,
+      patch: { isActive },
+    })),
   });
 
   return (
@@ -75,7 +80,7 @@ export default function PromotionsListPage() {
                     <td>
                       <div className="photo-box" style={{ width: 36, height: 36 }}>
                         {p.photoUrl ? (
-                          <img src={`${API_URL}${p.photoUrl}`} alt="" />
+                          <Thumb path={p.photoUrl} />
                         ) : (
                           <span className="placeholder" style={{ fontSize: 8 }}>
                             No photo

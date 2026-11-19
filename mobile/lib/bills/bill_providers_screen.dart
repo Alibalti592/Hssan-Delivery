@@ -29,7 +29,11 @@ class _BillProvidersScreenState extends State<BillProvidersScreen> {
   }
 
   void _retry() {
-    setState(() => _future = context.read<BillsRepository>().listProviders());
+    setState(
+      () => _future = context.read<BillsRepository>().listProviders(
+        refresh: true,
+      ),
+    );
   }
 
   @override

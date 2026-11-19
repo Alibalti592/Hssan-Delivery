@@ -184,18 +184,32 @@ class AuthController extends ChangeNotifier {
   /// Returns an error message on failure, or null on success. Reverts to the
   /// previous value on failure, since the caller's toggle UI updates
   /// optimistically before this resolves.
+  /// Shown at once (the switch flips, location reporting follows), then
+  /// confirmed by the server; a refusal or no network puts it back, and the
+  /// message says why.
   Future<String?> setAvailability(bool isAvailable) async {
+    final before = _account;
+    if (before != null && before.isAvailable != isAvailable) {
+      _account = before.copyWith(isAvailable: isAvailable);
+      notifyListeners();
+    }
     try {
       _account = await _repository.setAvailability(isAvailable);
       notifyListeners();
       return null;
     } on ApiException catch (e) {
-      notifyListeners();
+      _undoAvailability(before);
       return e.message;
     } on NetworkException catch (e) {
-      notifyListeners();
+      _undoAvailability(before);
       return e.message;
     }
+  }
+
+  void _undoAvailability(Account? before) {
+    // Not if the failure signed the user out meanwhile (a 401).
+    if (_status == AuthStatus.signedIn) _account = before;
+    notifyListeners();
   }
 
   /// Deletes the account, then ends the session. Returns an error message

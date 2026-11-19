@@ -70,7 +70,11 @@ final class PromotionService
      */
     public function list(int $page, int $limit): PaginatedResult
     {
+        // The restaurant in the same query: its name is in every row
+        // (PromotionResponse), which otherwise loaded it once per promotion.
         $qb = $this->promotionRepository->createQueryBuilder('p')
+            ->leftJoin('p.restaurant', 'r')
+            ->addSelect('r')
             ->orderBy('p.createdAt', 'DESC')
             ->addOrderBy('p.id', 'DESC');
 

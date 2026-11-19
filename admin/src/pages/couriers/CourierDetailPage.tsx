@@ -1,3 +1,4 @@
+import { optimisticToggle } from '../../api/optimistic';
 import { useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'react-router-dom';
@@ -26,10 +27,11 @@ export default function CourierDetailPage() {
 
   const toggleActive = useMutation({
     mutationFn: (isActive: boolean) => couriersApi.setActive(courierId, isActive),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['couriers', courierId] });
-      queryClient.invalidateQueries({ queryKey: ['couriers'] });
-    },
+    // Shown at once, here and in the list; put back if the server refuses.
+    ...optimisticToggle(queryClient, ['couriers'], (isActive: boolean) => ({
+      id: courierId,
+      patch: { isActive },
+    })),
   });
 
   const verify = useMutation({

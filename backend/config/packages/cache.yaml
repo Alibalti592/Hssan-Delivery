@@ -15,5 +15,11 @@ framework:
         #app: cache.adapter.apcu
 
         # Namespaced pools use the above "app" backend by default
-        #pools:
-            #my.dedicated.cache: null
+        pools:
+            # The ranking behind /api/popular (PopularityService): asked for
+            # on every home screen, changed only when an order is delivered
+            # or a delivered one deleted, which clear it (PopularityCache).
+            # Ten minutes at most otherwise, for the 30-day window to slide.
+            cache.popular:
+                adapter: cache.app
+                default_lifetime: 600

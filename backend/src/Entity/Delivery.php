@@ -10,6 +10,8 @@ use Doctrine\ORM\Mapping as ORM;
 // Jobs waiting for a courier, asked for every few seconds by the admin and
 // the couriers' apps.
 #[ORM\Index(name: 'idx_delivery_status_created', columns: ['status', 'created_at'])]
+// The admin's list of every delivery, newest first.
+#[ORM\Index(name: 'idx_delivery_created', columns: ['created_at'])]
 #[ORM\HasLifecycleCallbacks]
 class Delivery
 {

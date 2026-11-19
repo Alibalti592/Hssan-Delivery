@@ -1,5 +1,7 @@
+import { lazy, Suspense } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import RequireAuth from './components/RequireAuth';
+import { Loading } from './components/ui';
 import Layout from './components/Layout';
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
@@ -9,7 +11,6 @@ import RestaurantDetailPage from './pages/restaurants/RestaurantDetailPage';
 import CategoriesPage from './pages/categories/CategoriesPage';
 import ProductsListPage from './pages/products/ProductsListPage';
 import ProductFormPage from './pages/products/ProductFormPage';
-import DeliveryZonesListPage from './pages/zones/DeliveryZonesListPage';
 import CouriersListPage from './pages/couriers/CouriersListPage';
 import CourierDetailPage from './pages/couriers/CourierDetailPage';
 import OrdersListPage from './pages/orders/OrdersListPage';
@@ -19,11 +20,15 @@ import DeliveryDetailPage from './pages/deliveries/DeliveryDetailPage';
 import PromotionsListPage from './pages/promotions/PromotionsListPage';
 import PromotionFormPage from './pages/promotions/PromotionFormPage';
 import NotificationsPage from './pages/notifications/NotificationsPage';
-import CourierMapPage from './pages/courier-map/CourierMapPage';
 import ChangePasswordPage from './pages/account/ChangePasswordPage';
 import PasswordResetPage from './pages/users/PasswordResetPage';
 import BillProvidersPage from './pages/bill-providers/BillProvidersPage';
 import RestaurantCategoriesPage from './pages/restaurant-categories/RestaurantCategoriesPage';
+
+// The two map pages bring Leaflet, about a quarter of the dashboard's code:
+// fetched when opened, not with every other page.
+const DeliveryZonesListPage = lazy(() => import('./pages/zones/DeliveryZonesListPage'));
+const CourierMapPage = lazy(() => import('./pages/courier-map/CourierMapPage'));
 
 export default function App() {
   return (
@@ -47,7 +52,14 @@ export default function App() {
         <Route path="restaurants/:id/products/new" element={<ProductFormPage />} />
         <Route path="restaurants/:id/products/:productId/edit" element={<ProductFormPage />} />
 
-        <Route path="delivery-zones" element={<DeliveryZonesListPage />} />
+        <Route
+          path="delivery-zones"
+          element={
+            <Suspense fallback={<Loading />}>
+              <DeliveryZonesListPage />
+            </Suspense>
+          }
+        />
 
         <Route path="couriers" element={<CouriersListPage />} />
         <Route path="couriers/:id" element={<CourierDetailPage />} />
@@ -67,7 +79,14 @@ export default function App() {
 
         <Route path="restaurant-categories" element={<RestaurantCategoriesPage />} />
 
-        <Route path="courier-map" element={<CourierMapPage />} />
+        <Route
+          path="courier-map"
+          element={
+            <Suspense fallback={<Loading />}>
+              <CourierMapPage />
+            </Suspense>
+          }
+        />
 
         <Route path="password-reset" element={<PasswordResetPage />} />
         <Route path="account/password" element={<ChangePasswordPage />} />
