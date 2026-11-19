@@ -19,6 +19,7 @@ import 'package:mobile/core/api_client.dart';
 import 'package:mobile/core/token_storage.dart';
 import 'package:mobile/orders/orders_repository.dart';
 import 'package:mobile/promotions/promotions_repository.dart';
+import 'package:mobile/widgets/app_photo.dart';
 import 'package:provider/provider.dart';
 
 import 'test_utils.dart';
@@ -750,5 +751,86 @@ void main() {
     expect(find.byType(CategorySelector), findsNothing);
     expect(find.text('Que souhaitez-vous manger ?'), findsNothing);
     expect(find.text('Services'), findsOneWidget);
+  });
+
+  testWidgets('photos below the fold wait until scrolled near', (tester) async {
+    // A phone's height (what's below the fold), wider only for the test
+    // font, much wider than the real one; and a home full of photos.
+    tester.view.physicalSize = const Size(2400, 2532);
+    tester.view.devicePixelRatio = 3.0;
+    addTearDown(tester.view.reset);
+
+    Map<String, dynamic> restaurant(int id) => {
+      'id': id,
+      'name': 'Restaurant $id',
+      'description': null,
+      'isAvailable': true,
+      'photoUrl': '/uploads/restaurants/r$id.jpg',
+      'categories': const [],
+    };
+    Map<String, dynamic> dish(int id) => {
+      'id': id,
+      'name': 'Plat $id',
+      'description': null,
+      'price': '15.000',
+      'isAvailable': true,
+      'photoUrl': '/uploads/products/p$id.jpg',
+      'restaurantId': 1,
+      'categoryId': 1,
+      'options': const [],
+      'restaurant': restaurant(1),
+      'orderCount': 10,
+    };
+    await tester.pumpWidget(
+      _wrap(
+        promotions: [
+          for (var i = 1; i <= 5; i++)
+            {
+              ..._promotion(i, 'Promo $i'),
+              'photoUrl': '/uploads/promotions/$i.jpg',
+            },
+        ],
+        categories: [
+          for (var i = 1; i <= 8; i++)
+            {
+              'id': i,
+              'name': 'Catégorie $i',
+              'icon': 'pizza',
+              'imageUrl': '/uploads/restaurant-categories/c$i.jpg',
+              'position': i,
+            },
+        ],
+        restaurants: [for (var i = 1; i <= 20; i++) restaurant(i)],
+        popular: {
+          'restaurants': [
+            for (var i = 1; i <= 10; i++) {...restaurant(i), 'orderCount': 9},
+          ],
+          'dishes': [for (var i = 1; i <= 10; i++) dish(i)],
+          'windowDays': 30,
+        },
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    int built() => find.byType(AppPhoto, skipOffstage: false).evaluate().length;
+
+    // 25 when the whole feed was built at once; now the first screen's and
+    // a little more, just below (built ahead to scroll smoothly).
+    final atOpening = built();
+    expect(atOpening, lessThanOrEqualTo(15));
+
+    // Scrolled to the bottom: the rest comes in, and what scrolled out of
+    // sight is kept (not rebuilt, its photos not loaded again on return).
+    final feed = find.byWidgetPredicate(
+      (w) => w is Scrollable && w.axisDirection == AxisDirection.down,
+    );
+    await tester.scrollUntilVisible(
+      find.text('Les restaurants ouverts en premier'),
+      400,
+      scrollable: feed.first,
+    );
+    await tester.pumpAndSettle();
+    expect(built(), greaterThan(atOpening));
+    expect(find.text('Promo 1', skipOffstage: false), findsWidgets);
   });
 }

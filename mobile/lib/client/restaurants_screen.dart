@@ -57,19 +57,20 @@ class _RestaurantsScreenState extends State<RestaurantsScreen> {
     super.dispose();
   }
 
-  Future<List<Restaurant>> _load() {
+  Future<List<Restaurant>> _load({bool refresh = false}) {
     return context.read<CatalogueRepository>().listRestaurants(
       type: widget.type,
+      refresh: refresh,
     );
   }
 
   /// Best effort: without the categories the list simply isn't filtered.
-  Future<void> _loadCategories() async {
+  Future<void> _loadCategories({bool refresh = false}) async {
     List<RestaurantCategory> categories = const [];
     try {
       categories = await context
           .read<CatalogueRepository>()
-          .listRestaurantCategories(type: widget.type);
+          .listRestaurantCategories(type: widget.type, refresh: refresh);
     } catch (_) {
       // Offline, or a server older than this app: no category row.
     }
@@ -82,9 +83,10 @@ class _RestaurantsScreenState extends State<RestaurantsScreen> {
   }
 
   Future<void> _refresh() async {
-    final future = _load();
+    // Pulled down (or "Réessayer"): past the kept answers (TtlCache).
+    final future = _load(refresh: true);
     setState(() => _future = future);
-    await Future.wait([future, _loadCategories()]);
+    await Future.wait([future, _loadCategories(refresh: true)]);
   }
 
   /// The search and the category work together: a restaurant shows when it

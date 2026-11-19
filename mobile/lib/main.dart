@@ -176,8 +176,18 @@ class _HssanDeliveryAppState extends State<HssanDeliveryApp> {
     _cart = CartController();
     _selectedAddress = SelectedAddressController(_addresses);
 
+    _auth.addListener(_forgetCatalogueOnSignOut);
     _pushNotifications.initialize();
     _auth.bootstrap();
+  }
+
+  /// The kept catalogue answers (TtlCache) are the same for everyone, but
+  /// the next account on this phone starts from the server all the same.
+  void _forgetCatalogueOnSignOut() {
+    if (_auth.status != AuthStatus.signedOut) return;
+    _catalogue.clearCache();
+    _promotions.clearCache();
+    _bills.clearCache();
   }
 
   /// Whether a customer is signed in, waiting first for the saved session
@@ -208,6 +218,7 @@ class _HssanDeliveryAppState extends State<HssanDeliveryApp> {
   @override
   void dispose() {
     _api.close();
+    _auth.removeListener(_forgetCatalogueOnSignOut);
     _auth.dispose();
     _courierLocation.dispose();
     _deliveries.dispose();

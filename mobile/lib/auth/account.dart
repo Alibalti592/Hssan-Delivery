@@ -20,6 +20,14 @@ class Account {
   final bool isAvailable;
 
   bool get isCourier => roles.contains('ROLE_LIVREUR');
+
+  Account copyWith({bool? isAvailable}) => Account(
+    id: id,
+    name: name,
+    phone: phone,
+    roles: roles,
+    isAvailable: isAvailable ?? this.isAvailable,
+  );
   bool get isClient => roles.contains('ROLE_CLIENT');
 
   factory Account.fromJson(Map<String, dynamic> json) {

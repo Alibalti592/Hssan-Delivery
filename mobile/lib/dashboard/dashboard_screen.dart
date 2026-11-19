@@ -190,18 +190,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 style: TextStyle(fontWeight: FontWeight.w600),
                               ),
                             ),
-                            _updatingAvailability
-                                ? const SizedBox(
-                                    height: 20,
-                                    width: 20,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                    ),
-                                  )
-                                : Switch(
-                                    value: account?.isAvailable ?? true,
-                                    onChanged: _toggleAvailability,
-                                  ),
+                            // Flipped at once (AuthController), locked
+                            // until the server answers.
+                            Switch(
+                              value: account?.isAvailable ?? true,
+                              onChanged: _updatingAvailability
+                                  ? null
+                                  : _toggleAvailability,
+                            ),
                           ],
                         ),
                       ),
