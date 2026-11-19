@@ -20,6 +20,7 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\ResponseHeaderBag;
+use Symfony\Component\Lock\LockFactory;
 use Symfony\Component\RateLimiter\RateLimiterFactory;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Serializer\SerializerInterface;
@@ -37,6 +38,7 @@ final class OrderController extends AbstractApiController
         private readonly BillOrderService $billOrderService,
         private readonly OrderRepository $orderRepository,
         private readonly CourierLocationRepository $courierLocationRepository,
+        private readonly LockFactory $lockFactory,
         SerializerInterface $serializer,
         ValidatorInterface $validator,
     ) {
@@ -102,30 +104,50 @@ final class OrderController extends AbstractApiController
             );
         }
 
-        $limiter = $this->orderCreateLimiter->create((string) $user->getId());
-
-        if (!$limiter->consume()->isAccepted()) {
-            return $this->json(
-                ['message' => 'Trop de tentatives. Réessayez plus tard.'],
-                Response::HTTP_TOO_MANY_REQUESTS
-            );
-        }
-
         /** @var CreateOrderRequest $dto */
         $dto = $this->deserializeAndValidate($request, CreateOrderRequest::class);
 
-        if (null !== $blocked = $this->promoCodeBlocked($user, $dto)) {
-            return $blocked;
+        // A retry of a checkout (same clientRequestId): one at a time, and
+        // the order the first try placed comes back instead of a second.
+        $lock = null;
+        if (null !== $dto->clientRequestId) {
+            $lock = $this->lockFactory->createLock(
+                sprintf('order-create-%d-%s', $user->getId(), $dto->clientRequestId),
+                30
+            );
+            $lock->acquire(true);
         }
-        $order = $this->countingPromoCodeMisses(
-            $user,
-            fn () => $this->orderService->createOrder($dto, $user),
-        );
 
-        return $this->json(
-            OrderResponse::fromEntity($order),
-            Response::HTTP_CREATED
-        );
+        try {
+            if (null !== $dto->clientRequestId
+                && null !== $placed = $this->orderRepository->findOneByClientRequest($user, $dto->clientRequestId)) {
+                return $this->json(OrderResponse::fromEntity($placed), Response::HTTP_OK);
+            }
+
+            $limiter = $this->orderCreateLimiter->create((string) $user->getId());
+
+            if (!$limiter->consume()->isAccepted()) {
+                return $this->json(
+                    ['message' => 'Trop de tentatives. Réessayez plus tard.'],
+                    Response::HTTP_TOO_MANY_REQUESTS
+                );
+            }
+
+            if (null !== $blocked = $this->promoCodeBlocked($user, $dto)) {
+                return $blocked;
+            }
+            $order = $this->countingPromoCodeMisses(
+                $user,
+                fn () => $this->orderService->createOrder($dto, $user),
+            );
+
+            return $this->json(
+                OrderResponse::fromEntity($order),
+                Response::HTTP_CREATED
+            );
+        } finally {
+            $lock?->release();
+        }
     }
 
     /**

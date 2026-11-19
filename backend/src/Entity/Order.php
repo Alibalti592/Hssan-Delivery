@@ -17,6 +17,8 @@ use Doctrine\ORM\Mapping as ORM;
 // date), and a customer's own orders, newest first.
 #[ORM\Index(name: 'idx_order_status_created', columns: ['status', 'created_at'])]
 #[ORM\Index(name: 'idx_order_user_created', columns: ['user_id', 'created_at'])]
+// One order per checkout, however many times the app sends it.
+#[ORM\UniqueConstraint(name: 'uniq_order_user_request', columns: ['user_id', 'client_request_id'])]
 class Order
 {
     #[ORM\Id]
@@ -144,6 +146,10 @@ class Order
 
     #[ORM\Column(length: 50, nullable: true)]
     private ?string $promoCode = null;
+
+    /** See CreateOrderRequest::$clientRequestId. */
+    #[ORM\Column(length: 64, nullable: true)]
+    private ?string $clientRequestId = null;
 
     #[ORM\Column(length: 50, enumType: OrderStatus::class)]
     private OrderStatus $status = OrderStatus::PENDING;
@@ -355,6 +361,18 @@ class Order
     public function getPromoCode(): ?string
     {
         return $this->promoCode;
+    }
+
+    public function getClientRequestId(): ?string
+    {
+        return $this->clientRequestId;
+    }
+
+    public function setClientRequestId(?string $clientRequestId): static
+    {
+        $this->clientRequestId = $clientRequestId;
+
+        return $this;
     }
 
     public function applyDiscount(Promotion $promotion, string $amount): static

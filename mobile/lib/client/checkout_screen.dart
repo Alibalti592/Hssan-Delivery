@@ -9,6 +9,7 @@ import '../theme.dart';
 import '../widgets/cash_payment_note.dart';
 import '../widgets/dark_header.dart';
 import 'dart:async';
+import 'dart:math';
 import 'order_confirmed_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -27,6 +28,20 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   AddressSelection? _selection;
   DeliverySpeed _speed = DeliverySpeed.standard;
   bool _submitting = false;
+
+  /// This checkout's identifier, sent with every try to place it: a try
+  /// whose answer was lost (weak network, timeout) may still have placed
+  /// the order, and the next one then gets that order back, not a second.
+  late final String _requestId = _newRequestId();
+
+  static String _newRequestId() {
+    final random = Random.secure();
+    return List.generate(
+      16,
+      (_) => random.nextInt(256).toRadixString(16).padLeft(2, '0'),
+    ).join();
+  }
+
   String? _error;
 
   /// The backend's price for this cart and zone, promotion included. Null
@@ -151,6 +166,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         note: _note.text.trim(),
         promoCode: _appliedCode,
         speed: _speed,
+        clientRequestId: _requestId,
       );
       cart.clear();
       if (!mounted) return;

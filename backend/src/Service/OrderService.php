@@ -42,6 +42,7 @@ final class OrderService
         User $user,
     ): Order {
         $order = $this->priceOrder($dto, $user);
+        $order->setClientRequestId($dto->clientRequestId);
 
         $delivery = new Delivery();
 

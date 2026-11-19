@@ -31,6 +31,8 @@ Map<String, dynamic> _quote({
 
 void main() {
   late List<Map<String, dynamic>> placed;
+  // The next order is lost on the way, as on a weak network.
+  var loseNextOrder = false;
 
   Future<Widget> app() async {
     placed = [];
@@ -99,6 +101,10 @@ void main() {
         }
         if (path == '/api/orders') {
           placed.add(body);
+          if (loseNextOrder) {
+            loseNextOrder = false;
+            throw http.ClientException('Connection timed out');
+          }
           return jsonResponse({
             'id': 9,
             'restaurantId': 1,
@@ -220,5 +226,29 @@ void main() {
     expect(find.text('6.000 DT'), findsOneWidget);
     expect(find.text('30.000 DT'), findsOneWidget);
     expect(find.text('4.000 DT'), findsNothing);
+  });
+
+  testWidgets('trying again after a lost answer sends the same checkout', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(800, 2000);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(await app());
+    await tester.pumpAndSettle();
+
+    loseNextOrder = true;
+    await tester.tap(find.text('CONFIRMER LA COMMANDE'));
+    await tester.pumpAndSettle();
+    expect(find.text('Impossible de contacter le serveur.'), findsOneWidget);
+
+    await tester.tap(find.text('CONFIRMER LA COMMANDE'));
+    await tester.pumpAndSettle();
+
+    // The server may have placed the first: the same identifier lets it
+    // give that order back instead of placing a second one.
+    expect(placed, hasLength(2));
+    expect(placed[0]['clientRequestId'], matches(RegExp(r'^[0-9a-f]{32}$')));
+    expect(placed[1]['clientRequestId'], placed[0]['clientRequestId']);
   });
 }

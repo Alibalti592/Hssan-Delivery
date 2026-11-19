@@ -67,10 +67,10 @@ class OrdersRepository {
     double? deliveryLongitude,
     String? promoCode,
     DeliverySpeed speed = DeliverySpeed.standard,
+    String? clientRequestId,
   }) async {
-    final body = await _api.post(
-      '/api/orders',
-      _orderBody(
+    final body = await _api.post('/api/orders', {
+      ..._orderBody(
         speed: speed,
         restaurantId: restaurantId,
         items: items,
@@ -81,7 +81,10 @@ class OrdersRepository {
         deliveryLongitude: deliveryLongitude,
         promoCode: promoCode,
       ),
-    );
+      // The same for every try of one checkout: the server gives back the
+      // order a lost answer had placed instead of placing a second one.
+      'clientRequestId': ?clientRequestId,
+    });
     return ClientOrder.fromJson(body as Map<String, dynamic>);
   }
 

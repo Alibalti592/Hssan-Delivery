@@ -38,4 +38,13 @@ final class CreateOrderRequest
     /** A promotion code the client typed at checkout, if any. */
     #[Assert\Length(max: 50)]
     public ?string $promoCode = null;
+
+    /**
+     * Made by the app once per checkout and sent again when it retries:
+     * when the answer to the first try was lost on a weak network, the
+     * order it placed comes back instead of a second one.
+     */
+    #[Assert\Length(max: 64)]
+    #[Assert\Regex(pattern: '/^[A-Za-z0-9_-]+$/')]
+    public ?string $clientRequestId = null;
 }

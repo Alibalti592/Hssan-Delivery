@@ -140,7 +140,60 @@ final class OrderApiTest extends WebTestCase
         );
     }
 
-    public function testOrderAgainstAGroceryStoreGetsGroceryDeliveryType(): void
+    public function testARetriedCheckoutGivesBackTheSameOrder(): void
+    {
+        $client = static::createClient();
+        $this->entityManager = self::getContainer()->get(EntityManagerInterface::class);
+
+        $user = $this->createTestUser();
+        $restaurant = $this->createTestRestaurant();
+        $product = $this->createTestProduct($restaurant, $this->createTestCategory($restaurant));
+        $zone = $this->createTestDeliveryZone('4.000');
+        $token = $this->authenticateClient($client, $user);
+
+        $place = function (string $requestId) use ($client, $token, $restaurant, $product, $zone): array {
+            $client->request('POST', '/api/orders', server: [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_AUTHORIZATION' => 'Bearer '.$token,
+            ], content: json_encode([
+                'restaurantId' => $restaurant->getId(),
+                'items' => [['productId' => $product->getId(), 'quantity' => 1]],
+                'deliveryAddress' => 'Tunis, Tunisia',
+                'deliveryZoneId' => $zone->getId(),
+                'clientRequestId' => $requestId,
+            ]));
+
+            return json_decode((string) $client->getResponse()->getContent(), true);
+        };
+
+        $requestId = 'checkout-'.bin2hex(random_bytes(8));
+        $first = $place($requestId);
+        self::assertResponseStatusCodeSame(201);
+
+        // The answer was lost on the way: the app sends the same checkout again.
+        $again = $place($requestId);
+        self::assertResponseStatusCodeSame(200);
+        self::assertSame($first['id'], $again['id']);
+
+        // A new checkout is a new order.
+        $other = $place('checkout-'.bin2hex(random_bytes(8)));
+        self::assertResponseStatusCodeSame(201);
+        self::assertNotSame($first['id'], $other['id']);
+
+        $client->request('POST', '/api/orders', server: [
+            'CONTENT_TYPE' => 'application/json',
+            'HTTP_AUTHORIZATION' => 'Bearer '.$token,
+        ], content: json_encode([
+            'restaurantId' => $restaurant->getId(),
+            'items' => [['productId' => $product->getId(), 'quantity' => 1]],
+            'deliveryAddress' => 'Tunis, Tunisia',
+            'deliveryZoneId' => $zone->getId(),
+            'clientRequestId' => 'not valid!',
+        ]));
+        self::assertResponseStatusCodeSame(422);
+    }
+
+        public function testOrderAgainstAGroceryStoreGetsGroceryDeliveryType(): void
     {
         $client = static::createClient();
 
