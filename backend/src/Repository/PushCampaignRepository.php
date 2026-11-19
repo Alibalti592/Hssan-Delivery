@@ -21,7 +21,13 @@ class PushCampaignRepository extends ServiceEntityRepository
      */
     public function latest(int $max): array
     {
+        // Each row shows its promotion and who sent it: in the same query,
+        // not one more per campaign.
         return $this->createQueryBuilder('c')
+            ->leftJoin('c.promotion', 'p')
+            ->addSelect('p')
+            ->leftJoin('c.sentBy', 'u')
+            ->addSelect('u')
             ->orderBy('c.sentAt', 'DESC')
             ->addOrderBy('c.id', 'DESC')
             ->setMaxResults($max)

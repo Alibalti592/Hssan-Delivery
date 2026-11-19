@@ -17,6 +17,9 @@ use Doctrine\ORM\Mapping as ORM;
 // date), and a customer's own orders, newest first.
 #[ORM\Index(name: 'idx_order_status_created', columns: ['status', 'created_at'])]
 #[ORM\Index(name: 'idx_order_user_created', columns: ['user_id', 'created_at'])]
+// The admin's list (newest first) and the dashboard's day: by date alone,
+// which the two above can't serve (they start with another column).
+#[ORM\Index(name: 'idx_order_created', columns: ['created_at'])]
 // One order per checkout, however many times the app sends it.
 #[ORM\UniqueConstraint(name: 'uniq_order_user_request', columns: ['user_id', 'client_request_id'])]
 class Order

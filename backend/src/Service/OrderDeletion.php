@@ -22,6 +22,7 @@ final class OrderDeletion
         private readonly EntityManagerInterface $entityManager,
         #[Autowire(service: 'app.private_photo_uploader')]
         private readonly PhotoUploader $privatePhotoUploader,
+        private readonly PopularityCache $popularityCache,
     ) {
     }
 
@@ -35,6 +36,7 @@ final class OrderDeletion
         }
 
         $billPhoto = $order->getBillPhotoFilename();
+        $wasDelivered = OrderStatus::COMPLETED === $order->getStatus();
 
         if (null !== $delivery = $order->getDelivery()) {
             $this->entityManager->remove($delivery);
@@ -47,5 +49,9 @@ final class OrderDeletion
 
         // Once the order is gone for sure: a failed flush keeps the photo.
         $this->privatePhotoUploader->delete($billPhoto, BillOrderService::PHOTO_SUBDIRECTORY);
+        if ($wasDelivered) {
+            // It counted towards what's popular.
+            $this->popularityCache->clear();
+        }
     }
 }

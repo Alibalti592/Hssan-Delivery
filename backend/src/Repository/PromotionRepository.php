@@ -49,7 +49,9 @@ class PromotionRepository extends ServiceEntityRepository
     private function currentlyValid(\DateTimeImmutable $now): QueryBuilder
     {
         return $this->createQueryBuilder('p')
+            // Selected too: every promotion shows its restaurant's name.
             ->leftJoin('p.restaurant', 'r')
+            ->addSelect('r')
             ->leftJoin('p.product', 'offerProduct')
             ->andWhere('p.isActive = :true')
             ->andWhere('p.startAt <= :now')

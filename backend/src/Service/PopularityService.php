@@ -22,8 +22,12 @@ final class PopularityService
     public const WINDOW_DAYS = 30;
     public const MIN_ORDERS = 3;
 
+    /** Rows ranked and cached, more than any caller asks for. */
+    private const RANKED = 50;
+
     public function __construct(
         private readonly EntityManagerInterface $entityManager,
+        private readonly PopularityCache $cache,
     ) {
     }
 
@@ -32,7 +36,28 @@ final class PopularityService
      */
     public function popularRestaurants(\DateTimeImmutable $now, int $max): array
     {
-        $rows = $this->entityManager->createQueryBuilder()
+        // The ranking is cached (PopularityCache); the restaurants are loaded
+        // fresh, so one closed since is left out at once.
+        $rows = $this->cache->get('popular.restaurants', fn () => $this->rankRestaurants($now));
+        $restaurants = $this->byId(Restaurant::class, array_column($rows, 'id'));
+
+        $popular = [];
+        foreach ($rows as $row) {
+            $restaurant = $restaurants[$row['id']] ?? null;
+            if (null !== $restaurant && $restaurant->isAvailable() && count($popular) < $max) {
+                $popular[] = ['restaurant' => $restaurant, 'orderCount' => (int) $row['orderCount']];
+            }
+        }
+
+        return $popular;
+    }
+
+    /**
+     * @return list<array{id: int, orderCount: int}>
+     */
+    private function rankRestaurants(\DateTimeImmutable $now): array
+    {
+        return $this->entityManager->createQueryBuilder()
             ->select('r.id AS id', 'COUNT(o.id) AS orderCount')
             ->from(Order::class, 'o')
             ->join('o.restaurant', 'r')
@@ -48,16 +73,9 @@ final class PopularityService
             ->setParameter('since', $this->since($now))
             ->setParameter('type', RestaurantType::RESTAURANT)
             ->setParameter('min', self::MIN_ORDERS)
-            ->setMaxResults($max)
+            ->setMaxResults(self::RANKED)
             ->getQuery()
-            ->getResult();
-
-        $restaurants = $this->byId(Restaurant::class, array_column($rows, 'id'));
-
-        return array_map(
-            static fn (array $row) => ['restaurant' => $restaurants[$row['id']], 'orderCount' => (int) $row['orderCount']],
-            $rows
-        );
+            ->getArrayResult();
     }
 
     /**
@@ -68,7 +86,28 @@ final class PopularityService
      */
     public function popularDishes(\DateTimeImmutable $now, int $max): array
     {
-        $rows = $this->entityManager->createQueryBuilder()
+        // As popularRestaurants: the ranking cached, the dishes fresh.
+        $rows = $this->cache->get('popular.dishes', fn () => $this->rankDishes($now));
+        $products = $this->dishesById(array_column($rows, 'id'));
+
+        $popular = [];
+        foreach ($rows as $row) {
+            $product = $products[$row['id']] ?? null;
+            if (null !== $product && $product->isAvailable() && true === $product->getRestaurant()?->isAvailable()
+                && count($popular) < $max) {
+                $popular[] = ['product' => $product, 'orderCount' => (int) $row['orderCount']];
+            }
+        }
+
+        return $popular;
+    }
+
+    /**
+     * @return list<array{id: int, orderCount: int}>
+     */
+    private function rankDishes(\DateTimeImmutable $now): array
+    {
+        return $this->entityManager->createQueryBuilder()
             ->select('p.id AS id', 'COUNT(DISTINCT o.id) AS orderCount')
             ->from(OrderItem::class, 'i')
             ->join('i.order', 'o')
@@ -87,16 +126,9 @@ final class PopularityService
             ->setParameter('since', $this->since($now))
             ->setParameter('type', RestaurantType::RESTAURANT)
             ->setParameter('min', self::MIN_ORDERS)
-            ->setMaxResults($max)
+            ->setMaxResults(self::RANKED)
             ->getQuery()
-            ->getResult();
-
-        $products = $this->byId(Product::class, array_column($rows, 'id'));
-
-        return array_map(
-            static fn (array $row) => ['product' => $products[$row['id']], 'orderCount' => (int) $row['orderCount']],
-            $rows
-        );
+            ->getArrayResult();
     }
 
     /**
@@ -120,7 +152,35 @@ final class PopularityService
         return $found;
     }
 
-    private function since(\DateTimeImmutable $now): \DateTimeImmutable
+    /**
+     * With their restaurants, in one query: each is checked still open.
+     *
+     * @param list<int> $ids
+     *
+     * @return array<int, Product>
+     */
+    private function dishesById(array $ids): array
+    {
+        if ([] === $ids) {
+            return [];
+        }
+        $found = [];
+        $products = $this->entityManager->createQueryBuilder()
+            ->select('p', 'r')
+            ->from(Product::class, 'p')
+            ->join('p.restaurant', 'r')
+            ->andWhere('p.id IN (:ids)')
+            ->setParameter('ids', $ids)
+            ->getQuery()
+            ->getResult();
+        foreach ($products as $product) {
+            $found[$product->getId()] = $product;
+        }
+
+        return $found;
+    }
+
+        private function since(\DateTimeImmutable $now): \DateTimeImmutable
     {
         return $now->modify(sprintf('-%d days', self::WINDOW_DAYS));
     }

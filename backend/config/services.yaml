@@ -50,3 +50,10 @@ services:
         arguments:
             $uploadsDir: '%kernel.project_dir%/var/storage/private'
             $variants: null
+
+when@test:
+    services:
+        # Counts SQL statements for QueryCountTest (N+1 guard).
+        App\Tests\Support\QueryCounter:
+            public: true
+            tags: [doctrine.middleware]

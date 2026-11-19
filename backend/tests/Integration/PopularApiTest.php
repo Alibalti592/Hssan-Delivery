@@ -3,18 +3,23 @@
 namespace App\Tests\Integration;
 
 use App\Entity\Category;
+use App\Entity\Delivery;
 use App\Entity\DeliveryZone;
 use App\Entity\Order;
 use App\Entity\OrderItem;
 use App\Entity\Product;
 use App\Entity\Restaurant;
 use App\Entity\User;
+use App\Enum\DeliveryStatus;
 use App\Enum\OrderStatus;
+use App\Event\DeliveryStatusChangedEvent;
+use App\Tests\Support\QueryCounter;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
+use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
 
 /**
  * "Les plus commandés" / "Restaurants populaires": real counts of delivered
@@ -40,6 +45,10 @@ final class PopularApiTest extends WebTestCase
         $this->entityManager->createQuery(
             "UPDATE App\Entity\Restaurant r SET r.isAvailable = false WHERE r.name LIKE 'Popular-%'"
         )->execute();
+
+        // Orders are set up directly here, not delivered: the ranking an
+        // earlier test cached would hide them.
+        self::getContainer()->get('cache.popular')->clear();
 
         $this->zone = (new DeliveryZone())->setName("Zone {$this->tag}")->setFee('3.000');
         $this->entityManager->persist($this->zone);
@@ -96,6 +105,56 @@ final class PopularApiTest extends WebTestCase
         self::assertSame([5, 3], array_column($dishes, 'orderCount'));
         self::assertSame("{$this->tag} Pizzeria", $dishes[0]['restaurant']['name']);
         self::assertSame(30, $result['windowDays']);
+    }
+
+    public function testTheRankingIsCachedButAClosedRestaurantLeavesAtOnce(): void
+    {
+        // One kernel, so its cache lasts from one request to the next.
+        $this->client->disableReboot();
+        [$restaurant, $dish] = $this->restaurantWith('Cached', ['Plat du cache']);
+        for ($i = 0; $i < 3; ++$i) {
+            $this->order($restaurant, [$dish]);
+        }
+        self::assertContains("{$this->tag} Cached", array_column($this->popular()['restaurants'], 'name'));
+
+        // Asked again: the ranking comes from the cache, no counting query.
+        self::assertSame([], $this->rankingQueries(fn () => $this->popular()));
+
+        // Closed meanwhile: gone at once, though the ranking is cached.
+        $this->entityManager->find(Restaurant::class, $restaurant->getId())?->setIsAvailable(false);
+        $this->entityManager->flush();
+        $this->entityManager->clear();
+        $result = $this->popular();
+        self::assertNotContains("{$this->tag} Cached", array_column($result['restaurants'], 'name'));
+        self::assertNotContains('Plat du cache', array_column($result['dishes'], 'name'));
+    }
+
+    public function testADeliveredOrderClearsTheCachedRanking(): void
+    {
+        $this->client->disableReboot();
+        $this->popular();
+        self::assertSame([], $this->rankingQueries(fn () => $this->popular()), 'cached');
+
+        $delivery = (new Delivery())->setStatus(DeliveryStatus::DELIVERED);
+        self::getContainer()->get(EventDispatcherInterface::class)->dispatch(
+            new DeliveryStatusChangedEvent($delivery, DeliveryStatus::ON_THE_WAY)
+        );
+
+        self::assertNotSame([], $this->rankingQueries(fn () => $this->popular()), 'ranked again');
+    }
+
+    /**
+     * The counting queries behind the ranking that [request] ran.
+     *
+     * @return list<string>
+     */
+    private function rankingQueries(callable $request): array
+    {
+        $this->entityManager->clear();
+        QueryCounter::reset();
+        $request();
+
+        return array_values(array_filter(QueryCounter::$queries, static fn (string $sql) => str_contains($sql, 'COUNT(')));
     }
 
     public function testNeedsAnAccount(): void
