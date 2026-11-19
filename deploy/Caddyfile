@@ -2,12 +2,34 @@
 # domains point at this server (DNS A record) and ports 80/443 are open.
 {
 	email {$ACME_EMAIL}
+
+	# Cloudflare in front (DNS records proxied, orange cloud): it serves
+	# photos from near the customers and opens their connections close to
+	# them. Every request then reaches us from a Cloudflare address, with
+	# the customer's own in CF-Connecting-IP, believed only when the
+	# request really comes from Cloudflare (https://www.cloudflare.com/ips/).
+	# The backend's limits per address (sign-up, login attempts) depend on
+	# it: without this, all customers behind one Cloudflare server would
+	# share one limit. Harmless without Cloudflare: other addresses are
+	# taken as they are.
+	servers {
+		trusted_proxies static 173.245.48.0/20 103.21.244.0/22 103.22.200.0/22 103.31.4.0/22 141.101.64.0/18 108.162.192.0/18 190.93.240.0/20 188.114.96.0/20 197.234.240.0/22 198.41.128.0/17 162.158.0.0/15 104.16.0.0/13 104.24.0.0/14 172.64.0.0/13 131.0.72.0/22 2400:cb00::/32 2606:4700::/32 2803:f800::/32 2405:b500::/32 2405:8100::/32 2a06:98c0::/29 2c0f:f248::/32
+		client_ip_headers CF-Connecting-IP
+	}
+}
+
+# The backend sees the customer's address (worked out above) as the only
+# X-Forwarded-For entry: it trusts this proxy, not Cloudflare's addresses.
+(backend) {
+	reverse_proxy backend:80 {
+		header_up X-Forwarded-For {client_ip}
+	}
 }
 
 # The API the mobile app talks to.
 {$API_DOMAIN} {
 	encode zstd gzip
-	reverse_proxy backend:80
+	import backend
 }
 
 # The admin dashboard. /api and /uploads go to the backend on this same
@@ -15,10 +37,10 @@
 {$ADMIN_DOMAIN} {
 	encode zstd gzip
 	handle /api/* {
-		reverse_proxy backend:80
+		import backend
 	}
 	handle /uploads/* {
-		reverse_proxy backend:80
+		import backend
 	}
 	handle {
 		reverse_proxy admin:80

@@ -282,6 +282,48 @@ docker compose -f docker-compose.prod.yml run --rm --no-deps --entrypoint sh \
 docker compose -f docker-compose.prod.yml up -d
 ```
 
+## 8b. Cloudflare in front (optional, free)
+
+When the server is far from the customers (this one is in Canada, they're
+in Tunisia), Cloudflare serves the photos from near them and opens their
+connections close to them. Menus and orders still go to the server.
+
+The Caddyfile is already set for it: it takes the customer's address from
+Cloudflare (CF-Connecting-IP) and passes it to the backend, whose sign-up
+and login limits count per address.
+
+1. On cloudflare.com, create an account and **Add a site**: the bare domain,
+   **Free** plan. Cloudflare copies the DNS records it finds.
+2. **DNS → Records**: check the A records for `api`, `admin`, the bare domain
+   and `www` point at the server, each **Proxied** (orange cloud). Keep any
+   other records (mail...) as they are.
+3. **SSL/TLS → Overview**: **Full (strict)**. The server keeps its own
+   Let's Encrypt certificates.
+4. **SSL/TLS → Edge Certificates**: leave **Always Use HTTPS** off. Caddy
+   already redirects to HTTPS itself, and this keeps its certificate
+   renewals working.
+5. **Security → Bots**: leave **Bot Fight Mode** off. It challenges anything
+   that isn't a browser, which includes the app's API calls.
+6. At the domain's registrar, replace the name servers with the two
+   Cloudflare shows. It can take a few hours; Cloudflare emails when the
+   site is active.
+
+Check it once active (`server: cloudflare`; the photo's `cf-cache-status`
+turns to `HIT` the second time):
+
+```bash
+curl -sI https://api.example.tn/api/popular | grep -iE '^HTTP|^server'
+f=$(docker compose -f docker-compose.prod.yml exec -T backend sh -c 'ls public/uploads/products/w480 | head -1')
+curl -sI "https://api.example.tn/uploads/products/w480/$f" | grep -iE '^HTTP|cf-cache-status'
+```
+
+Cloudflare's addresses are listed in the Caddyfile (`trusted_proxies`).
+They rarely change; compare once in a while with
+https://www.cloudflare.com/ips/.
+
+To turn it off: set the records to **DNS only** (grey cloud). Everything
+keeps working without it.
+
 ## 9. Day to day
 
 All from `/opt/hssan-delivery/deploy`:
