@@ -211,6 +211,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         : '${widget.product.name} (${_option!.name})';
     messenger.showSnackBar(
       SnackBar(
+        // A snack bar with a button stays until dismissed unless told
+        // otherwise: it then covered the cart's total and its COMMANDER
+        // button for good.
+        persist: false,
+        duration: const Duration(seconds: 3),
         content: Text(
           addOns.isEmpty
               ? '$label ajouté au panier'
@@ -220,9 +225,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         ),
         action: SnackBarAction(
           label: 'VOIR LE PANIER',
-          onPressed: () => navigator.push(
-            MaterialPageRoute(builder: (_) => const CartScreen()),
-          ),
+          onPressed: () {
+            messenger.hideCurrentSnackBar();
+            navigator.push(
+              MaterialPageRoute(builder: (_) => const CartScreen()),
+            );
+          },
         ),
       ),
     );
@@ -336,14 +344,18 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 subtitle: 'Choisissez-en 1',
                 badge: _Badge.done,
                 children: [
-                  for (final option in product.options)
-                    _ChoiceRow(
-                      label: option.name,
-                      price: '${option.price} DT',
-                      multiple: false,
-                      selected: option.name == _option?.name,
-                      onTap: () => setState(() => _option = option),
-                    ),
+                  _ChoiceChips(
+                    multiple: false,
+                    choices: [
+                      for (final option in product.options)
+                        _Chip(
+                          label: option.name,
+                          price: '${option.price} DT',
+                          selected: option.name == _option?.name,
+                          onTap: () => setState(() => _option = option),
+                        ),
+                    ],
+                  ),
                 ],
               ),
             ),
@@ -360,16 +372,21 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     : _Badge.done,
                 flagged: _flagged == group.name,
                 children: [
-                  for (final choice in group.choices)
-                    _ChoiceRow(
-                      label: choice.name,
-                      price: choice.isFree ? 'Gratuit' : '+${choice.price} DT',
-                      free: choice.isFree,
-                      multiple: group.multiple,
-                      selected:
-                          _picked[group.name]?.contains(choice.name) ?? false,
-                      onTap: () => _toggle(group, choice),
-                    ),
+                  _ChoiceChips(
+                    multiple: group.multiple,
+                    choices: [
+                      for (final choice in group.choices)
+                        _Chip(
+                          label: choice.name,
+                          // Free ones say nothing: most sauces are.
+                          price: choice.isFree ? null : '+${choice.price} DT',
+                          selected:
+                              _picked[group.name]?.contains(choice.name) ??
+                              false,
+                          onTap: () => _toggle(group, choice),
+                        ),
+                    ],
+                  ),
                 ],
               ),
             ),
@@ -592,6 +609,107 @@ class _ChoiceSection extends StatelessWidget {
   }
 }
 
+/// One choice in a [_ChoiceChips].
+class _Chip {
+  const _Chip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+    this.price,
+  });
+
+  final String label;
+
+  /// "+1.500 DT"; null for a free one.
+  final String? price;
+  final bool selected;
+  final VoidCallback onTap;
+}
+
+/// A group's choices as pills side by side, wrapping onto the next line:
+/// six sauces fit in two lines instead of six rows. A picked one turns
+/// black, with a tick when several can be picked.
+class _ChoiceChips extends StatelessWidget {
+  const _ChoiceChips({required this.choices, required this.multiple});
+
+  final List<_Chip> choices;
+  final bool multiple;
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = accentOf(context);
+    final onAccent = Theme.of(context).colorScheme.onPrimary;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 14, 20, 4),
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 10,
+        children: [
+          for (final choice in choices)
+            Semantics(
+              checked: multiple ? choice.selected : null,
+              selected: multiple ? null : choice.selected,
+              button: true,
+              child: Material(
+                color: choice.selected ? accent : Colors.transparent,
+                shape: StadiumBorder(
+                  side: BorderSide(
+                    color: choice.selected ? accent : const Color(0xFFC3C9D2),
+                    width: 1.3,
+                  ),
+                ),
+                child: InkWell(
+                  customBorder: const StadiumBorder(),
+                  onTap: choice.onTap,
+                  child: AnimatedPadding(
+                    duration: const Duration(milliseconds: 140),
+                    padding: EdgeInsets.fromLTRB(
+                      choice.selected && multiple ? 10 : 14,
+                      10,
+                      14,
+                      10,
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (choice.selected && multiple) ...[
+                          Icon(Icons.check_rounded, size: 16, color: onAccent),
+                          const SizedBox(width: 4),
+                        ],
+                        Text(
+                          choice.label,
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: choice.selected ? onAccent : null,
+                          ),
+                        ),
+                        if (choice.price case final price?) ...[
+                          const SizedBox(width: 6),
+                          Text(
+                            price,
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w600,
+                              color: choice.selected
+                                  ? onAccent.withValues(alpha: 0.75)
+                                  : mutedText,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
 /// One choice: a checkbox (several) or a round button (one), its name and
 /// its price, with the whole row as the tap target.
 class _ChoiceRow extends StatelessWidget {
@@ -601,14 +719,12 @@ class _ChoiceRow extends StatelessWidget {
     required this.multiple,
     required this.selected,
     required this.onTap,
-    this.free = false,
   });
 
   final String label;
   final String price;
   final bool multiple;
   final bool selected;
-  final bool free;
   final VoidCallback onTap;
 
   @override
@@ -640,7 +756,7 @@ class _ChoiceRow extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 13.5,
                     fontWeight: FontWeight.w600,
-                    color: free ? mutedText : const Color(0xFF3A4250),
+                    color: const Color(0xFF3A4250),
                   ),
                 ),
               ],
