@@ -38,6 +38,10 @@ export function ProductEditor({
   const fileRef = useRef<HTMLInputElement>(null);
 
   const [name, setName] = useState(product?.name ?? '');
+  // What's in it ("1 burger, frites, une boisson"): shown under the name in
+  // the app. Kept as it was when editing; it used to be sent as null, which
+  // erased it on every save.
+  const [description, setDescription] = useState(product?.description ?? '');
   const [price, setPrice] = useState(product?.price ?? '');
   const [options, setOptions] = useState<ProductOption[]>(product?.options ?? []);
   const [extraGroups, setExtraGroups] = useState<ProductExtraGroup[]>(product?.extraGroups ?? []);
@@ -83,7 +87,7 @@ export function ProductEditor({
     mutationFn: async (_addAnother: boolean) => {
       const payload = {
         name: name.trim(),
-        description: null,
+        description: description.trim() || null,
         price: options.length > 0 ? null : price,
         options: options.map((o) => ({ name: o.name.trim(), price: o.price })),
         categoryId: Number(categoryId),
@@ -104,6 +108,7 @@ export function ProductEditor({
         // Same category, blank form: ready for the next dish.
         setAddedNote(`“${saved.name}” added.`);
         setName('');
+        setDescription('');
         setPrice('');
         setOptions([]);
         // Kept: the next dish usually takes the same sauces and drinks.
@@ -211,7 +216,12 @@ export function ProductEditor({
                   e.target.value = '';
                 }}
               />
-              <button type="button" className="btn ghost sm" disabled={uploadNow.isPending} onClick={() => fileRef.current?.click()}>
+              <button
+                type="button"
+                className="btn ghost sm"
+                disabled={uploadNow.isPending}
+                onClick={() => fileRef.current?.click()}
+              >
                 {uploadNow.isPending ? 'Uploading…' : shownPhoto ? 'Replace photo' : 'Add a photo'}
               </button>
               {(pendingFile || photoUrl) && (
@@ -249,6 +259,22 @@ export function ProductEditor({
               placeholder="e.g. Pizza Margherita"
               required
             />
+          </div>
+
+          <div className="field-group">
+            <label className="field-label" htmlFor="product-description">
+              Description <span className="optional">optional</span>
+            </label>
+            <textarea
+              id="product-description"
+              className="field-textarea"
+              rows={2}
+              maxLength={500}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="e.g. 1 burger, frites, 4 nuggets et une boisson 33 cl"
+            />
+            <span className="rmeta">Shown under the name in the app: what's inside a box or a menu.</span>
           </div>
 
           <div className="field-row">

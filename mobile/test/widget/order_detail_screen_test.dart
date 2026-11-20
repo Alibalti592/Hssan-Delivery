@@ -247,6 +247,7 @@ void main() {
     OrdersRepository repositoryWith({
       required String deliveryStatus,
       Map<String, dynamic>? courier,
+      bool pickupKnown = true,
     }) => OrdersRepository(
       ApiClient(
         tokenProvider: () => 'jwt-123',
@@ -263,8 +264,8 @@ void main() {
               deliveryStatus: deliveryStatus,
               courierName: 'Awa',
               courierPhone: '22000003',
-              pickupLatitude: 37.2700,
-              pickupLongitude: 9.8600,
+              pickupLatitude: pickupKnown ? 37.2700 : null,
+              pickupLongitude: pickupKnown ? 9.8600 : null,
               deliveryLatitude: 37.2746,
               deliveryLongitude: 9.8739,
             ),
@@ -326,6 +327,40 @@ void main() {
         findsOneWidget,
       );
       expect(find.text('Au point de retrait dans'), findsOneWidget);
+    });
+
+    testWidgets('to a restaurant (no pickup point on the map): no arrival '
+        'time to the client yet', (tester) async {
+      _useTallViewport(tester);
+      // Next to the client, but the order is still at the restaurant.
+      await tester.pumpWidget(
+        _app(
+          repositoryWith(
+            deliveryStatus: 'ACCEPTED',
+            pickupKnown: false,
+            courier: {
+              'latitude': 37.2740,
+              'longitude': 9.8739,
+              'updatedAt': DateTime.now().toUtc().toIso8601String(),
+            },
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+
+      expect(
+        find.text('Votre livreur va chercher votre commande'),
+        findsOneWidget,
+      );
+      expect(find.text('Votre livreur arrive'), findsNothing);
+      expect(find.text('Arrivée estimée'), findsNothing);
+      expect(
+        find.text('Il récupère votre commande, puis vient chez vous.'),
+        findsOneWidget,
+      );
+      // Still on the map, with the client's address.
+      expect(find.byTooltip('Votre livreur'), findsOneWidget);
     });
 
     testWidgets('no position yet: says it is coming', (tester) async {
