@@ -4,9 +4,9 @@ import '../theme.dart';
 import '../widgets/app_photo.dart';
 import 'catalogue_models.dart';
 
-/// The icon drawn for a restaurant category without an image of its own.
-/// The keys mirror the backend's RestaurantCategory::ICONS; an unknown one
-/// (a newer server) falls back to the fork and knife.
+/// The icon kept for a category's own image while it loads or fails. The
+/// keys mirror the backend's RestaurantCategory::ICONS; an unknown one (a
+/// newer server) falls back to the fork and knife.
 IconData categoryIconData(String key) => switch (key) {
   'fast_food' => Icons.fastfood_outlined,
   'burger' => Icons.lunch_dining_outlined,
@@ -29,8 +29,42 @@ IconData categoryIconData(String key) => switch (key) {
   _ => Icons.restaurant_outlined,
 };
 
-/// The row of restaurant categories that filters a restaurant list: a
-/// round tile and a name each, scrolling sideways, "Tout" first.
+/// The 3D illustrations drawn for a category without an image of its own,
+/// one per icon key (assets/categories/), in the style of the home
+/// screen's services.
+const _illustrated = {
+  'restaurant',
+  'fast_food',
+  'burger',
+  'pizza',
+  'kebab',
+  'grill',
+  'bowl',
+  'soup',
+  'pasta',
+  'fish',
+  'tapas',
+  'croissant',
+  'breakfast',
+  'leaf',
+  'cake',
+  'ice_cream',
+  'coffee',
+  'drink',
+  'basket',
+};
+
+/// The illustration for icon [key]; an unknown one (a newer server) gets
+/// the plate and cutlery.
+String categoryIllustration(String key) =>
+    'assets/categories/${_illustrated.contains(key) ? key : 'restaurant'}.webp';
+
+/// "Tout": every restaurant, whatever its category.
+const allCategoriesIllustration = 'assets/categories/all.webp';
+
+/// The row of restaurant categories: an illustrated tile and a name each,
+/// scrolling sideways, "Tout" first unless [showAll] is false (the home
+/// screen, where a tap opens a category rather than filtering).
 ///
 /// The tile of [selectedId] (or "Tout" when null) is highlighted, and
 /// [onSelected] gets the tapped category's id, or null for "Tout" and for a
@@ -40,14 +74,16 @@ class CategorySelector extends StatefulWidget {
     required this.categories,
     required this.onSelected,
     this.selectedId,
+    this.showAll = true,
     super.key,
   });
 
   final List<RestaurantCategory> categories;
   final int? selectedId;
   final ValueChanged<int?> onSelected;
+  final bool showAll;
 
-  static const double _tileWidth = 76;
+  static const double _tileWidth = 78;
   static const double _gap = 4;
   static const double _padding = 12;
 
@@ -74,7 +110,7 @@ class _CategorySelectorState extends State<CategorySelector> {
       final position = _scroll.position;
       final tileEnd =
           CategorySelector._padding +
-          (index + 1) * extent +
+          (index + (widget.showAll ? 1 : 0)) * extent +
           CategorySelector._tileWidth;
       final overflow =
           tileEnd + CategorySelector._padding - position.viewportDimension;
@@ -96,21 +132,23 @@ class _CategorySelectorState extends State<CategorySelector> {
 
     return SizedBox(
       // Room for a name on two lines ("Cuisine Tunisienne").
-      height: 100,
+      height: 112,
       child: ListView.separated(
         controller: _scroll,
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(
           horizontal: CategorySelector._padding,
         ),
-        itemCount: categories.length + 1,
+        itemCount: categories.length + (widget.showAll ? 1 : 0),
         separatorBuilder: (_, _) =>
             const SizedBox(width: CategorySelector._gap),
         itemBuilder: (context, index) {
+          if (!widget.showAll) index++;
           if (index == 0) {
             return _CategoryTile(
               name: 'Tout',
-              icon: Icons.grid_view_rounded,
+              icon: Icons.restaurant_outlined,
+              illustration: allCategoriesIllustration,
               selected: widget.selectedId == null,
               onTap: () => widget.onSelected(null),
             );
@@ -120,6 +158,7 @@ class _CategorySelectorState extends State<CategorySelector> {
           return _CategoryTile(
             name: category.name,
             icon: categoryIconData(category.icon),
+            illustration: categoryIllustration(category.icon),
             imageUrl: category.imageUrl,
             selected: selected,
             onTap: () => widget.onSelected(selected ? null : category.id),
@@ -134,6 +173,7 @@ class _CategoryTile extends StatelessWidget {
   const _CategoryTile({
     required this.name,
     required this.icon,
+    required this.illustration,
     required this.selected,
     required this.onTap,
     this.imageUrl,
@@ -141,22 +181,25 @@ class _CategoryTile extends StatelessWidget {
 
   final String name;
   final IconData icon;
+  final String illustration;
   final String? imageUrl;
   final bool selected;
   final VoidCallback onTap;
 
-  static const double _size = 56;
+  static const double _size = 64;
+  static const _radius = BorderRadius.all(Radius.circular(20));
 
   @override
   Widget build(BuildContext context) {
     final accent = accentOf(context);
+    final dark = Theme.of(context).brightness == Brightness.dark;
     final hasImage = imageUrl != null && imageUrl!.isNotEmpty;
 
     return Semantics(
       button: true,
       selected: selected,
       child: InkWell(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: _radius,
         onTap: onTap,
         child: SizedBox(
           width: CategorySelector._tileWidth,
@@ -168,14 +211,21 @@ class _CategoryTile extends StatelessWidget {
                 curve: Curves.easeOut,
                 width: _size,
                 height: _size,
-                // The ring around a selected image; an icon tile fills instead.
-                padding: EdgeInsets.all(hasImage && selected ? 2.5 : 0),
+                padding: EdgeInsets.all(hasImage ? 0 : 10),
                 decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: selected ? accent : fieldFillOf(context),
+                  borderRadius: _radius,
+                  color: dark ? const Color(0xFF1E1E1E) : serviceTile,
+                  // The selected one is outlined, in the brand's black.
+                  border: Border.all(
+                    color: selected ? accent : Colors.transparent,
+                    width: 2,
+                  ),
                 ),
                 child: hasImage
-                    ? ClipOval(
+                    ? ClipRRect(
+                        borderRadius: const BorderRadius.all(
+                          Radius.circular(18),
+                        ),
                         child: AppPhoto(
                           imageUrl,
                           icon: icon,
@@ -183,12 +233,11 @@ class _CategoryTile extends StatelessWidget {
                           height: _size,
                         ),
                       )
-                    : Icon(
-                        icon,
-                        size: 24,
-                        color: selected
-                            ? Theme.of(context).colorScheme.onPrimary
-                            : accent,
+                    : Image.asset(
+                        illustration,
+                        fit: BoxFit.contain,
+                        // Decoded at the size it's shown, not the file's.
+                        cacheWidth: 144,
                       ),
               ),
               const SizedBox(height: 6),
@@ -198,10 +247,10 @@ class _CategoryTile extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontSize: 11.5,
+                  fontSize: 12,
                   height: 1.2,
                   fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
-                  color: selected ? accent : mutedText,
+                  color: selected ? accent : null,
                 ),
               ),
             ],

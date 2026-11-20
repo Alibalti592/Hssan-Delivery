@@ -39,9 +39,10 @@ dev_dependencies:
 flutter:
   uses-material-design: true
 
-  # The home screen's service illustrations.
+  # The home screen's service and category illustrations.
   assets:
     - assets/services/
+    - assets/categories/
 
   # Bundled so the app renders text without a network fetch to Google Fonts —
   # on web, Flutter's CanvasKit renderer otherwise fetches Roboto from

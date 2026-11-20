@@ -369,7 +369,7 @@ void main() {
     await tester.pumpWidget(_wrap());
     await tester.pumpAndSettle();
 
-    expect(find.text('Services'), findsOneWidget);
+    expect(find.text('Factures'), findsOneWidget); // the rest still shows
     expect(find.text('Impossible de charger les promotions.'), findsNothing);
   });
 
@@ -450,9 +450,8 @@ void main() {
     );
   });
 
-  testWidgets('"Que souhaitez-vous manger ?" filters the restaurants below', (
-    tester,
-  ) async {
+  testWidgets('"Que souhaitez-vous manger ?" sits under the services, '
+      'and a category opens its restaurants', (tester) async {
     tester.view.physicalSize = const Size(800, 2400);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
@@ -491,49 +490,49 @@ void main() {
       matching: find.text(name),
     );
 
-    // Right above the restaurants, "Tout" first.
+    // Under the services, above the offers and the restaurants.
     final title = find.text('Que souhaitez-vous manger ?');
     expect(title, findsOneWidget);
     expect(
       tester.getTopLeft(title).dy,
-      greaterThan(tester.getTopLeft(find.text('Services')).dy),
+      greaterThan(tester.getTopLeft(find.text('Colis')).dy),
     );
     expect(
       tester.getTopLeft(title).dy,
       lessThan(tester.getTopLeft(find.text('Restaurants').last).dy),
     );
-    expect(tile('Tout'), findsOneWidget);
-    expect(find.text('Napoli Express'), findsOneWidget);
-    expect(find.text('Douceurs du Lac'), findsOneWidget);
+    // No "Tout" here: every category is a way in, not a filter.
+    expect(tile('Tout'), findsNothing);
+    expect(tile('Pizza'), findsOneWidget);
+
+    // Each drawn in 3D, like the services.
+    final pictures = tester
+        .widgetList<Image>(
+          find.descendant(
+            of: find.byType(CategorySelector),
+            matching: find.byType(Image),
+          ),
+        )
+        .map(
+          (image) => ((image.image as ResizeImage).imageProvider as AssetImage)
+              .assetName,
+        );
+    expect(pictures, [
+      'assets/categories/pizza.webp',
+      'assets/categories/cake.webp',
+    ]);
 
     await tester.tap(tile('Sucré'));
-    await tester.pumpAndSettle();
-
-    // Filtered in place: still on the home screen.
-    expect(find.byType(RestaurantsScreen), findsNothing);
-    expect(find.text('Douceurs du Lac'), findsOneWidget);
-    expect(find.text('Napoli Express'), findsNothing);
-
-    await tester.tap(tile('Tout'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Napoli Express'), findsOneWidget);
-    expect(find.text('Douceurs du Lac'), findsOneWidget);
-
-    // "Voir tout" keeps the category picked here.
-    await tester.tap(tile('Pizza'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Voir tout'));
     await tester.pumpAndSettle();
 
     final list = find.byType(RestaurantsScreen);
     expect(list, findsOneWidget);
     expect(
-      find.descendant(of: list, matching: find.text('Napoli Express')),
+      find.descendant(of: list, matching: find.text('Douceurs du Lac')),
       findsOneWidget,
     );
     expect(
-      find.descendant(of: list, matching: find.text('Douceurs du Lac')),
+      find.descendant(of: list, matching: find.text('Napoli Express')),
       findsNothing,
     );
   });
@@ -769,7 +768,7 @@ void main() {
 
     expect(find.text('Les plus commandés'), findsNothing);
     expect(find.text('Restaurants populaires'), findsNothing);
-    expect(find.text('Services'), findsOneWidget);
+    expect(find.text('Factures'), findsOneWidget); // the rest still shows
   });
 
   testWidgets('no category row while no restaurant has a category', (
@@ -780,7 +779,7 @@ void main() {
 
     expect(find.byType(CategorySelector), findsNothing);
     expect(find.text('Que souhaitez-vous manger ?'), findsNothing);
-    expect(find.text('Services'), findsOneWidget);
+    expect(find.text('Factures'), findsOneWidget); // the rest still shows
   });
 
   testWidgets('photos below the fold wait until scrolled near', (tester) async {

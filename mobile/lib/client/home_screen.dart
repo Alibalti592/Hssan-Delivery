@@ -91,12 +91,9 @@ class _HomeScreenState extends State<HomeScreen> {
   late Future<List<Restaurant>> _restaurantsFuture;
   List<ClientOrder> _activeOrders = const [];
 
-  /// "Que souhaitez-vous manger ?", above the restaurants; empty (and left
+  /// "Que souhaitez-vous manger ?", under the services; empty (and left
   /// out) until loaded, and when no restaurant has a category yet.
   List<RestaurantCategory> _categories = const [];
-
-  /// The category the restaurants below are filtered by; null is "Tout".
-  int? _categoryId;
 
   /// "Vos plus commandés": dishes from the customer's own recent orders,
   /// still on the menu today. Empty (and left out) for a new customer.
@@ -230,11 +227,7 @@ class _HomeScreenState extends State<HomeScreen> {
           .read<CatalogueRepository>()
           .listRestaurantCategories(refresh: refresh);
       if (!mounted) return;
-      setState(() {
-        _categories = categories;
-        // A filter with no tile to undo it would hide restaurants for good.
-        if (!categories.any((c) => c.id == _categoryId)) _categoryId = null;
-      });
+      setState(() => _categories = categories);
     } catch (_) {
       // Best effort: the restaurants are all still one tap away.
     }
@@ -264,13 +257,14 @@ class _HomeScreenState extends State<HomeScreen> {
     ]);
   }
 
-  /// The full restaurant list, on the category picked here if any.
-  void _openRestaurants() {
+  /// The full restaurant list, on category [categoryId] if given (its
+  /// row there undoes it).
+  void _openRestaurants({int? categoryId}) {
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => Scaffold(
           appBar: AppBar(title: const Text('Restaurants')),
-          body: RestaurantsScreen(initialCategoryId: _categoryId),
+          body: RestaurantsScreen(initialCategoryId: categoryId),
         ),
       ),
     );
@@ -414,11 +408,23 @@ class _HomeScreenState extends State<HomeScreen> {
                 context,
               ).push(MaterialPageRoute(builder: (_) => const SearchScreen())),
             ),
-            const HomeSectionHeader(title: 'Services'),
+            const SizedBox(height: 20),
             _ServicesGrid(onTap: _openService),
+            // Right under the services: what to eat is the next question.
+            // A tap opens the restaurants of that category.
+            if (_categories.isNotEmpty) ...[
+              const HomeSectionHeader(title: 'Que souhaitez-vous manger ?'),
+              CategorySelector(
+                categories: _categories,
+                showAll: false,
+                onSelected: (id) {
+                  if (id != null) _openRestaurants(categoryId: id);
+                },
+              ),
+            ],
             // Below the services, not above: the services are how the app is
             // used, and the offers would otherwise push them below the fold
-            // on small phones. The banners still show on the first screen.
+            // on small phones.
             _PromotionsSection(future: _promotionsFuture, onRetry: _refresh),
             if (_favourites.isNotEmpty) ...[
               const HomeSectionHeader(
@@ -438,15 +444,6 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ],
             ..._popularSections(),
-            // Right above the restaurants it filters.
-            if (_categories.isNotEmpty) ...[
-              const HomeSectionHeader(title: 'Que souhaitez-vous manger ?'),
-              CategorySelector(
-                categories: _categories,
-                selectedId: _categoryId,
-                onSelected: (id) => setState(() => _categoryId = id),
-              ),
-            ],
             HomeSectionHeader(
               title: 'Restaurants',
               subtitle: 'Les restaurants ouverts en premier',
@@ -454,7 +451,6 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             _RestaurantsPreview(
               future: _restaurantsFuture,
-              categoryId: _categoryId,
               onTapRestaurant: _openRestaurant,
             ),
             _NewArrivals(
@@ -779,19 +775,15 @@ class _ServiceTile extends StatelessWidget {
   }
 }
 
-/// The restaurants under the category row: open ones first, a few at
+/// The restaurants at the bottom of the feed: open ones first, a few at
 /// most ("Voir tout" has the full list).
 class _RestaurantsPreview extends StatelessWidget {
   const _RestaurantsPreview({
     required this.future,
     required this.onTapRestaurant,
-    this.categoryId,
   });
 
   final Future<List<Restaurant>> future;
-
-  /// Only the restaurants with this category; null shows them all.
-  final int? categoryId;
   final void Function(Restaurant) onTapRestaurant;
 
   static const int _shown = 4;
@@ -821,21 +813,14 @@ class _RestaurantsPreview extends StatelessWidget {
           );
         }
 
-        final categoryId = this.categoryId;
         final restaurants = openFirst(
-          (snapshot.data ?? const <Restaurant>[]).where(
-            (r) => categoryId == null || r.hasCategory(categoryId),
-          ),
+          snapshot.data ?? const <Restaurant>[],
         ).take(_shown).toList();
 
         if (restaurants.isEmpty) {
-          return Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-            child: Text(
-              categoryId == null
-                  ? 'Aucun restaurant disponible pour le moment.'
-                  : 'Aucun restaurant dans cette catégorie pour le moment.',
-            ),
+          return const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            child: Text('Aucun restaurant disponible pour le moment.'),
           );
         }
 
