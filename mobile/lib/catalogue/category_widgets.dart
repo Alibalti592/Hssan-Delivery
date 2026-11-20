@@ -62,9 +62,8 @@ String categoryIllustration(String key) =>
 /// "Tout": every restaurant, whatever its category.
 const allCategoriesIllustration = 'assets/categories/all.webp';
 
-/// The row of restaurant categories: an illustrated tile and a name each,
-/// scrolling sideways, "Tout" first unless [showAll] is false (the home
-/// screen, where a tap opens a category rather than filtering).
+/// The row of restaurant categories that filters a restaurant list: an
+/// illustrated tile and a name each, scrolling sideways, "Tout" first.
 ///
 /// The tile of [selectedId] (or "Tout" when null) is highlighted, and
 /// [onSelected] gets the tapped category's id, or null for "Tout" and for a
@@ -74,14 +73,12 @@ class CategorySelector extends StatefulWidget {
     required this.categories,
     required this.onSelected,
     this.selectedId,
-    this.showAll = true,
     super.key,
   });
 
   final List<RestaurantCategory> categories;
   final int? selectedId;
   final ValueChanged<int?> onSelected;
-  final bool showAll;
 
   static const double _tileWidth = 78;
   static const double _gap = 4;
@@ -110,7 +107,7 @@ class _CategorySelectorState extends State<CategorySelector> {
       final position = _scroll.position;
       final tileEnd =
           CategorySelector._padding +
-          (index + (widget.showAll ? 1 : 0)) * extent +
+          (index + 1) * extent +
           CategorySelector._tileWidth;
       final overflow =
           tileEnd + CategorySelector._padding - position.viewportDimension;
@@ -139,11 +136,10 @@ class _CategorySelectorState extends State<CategorySelector> {
         padding: const EdgeInsets.symmetric(
           horizontal: CategorySelector._padding,
         ),
-        itemCount: categories.length + (widget.showAll ? 1 : 0),
+        itemCount: categories.length + 1,
         separatorBuilder: (_, _) =>
             const SizedBox(width: CategorySelector._gap),
         itemBuilder: (context, index) {
-          if (!widget.showAll) index++;
           if (index == 0) {
             return _CategoryTile(
               name: 'Tout',
