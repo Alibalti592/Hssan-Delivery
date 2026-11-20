@@ -55,12 +55,14 @@ test('builds a menu on the restaurant page: a category inline, then products one
   await expect(drawer.getByLabel('Category')).toHaveValue('7');
 
   await drawer.getByLabel('Name', { exact: true }).fill('Margherita');
+  await drawer.getByLabel('Description').fill('Tomate, mozzarella, basilic');
   await drawer.getByLabel('Price (DT)').fill('14.500');
   await drawer.getByRole('button', { name: 'Add & add another' }).click();
 
   // The panel stays open, blank, on the same category.
   await expect(drawer.getByText('“Margherita” added. Add the next one.')).toBeVisible();
   await expect(drawer.getByLabel('Name', { exact: true })).toHaveValue('');
+  await expect(drawer.getByLabel('Description')).toHaveValue('');
   await expect(drawer.getByLabel('Category')).toHaveValue('7');
 
   await drawer.getByLabel('Name', { exact: true }).fill('Regina');
@@ -72,7 +74,56 @@ test('builds a menu on the restaurant page: a category inline, then products one
   await expect(page.getByLabel('Margherita available')).toBeChecked();
   await expect(page.getByLabel('Regina available')).toBeChecked();
   expect(products).toMatchObject([
-    { name: 'Margherita', price: '14.500', categoryId: 7 },
-    { name: 'Regina', price: '16.000', categoryId: 7 },
+    { name: 'Margherita', description: 'Tomate, mozzarella, basilic', price: '14.500', categoryId: 7 },
+    { name: 'Regina', description: null, price: '16.000', categoryId: 7 },
   ]);
+});
+
+test('editing a dish keeps its description (what is inside a box)', async ({ page }) => {
+  await mockStats(page);
+  const box = {
+    id: 21,
+    name: 'Box Burger',
+    description: '1 burger, frites, 4 nuggets et une boisson',
+    price: '18.500',
+    options: [],
+    extraGroups: [],
+    isAvailable: true,
+    photoUrl: null,
+    restaurantId: 3,
+    categoryId: 7,
+  };
+  let saved: Record<string, unknown> | null = null;
+  const json = (route: import('@playwright/test').Route, body: unknown) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
+
+  await page.route('**/api/admin/restaurants/3', (route) =>
+    json(route, { id: 3, name: 'Click BOX', description: null, isAvailable: true, type: 'RESTAURANT', photoUrl: null }),
+  );
+  await page.route('**/api/admin/restaurants/3/categories**', (route) =>
+    json(route, [{ id: 7, name: 'Nos Box', restaurantId: 3 }]),
+  );
+  await page.route('**/api/admin/restaurants/3/products**', (route) =>
+    json(route, { items: [box], meta: { page: 1, limit: 100, total: 1, pages: 1 } }),
+  );
+  await page.route('**/api/admin/products/21', (route) => {
+    saved = route.request().postDataJSON();
+    return json(route, { ...box, ...saved });
+  });
+
+  await loginAsAdmin(page);
+  await page.goto('/restaurants/3');
+  await page.getByRole('button', { name: /Box Burger/ }).click();
+
+  const drawer = page.getByRole('dialog', { name: 'Edit product' });
+  await expect(drawer.getByLabel('Description')).toHaveValue('1 burger, frites, 4 nuggets et une boisson');
+  await drawer.getByLabel('Price (DT)').fill('19.000');
+  await drawer.getByRole('button', { name: /Save/ }).click();
+
+  await expect
+    .poll(() => saved)
+    .toMatchObject({
+      price: '19.000',
+      description: '1 burger, frites, 4 nuggets et une boisson',
+    });
 });
