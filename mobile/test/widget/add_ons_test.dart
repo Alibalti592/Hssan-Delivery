@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/testing.dart';
 import 'package:mobile/cart/cart.dart';
+import 'package:mobile/catalogue/add_on_card.dart';
 import 'package:mobile/catalogue/add_ons.dart';
 import 'package:mobile/catalogue/catalogue_models.dart';
 import 'package:mobile/catalogue/catalogue_repository.dart';
@@ -168,14 +169,28 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Envie d’un petit plus ?'), findsOneWidget);
-    expect(find.text('Sauces'), findsOneWidget);
-    expect(find.text('Suppléments'), findsOneWidget);
-    expect(find.text('Boissons'), findsOneWidget);
+    // One row of cards you swipe sideways, drinks first: the cart's look.
+    final cards = tester
+        .widgetList<AddOnCard>(find.byType(AddOnCard))
+        .map((c) => c.product.name)
+        .toList();
+    expect(cards.first, 'Coca-Cola');
+    expect(cards, containsAll(['Sauce algérienne', 'Coca-Cola']));
     expect(find.text('15.000 DT'), findsWidgets);
 
-    await tester.tap(find.text('Sauce algérienne'));
     await tester.tap(find.text('Coca-Cola'));
+    await tester.drag(find.byType(AddOnCard).first, const Offset(-300, 0));
     await tester.pumpAndSettle();
+    await tester.tap(find.text('Sauce algérienne'));
+    await tester.pumpAndSettle();
+    // Picked ones say so (a tick), and a second tap would take them back.
+    expect(
+      find.descendant(
+        of: find.widgetWithText(AddOnCard, 'Coca-Cola'),
+        matching: find.byIcon(Icons.check),
+      ),
+      findsOneWidget,
+    );
     // 15 + 1 + 2.5, on the button.
     expect(find.text('18.500 DT'), findsOneWidget);
 

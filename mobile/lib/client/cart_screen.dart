@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../cart/cart.dart';
+import '../catalogue/add_on_card.dart';
 import '../catalogue/add_ons.dart';
 import '../catalogue/catalogue_models.dart';
 import '../catalogue/catalogue_repository.dart';
@@ -228,7 +229,7 @@ class _CompleteOrderState extends State<_CompleteOrder> {
               separatorBuilder: (_, _) => const SizedBox(width: 10),
               itemBuilder: (context, index) {
                 final (kind, product) = shown[index];
-                return _AddOnCard(
+                return AddOnCard(
                   product: product,
                   kind: kind,
                   onAdd: () => cart.add(
@@ -241,102 +242,6 @@ class _CompleteOrderState extends State<_CompleteOrder> {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _AddOnCard extends StatelessWidget {
-  const _AddOnCard({
-    required this.product,
-    required this.kind,
-    required this.onAdd,
-  });
-
-  final Product product;
-  final AddOnKind kind;
-  final VoidCallback onAdd;
-
-  IconData get _icon => switch (kind) {
-    AddOnKind.drink => Icons.local_drink_outlined,
-    AddOnKind.sauce => Icons.water_drop_outlined,
-    AddOnKind.supplement => Icons.add_circle_outline,
-  };
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 132,
-      child: Material(
-        color: Theme.of(context).colorScheme.surface,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: BorderSide(color: cardBorderOf(context)),
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: onAdd,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              SizedBox(
-                height: 92,
-                child: AppPhoto(product.photoUrl, icon: _icon, iconSize: 28),
-              ),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(10, 8, 8, 8),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        product.name,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w700,
-                          height: 1.2,
-                        ),
-                      ),
-                      const Spacer(),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              '${addOnPrice(product)} DT',
-                              style: const TextStyle(
-                                fontSize: 12.5,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                          ),
-                          Semantics(
-                            button: true,
-                            label: 'Ajouter ${product.name}',
-                            child: Container(
-                              width: 28,
-                              height: 28,
-                              decoration: const BoxDecoration(
-                                color: navy,
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(
-                                Icons.add,
-                                size: 18,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }
