@@ -42,6 +42,9 @@ const mutedText = Color(0xFF8B93A0);
 const fieldFill = Color(0xFFEAF0F7);
 const cardBorder = Color(0xFFEDF0F4);
 
+/// The home screen's service tiles, behind their illustrations.
+const serviceTile = Color(0xFFF2F4F7);
+
 /// Dark-mode counterparts of [fieldFill] / [cardBorder].
 const _fieldFillDark = Color(0xFF2A2A2A);
 const _cardBorderDark = Color(0xFF2E2E2E);

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/testing.dart';
 import 'package:mobile/addresses/address_repository.dart';
@@ -245,6 +246,23 @@ void main() {
     expect(find.text('Courses'), findsOneWidget);
     expect(find.text('Colis'), findsOneWidget);
     expect(find.text('Pressing'), findsNothing);
+
+    // Each tile shows its illustration, and the file ships with the app.
+    final images = tester
+        .widgetList<Image>(find.byType(Image))
+        .map((image) => image.image)
+        .whereType<ResizeImage>()
+        .map((image) => (image.imageProvider as AssetImage).assetName)
+        .toList();
+    expect(images, [
+      'assets/services/restaurants.webp',
+      'assets/services/factures.webp',
+      'assets/services/courses.webp',
+      'assets/services/colis.webp',
+    ]);
+    for (final asset in images) {
+      expect((await rootBundle.load(asset)).lengthInBytes, greaterThan(0));
+    }
   });
 
   testWidgets('tapping Factures opens the bill providers, by kind', (
@@ -269,6 +287,9 @@ void main() {
     await tester.pumpWidget(_wrap());
     await tester.pumpAndSettle();
 
+    // The second row of services is below the fold of the test's screen.
+    await tester.ensureVisible(find.text('Colis'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Colis'));
     await tester.pumpAndSettle();
 
@@ -287,6 +308,12 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
+      // Below the services grid, out of the test screen's first view.
+      await tester.scrollUntilVisible(
+        find.text('Promotions'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
 
       // findsWidgets: the carousel loops, so a card can be built twice.
       expect(find.text('Summer Discount'), findsWidgets);
@@ -410,6 +437,9 @@ void main() {
     await tester.pumpAndSettle();
     requestedUrl = null; // discard the home feed's own restaurant-type fetch
 
+    // The second row of services is below the fold of the test's screen.
+    await tester.ensureVisible(find.text('Courses'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Courses'));
     await tester.pumpAndSettle();
 
