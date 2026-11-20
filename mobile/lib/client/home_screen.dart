@@ -35,16 +35,16 @@ import 'search_screen.dart';
 class _Service {
   const _Service({
     required this.title,
-    required this.subtitle,
-    required this.icon,
+    required this.image,
     this.restaurantType,
     this.isParcel = false,
     this.isBills = false,
   });
 
   final String title;
-  final String subtitle;
-  final IconData icon;
+
+  /// The illustration on the tile (assets/services/).
+  final String image;
 
   /// Set when tapping this card should open RestaurantsScreen browsing
   /// this type — null for a service with its own screen (Colis, Factures).
@@ -60,28 +60,20 @@ class _Service {
 const _services = [
   _Service(
     title: 'Restaurants',
-    subtitle: 'Vos plats préférés',
-    icon: Icons.restaurant_menu,
+    image: 'assets/services/restaurants.webp',
     restaurantType: RestaurantType.restaurant,
   ),
   _Service(
     title: 'Factures',
-    subtitle: 'Paiement rapide',
-    icon: Icons.receipt_long,
+    image: 'assets/services/factures.webp',
     isBills: true,
   ),
   _Service(
     title: 'Courses',
-    subtitle: 'Produits du quotidien',
-    icon: Icons.shopping_basket_outlined,
+    image: 'assets/services/courses.webp',
     restaurantType: RestaurantType.grocery,
   ),
-  _Service(
-    title: 'Colis',
-    subtitle: 'Envoi rapide',
-    icon: Icons.local_shipping_outlined,
-    isParcel: true,
-  ),
+  _Service(title: 'Colis', image: 'assets/services/colis.webp', isParcel: true),
 ];
 
 class HomeScreen extends StatefulWidget {
@@ -422,26 +414,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 context,
               ).push(MaterialPageRoute(builder: (_) => const SearchScreen())),
             ),
-            const HomeSectionHeader(title: 'Services'),
-            SizedBox(
-              height: 144,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                itemCount: _services.length,
-                separatorBuilder: (_, _) => const SizedBox(width: 12),
-                itemBuilder: (context, index) {
-                  final service = _services[index];
-                  return _ServiceCard(
-                    service: service,
-                    onTap: () => _openService(service),
-                  );
-                },
-              ),
-            ),
+            const SizedBox(height: 20),
+            _ServicesGrid(onTap: _openService),
             // Below the services, not above: the services are how the app is
             // used, and the offers would otherwise push them below the fold
-            // on small phones. The banners still show on the first screen.
+            // on small phones.
             _PromotionsSection(future: _promotionsFuture, onRetry: _refresh),
             if (_favourites.isNotEmpty) ...[
               const HomeSectionHeader(
@@ -720,59 +697,82 @@ class _SearchBar extends StatelessWidget {
   }
 }
 
-class _ServiceCard extends StatelessWidget {
-  const _ServiceCard({required this.service, required this.onTap});
+/// The four services, two by two: a big illustration on a light tile, the
+/// name under it.
+class _ServicesGrid extends StatelessWidget {
+  const _ServicesGrid({required this.onTap});
+
+  final void Function(_Service) onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    Widget row(int first) => Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: _ServiceTile(
+            service: _services[first],
+            onTap: () => onTap(_services[first]),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _ServiceTile(
+            service: _services[first + 1],
+            onTap: () => onTap(_services[first + 1]),
+          ),
+        ),
+      ],
+    );
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Column(children: [row(0), const SizedBox(height: 14), row(2)]),
+    );
+  }
+}
+
+class _ServiceTile extends StatelessWidget {
+  const _ServiceTile({required this.service, required this.onTap});
 
   final _Service service;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: 104,
-      child: Material(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(16),
-          onTap: onTap,
-          child: Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: cardBorder),
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    return Semantics(
+      button: true,
+      label: service.title,
+      excludeSemantics: true,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: onTap,
+        child: Column(
+          children: [
+            AspectRatio(
+              aspectRatio: 1.4,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: dark ? const Color(0xFF1E1E1E) : serviceTile,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                padding: const EdgeInsets.all(10),
+                child: Image.asset(
+                  service.image,
+                  fit: BoxFit.contain,
+                  // Decoded at the size it's shown, not the file's.
+                  cacheWidth: 360,
+                ),
+              ),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  width: 40,
-                  height: 40,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: fieldFill,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Icon(service.icon, color: navy, size: 20),
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  service.title,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w800,
-                    fontSize: 13,
-                  ),
-                ),
-                const SizedBox(height: 1),
-                Text(
-                  service.subtitle,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 10.5, color: mutedText),
-                ),
-              ],
+            const SizedBox(height: 8),
+            Text(
+              service.title,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
             ),
-          ),
+          ],
         ),
       ),
     );
