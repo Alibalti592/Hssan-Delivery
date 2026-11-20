@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../cart/cart.dart';
+import '../catalogue/add_on_card.dart';
 import '../catalogue/add_ons.dart';
 import '../catalogue/catalogue_models.dart';
 import '../catalogue/catalogue_repository.dart';
@@ -55,11 +56,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   /// The ones ticked, by product id: one of each goes in the cart with
   /// the dish.
   final Set<int> _addOns = {};
-
-  /// The kinds opened past their first few items.
-  final Set<AddOnKind> _expanded = {};
-
-  static const _addOnsShown = 5;
 
   bool get _hasPhoto =>
       widget.product.photoUrl != null && widget.product.photoUrl!.isNotEmpty;
@@ -390,10 +386,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 ],
               ),
             ),
-          if (_addOnGroups.isNotEmpty)
+          if (_addOnGroups.isNotEmpty) ...[
             const SliverToBoxAdapter(child: _AddOnsHeading()),
-          for (final group in _addOnGroups)
-            SliverToBoxAdapter(child: _addOnSection(group)),
+            SliverToBoxAdapter(child: _addOnsRow()),
+          ],
           const SliverToBoxAdapter(child: SizedBox(height: 24)),
         ],
       ),
@@ -410,53 +406,34 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     );
   }
 
-  /// One kind of the restaurant's extras: its first few, and the rest a
-  /// tap away.
-  Widget _addOnSection(AddOnGroup group) {
-    final expanded = _expanded.contains(group.kind);
-    final shown = expanded
-        ? group.products
-        : group.products.take(_addOnsShown).toList();
-    final hidden = group.products.length - shown.length;
-    final picked = group.products.where((p) => _addOns.contains(p.id)).length;
+  /// The restaurant's drinks, sauces and supplements in one row of cards
+  /// you swipe sideways, drinks first: the same as the cart's "Complétez
+  /// votre commande". A tap picks one to go with the dish.
+  Widget _addOnsRow() {
+    const order = [AddOnKind.drink, AddOnKind.sauce, AddOnKind.supplement];
+    final addOns = [
+      for (final kind in order)
+        for (final group in _addOnGroups.where((g) => g.kind == kind))
+          for (final product in group.products) (kind, product),
+    ];
 
-    return _ChoiceSection(
-      title: group.kind.title,
-      subtitle: picked == 0
-          ? 'Ajoutez-en à votre commande'
-          : picked == 1
-          ? '1 ajouté'
-          : '$picked ajoutés',
-      badge: _Badge.optional,
-      children: [
-        for (final product in shown)
-          _ChoiceRow(
-            label: product.name,
-            price: '+${addOnPrice(product)} DT',
-            multiple: true,
-            selected: _addOns.contains(product.id),
-            onTap: () => _toggleAddOn(product),
-          ),
-        if (hidden > 0)
-          InkWell(
-            onTap: () => setState(() => _expanded.add(group.kind)),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-              child: Row(
-                children: [
-                  Text(
-                    'Voir les $hidden autres',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 14,
-                    ),
-                  ),
-                  const Icon(Icons.expand_more, size: 20),
-                ],
-              ),
-            ),
-          ),
-      ],
+    return SizedBox(
+      height: 196 + 28,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.fromLTRB(20, 14, 20, 14),
+        itemCount: addOns.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 10),
+        itemBuilder: (context, index) {
+          final (kind, product) = addOns[index];
+          return AddOnCard(
+            product: product,
+            kind: kind,
+            picked: _addOns.contains(product.id),
+            onAdd: () => _toggleAddOn(product),
+          );
+        },
+      ),
     );
   }
 
@@ -706,98 +683,6 @@ class _ChoiceChips extends StatelessWidget {
             ),
         ],
       ),
-    );
-  }
-}
-
-/// One choice: a checkbox (several) or a round button (one), its name and
-/// its price, with the whole row as the tap target.
-class _ChoiceRow extends StatelessWidget {
-  const _ChoiceRow({
-    required this.label,
-    required this.price,
-    required this.multiple,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String label;
-  final String price;
-  final bool multiple;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      checked: selected,
-      button: true,
-      child: Material(
-        color: selected ? const Color(0xFFF7F8FA) : Colors.white,
-        child: InkWell(
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
-            child: Row(
-              children: [
-                _Mark(selected: selected, round: !multiple),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Text(
-                    label,
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                    ),
-                  ),
-                ),
-                Text(
-                  price,
-                  style: TextStyle(
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.w600,
-                    color: const Color(0xFF3A4250),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// The tick of a choice: a rounded square (several) or a circle (one),
-/// filled black with a white check, or a black ring, once picked.
-class _Mark extends StatelessWidget {
-  const _Mark({required this.selected, required this.round});
-
-  final bool selected;
-  final bool round;
-
-  @override
-  Widget build(BuildContext context) {
-    const size = 22.0;
-    final accent = accentOf(context);
-
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 160),
-      curve: Curves.easeOut,
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        color: selected && !round ? accent : Colors.white,
-        shape: round ? BoxShape.circle : BoxShape.rectangle,
-        borderRadius: round ? null : BorderRadius.circular(6),
-        border: Border.all(
-          color: selected ? accent : const Color(0xFFC3C9D2),
-          width: selected && round ? 6.5 : 1.8,
-        ),
-      ),
-      child: selected && !round
-          ? const Icon(Icons.check_rounded, size: 16, color: Colors.white)
-          : null,
     );
   }
 }
