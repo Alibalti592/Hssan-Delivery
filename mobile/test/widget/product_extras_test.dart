@@ -175,7 +175,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Sauces'), findsOneWidget);
-    expect(find.text('Gratuit'), findsNWidgets(2));
+    // Free sauces carry no price; paid choices do.
+    expect(find.text('Gratuit'), findsNothing);
     expect(find.text('+1.500 DT'), findsOneWidget);
     expect(find.text('Choisissez-en 1'), findsOneWidget);
     expect(find.text('Obligatoire'), findsOneWidget);
@@ -212,8 +213,12 @@ void main() {
     await tester.tap(find.text('Ajouter'));
     await tester.pumpAndSettle();
 
-    // A shortcut to the cart in the confirmation.
+    // A shortcut to the cart in the confirmation, gone on its own after a
+    // few seconds: kept, it covered the cart's COMMANDER button for good.
     expect(find.text('VOIR LE PANIER'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 4));
+    await tester.pumpAndSettle();
+    expect(find.text('VOIR LE PANIER'), findsNothing);
 
     final line = cart.lines.single;
     expect(line.extras.map((e) => '${e.group}/${e.name}'), [

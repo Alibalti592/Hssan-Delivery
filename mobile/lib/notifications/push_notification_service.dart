@@ -218,6 +218,9 @@ class PushNotificationService {
 
     messengerKey.currentState?.showSnackBar(
       SnackBar(
+        // Gone on its own like any other notice, "VOIR" button or not (with
+        // one it would otherwise stay over the screen until swiped away).
+        persist: false,
         content: Text(text),
         action:
             (message.data['orderId'] != null ||
