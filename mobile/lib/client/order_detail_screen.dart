@@ -265,7 +265,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     order: order,
                     courier: courier,
                     heading: heading,
-                    goingToPickup: heading != null && heading == pickup,
+                    goingToPickup: _goingToPickup(order),
                   ),
                   const SizedBox(height: 16),
                 ],
@@ -571,10 +571,19 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 /// Where the courier is going next: the pickup until they've collected,
 /// then the client. A bill's courier collects at the client's door, pays at
 /// the counter (no pin), then comes back.
+/// Accepted but not picked up yet: the courier is on the way to the
+/// restaurant (or the parcel's sender). A bill's courier comes to the
+/// client first instead.
+bool _goingToPickup(ClientOrder order) =>
+    !order.isBill && order.deliveryStatus == DeliveryStatus.accepted;
+
 LatLng? _headingTo(ClientOrder order, LatLng? pickup, LatLng? dropOff) {
   switch (order.deliveryStatus) {
     case DeliveryStatus.accepted:
-      return pickup ?? dropOff;
+      // To the pickup point, when it's known (a parcel's). A restaurant has
+      // none on the map: no arrival time then, rather than one to the
+      // client's door that leaves out the stop at the restaurant.
+      return order.isBill ? dropOff : pickup;
     case DeliveryStatus.pickedUp:
       return order.isBill ? null : dropOff;
     case DeliveryStatus.onTheWay:
@@ -628,7 +637,9 @@ class _CourierProgress extends StatelessWidget {
     if (courier == null) {
       note = 'Sa position s\'affichera sur la carte dans un instant.';
     } else if (heading == null) {
-      note = 'Suivez-le sur la carte.';
+      note = goingToPickup
+          ? 'Il récupère votre commande, puis vient chez vous.'
+          : 'Suivez-le sur la carte.';
     } else {
       final km = courier.distanceKmTo(heading);
       label = goingToPickup ? 'Au point de retrait dans' : 'Arrivée estimée';
